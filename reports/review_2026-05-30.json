@@ -1,0 +1,13 @@
+{
+  "performance_summary": "3 trades, 2 wins, 1 loss, win_rate=66.67%, total_pnl=0.22",
+  "what_worked": [
+    "SPY sell at 756.48 delivered 15% gain",
+    "AAPL sell at 201.33 delivered 12% gain"
+  ],
+  "what_failed": [
+    "QQQ stop-loss triggered at 480.2 causing -5% loss"
+  ],
+  "strategy_adjustments": [],
+  "market_outlook": "Mixed session with gains from equity sells but a minor loss on QQQ stop-loss. Market shows no clear directional bias; next session may see continued volatility.",
+  "confidence_score": 0.5
+}

@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ATOS Dashboard</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#15171a;color:#c4c8cc;font-family:Inter,-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased}
+nav{display:flex;background:rgba(255,255,255,.02);border-bottom:1px solid rgba(255,255,255,.06);padding:0 20px;overflow-x:auto;position:sticky;top:0;z-index:10;backdrop-filter:blur(12px)}
+nav a{padding:14px 20px;font-size:12px;font-weight:500;letter-spacing:.8px;text-transform:uppercase;color:#838990;border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap;cursor:pointer;text-decoration:none}
+nav a:hover{color:#c4c8cc}
+nav a.active{color:#e8eaed;border-bottom-color:#7b9ea3}
+#app{max-width:1400px;margin:0 auto;padding:24px}
+.page{display:none}.page.show{display:block}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:24px}
+.kpi{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.04);border-radius:12px;padding:16px}
+.kpi .lbl{font-size:9px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:#838990;margin-bottom:4px}
+.kpi .val{font-size:26px;font-weight:600;letter-spacing:-.5px;color:#e8eaed}
+.kpi .sub{font-size:11px;color:#838990;margin-top:2px}
+.up{color:#30d158}.down{color:#ff453a}
+.card{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.04);border-radius:12px;padding:20px;margin-bottom:16px}
+.card h2{font-size:10px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:#838990;margin-bottom:14px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{padding:6px 8px;text-align:left;font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#838990;border-bottom:1px solid rgba(255,255,255,.06);white-space:nowrap}
+td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.03);white-space:nowrap}
+tr:hover td{background:rgba(255,255,255,.03)}
+.num{font-family:"JetBrains Mono","SF Mono",monospace;text-align:right}
+.sym{font-weight:500;color:#e8eaed}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+@media(max-width:768px){.grid2{grid-template-columns:1fr}}
+.log{display:flex;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.02);font-size:11px;color:#838990;line-height:1.4}
+.log .lt{color:#7b9ea3;font-family:"JetBrains Mono",monospace;font-size:10px;white-space:nowrap;min-width:80px}
+.log .lm{flex:1}
+.loading{padding:40px;text-align:center;color:#838990;font-size:13px}
+.empty{color:#838990;font-size:12px;padding:16px;text-align:center}
+.badge{display:inline-block;padding:2px 8px;font-size:9px;font-weight:600;border-radius:4px}
+.badge.up{background:rgba(48,209,88,.12);color:#30d158}
+.badge.down{background:rgba(255,69,58,.12);color:#ff453a}
+.badge.warn{background:rgba(255,204,0,.12);color:#ffcc00}
+.badge.neutral{background:rgba(255,255,255,.04);color:#838990}
+</style>
+</head>
+<body>
+<nav id="nav">
+  <a href="#" class="active" data-page="overview">Overview</a>
+  <a href="#" data-page="short">Short-Term</a>
+  <a href="#" data-page="long">Long-Term</a>
+  <a href="#" data-page="stops">Stops</a>
+  <a href="#" data-page="trades">Trades</a>
+  <a href="#" data-page="ai">AI Insights</a>
+</nav>
+<div id="app">
+<div class="page show" id="p-overview">
+  <div class="kpis" id="ov-kpis"></div>
+  <div class="grid2">
+    <div class="card"><h2>Short-Term</h2><div id="ov-short" class="loading">Loading...</div></div>
+    <div class="card"><h2>Long-Term</h2><div id="ov-long" class="loading">Loading...</div></div>
+  </div>
+  <div class="card"><h2>Activity Log</h2><div id="ov-log" class="loading">Loading...</div></div>
+</div>
+<div class="page" id="p-short">
+  <div class="kpis" id="st-kpis"></div>
+  <div class="card"><h2>Positions</h2><div id="st-table"><div class="loading">Loading...</div></div></div>
+  <div class="card"><h2>System</h2><div id="st-sys" class="loading">Loading...</div></div>
+</div>
+<div class="page" id="p-long">
+  <div class="kpis" id="lt-kpis"></div>
+  <div class="card"><h2>Holdings</h2><div id="lt-table"><div class="loading">Loading...</div></div></div>
+  <div class="card"><h2>Strategy</h2><div id="lt-strat" class="loading">Loading...</div></div>
+</div>
+<div class="page" id="p-stops">
+  <div class="card"><h2>Trailing Stops</h2><div id="sp-table"><div class="loading">Loading...</div></div></div>
+</div>
+<div class="page" id="p-trades">
+  <div class="card"><h2>Trade History</h2><div id="tr-table"><div class="loading">Loading...</div></div></div>
+</div>
+<div class="page" id="p-ai">
+  <div class="kpis" id="ai-kpis"></div>
+  <div class="card"><h2>Recent AI Decisions</h2><div id="ai-dec"><div class="loading">Loading...</div></div></div>
+  <div class="card"><h2>Learning Patterns</h2><div id="ai-pat" class="loading">Loading...</div></div>
+  <div class="card"><h2>Per-Symbol Stats</h2><div id="ai-sym" class="loading">Loading...</div></div>
+</div>
+</div>
+<script>
+(function(){
+  var nav = document.getElementById('nav');
+  nav.addEventListener('click', function(e){
+    var a = e.target.closest('a'); if (!a||!a.dataset.page) return; e.preventDefault();
+    nav.querySelectorAll('a').forEach(function(x){x.classList.remove('active');});
+    a.classList.add('active');
+    document.querySelectorAll('.page').forEach(function(p){p.classList.remove('show');});
+    var pg=document.getElementById('p-'+a.dataset.page); if(pg)pg.classList.add('show');
+  });
+})();
+function fmt(n){if(n===undefined||n===null||n==='--')return'--';if(typeof n==='number')return n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});return String(n);}
+function pct(n){if(n===undefined||n===null)return'--';var v=typeof n==='number'?n:parseFloat(n)||0;return(v>=0?'+':'')+v.toFixed(2)+'%';}
+function cls(n){return(typeof n!=='number'?parseFloat(n)||0:n)>=0?'up':'down';}
+function kpi(l,v,s,c){return'<div class="kpi'+(c?' '+c:'')+'"><div class="lbl">'+l+'</div><div class="val">'+v+'</div>'+(s?'<div class="sub">'+s+'</div>':'')+'</div>';}
+function badge(v){if(!v)return'<span class="badge neutral">?</span>';if(v==='BULL'||v.indexOf('BULL')>=0)return'<span class="badge up">'+v+'</span>';if(v==='BEAR'||v.indexOf('BEAR')>=0)return'<span class="badge down">'+v+'</span>';if(v==='NEUTRAL')return'<span class="badge neutral">'+v+'</span>';return'<span class="badge warn">'+v+'</span>';}
+var _S=null;
+function load(){
+  fetch('/api').then(function(r){return r.json()}).then(function(d){
+    _S=d;renderOverview(d);renderShort(d);renderLong(d);renderStops(d);renderTrades(d);
+  }).catch(function(e){var err='<div class="empty" style="color:#ff453a">Error: '+e.message+'</div>';document.querySelectorAll('.loading').forEach(function(el){if(el.classList.contains('loading'))el.innerHTML=err;});});
+  fetch('/api/refresh').catch(function(){});
+}
+function renderOverview(d){
+  var c=d.combined||{};
+  document.getElementById('ov-kpis').innerHTML=kpi('Combined PV','$'+fmt(c.pv),'Short + Long')+kpi('Combined P&L','$'+fmt(c.pl),c.pl>=0?'Profit':'Loss',cls(c.pl))+kpi('Return',pct(c.chg),'From $'+fmt(c.init),cls(c.chg))+kpi('Total Cash','$'+fmt(c.cash),'Available');
+  var s=d.short||{};var l=d.long||{};
+  document.getElementById('ov-short').innerHTML='<div class="log"><span class="lt">Value</span><span class="lm">$'+fmt(s.pv)+'</span></div><div class="log"><span class="lt">Cash</span><span class="lm">$'+fmt(s.cash)+'</span></div><div class="log"><span class="lt">Return</span><span class="lm" class="'+cls(s.chg)+'">'+pct(s.chg)+'</span></div><div class="log"><span class="lt">Positions</span><span class="lm">'+fmt(s.cnt)+'</span></div><div class="log"><span class="lt">Cycles</span><span class="lm">'+fmt(d.cycle_count)+'</span></div>';
+  document.getElementById('ov-long').innerHTML='<div class="log"><span class="lt">Value</span><span class="lm">$'+fmt(l.pv)+'</span></div><div class="log"><span class="lt">Cash</span><span class="lm">$'+fmt(l.cash)+'</span></div><div class="log"><span class="lt">Return</span><span class="lm" class="'+cls(l.chg)+'">'+pct(l.chg)+'</span></div><div class="log"><span class="lt">Holdings</span><span class="lm">'+fmt(l.cnt)+'</span></div><div class="log"><span class="lt">Rebalance</span><span class="lm">'+(d.long_meta&&d.long_meta.rebalance||'--')+'</span></div>';
+  var acts=d.activity||[];
+  document.getElementById('ov-log').innerHTML=acts.length?acts.map(function(a){return'<div class="log"><span class="lt">'+a.time+'</span><span class="lm">'+a.msg+'</span></div>';}).join(''):'<div class="empty">No activity</div>';
+}
+function renderShort(d){
+  var s=d.short||{};
+  document.getElementById('st-kpis').innerHTML=kpi('Portfolio Value','$'+fmt(s.pv))+kpi('P&L','$'+fmt(s.pl),'',cls(s.pl))+kpi('Return',pct(s.chg),'',cls(s.chg))+kpi('Cash','$'+fmt(s.cash))+kpi('Positions',fmt(s.cnt));
+  var pos=s.pos||[];if(!pos.length){document.getElementById('st-table').innerHTML='<div class="empty">No positions</div>';return;}
+  var h='<table><tr><th>Sym</th><th>Shares</th><th>Avg</th><th>Price</th><th>Value</th><th>P&L</th><th>Return</th><th>Day Chg</th><th>Weight</th></tr>';
+  pos.forEach(function(p){h+='<tr><td class="sym">'+p.sym+'</td><td class="num">'+fmt(p.shares)+'</td><td class="num">$'+fmt(p.avg)+'</td><td class="num">$'+fmt(p.price)+'</td><td class="num">$'+fmt(p.val)+'</td><td class="num '+cls(p.pl)+'">'+(p.pl>=0?'+':'')+fmt(p.pl)+'</td><td class="num '+cls(p.pl_pct)+'">'+pct(p.pl_pct)+'</td><td class="num '+cls(p.day_chg)+'">'+(p.day_chg>=0?'+':'')+fmt(p.day_chg)+' ('+(p.day_pct>=0?'+':'')+p.day_pct.toFixed(2)+'%)</td><td class="num">'+p.wt+'%</td></tr>';});
+  h+='</table>';document.getElementById('st-table').innerHTML=h;
+  document.getElementById('st-sys').innerHTML='<div class="log"><span class="lt">Cycles</span><span class="lm">'+fmt(d.cycle_count)+'</span></div><div class="log"><span class="lt">Last Cycle</span><span class="lm">'+(d.last_cycle||'--')+'</span></div><div class="log"><span class="lt">Equity</span><span class="lm">$'+fmt(d.equity_total)+'</span></div>';
+}
+function renderLong(d){
+  var l=d.long||{};
+  document.getElementById('lt-kpis').innerHTML=kpi('Portfolio Value','$'+fmt(l.pv))+kpi('P&L','$'+fmt(l.pl),'',cls(l.pl))+kpi('Return',pct(l.chg),'',cls(l.chg))+kpi('Cash','$'+fmt(l.cash))+kpi('Holdings',fmt(l.cnt));
+  var pos=l.pos||[];if(!pos.length){document.getElementById('lt-table').innerHTML='<div class="empty">No holdings</div>';return;}
+  var h='<table><tr><th>Sym</th><th>Shares</th><th>Avg</th><th>Price</th><th>Value</th><th>P&L</th><th>Return</th><th>Score</th><th>Weight</th></tr>';
+  pos.forEach(function(p){h+='<tr><td class="sym">'+p.sym+'</td><td class="num">'+fmt(p.shares)+'</td><td class="num">$'+fmt(p.avg)+'</td><td class="num">$'+fmt(p.price)+'</td><td class="num">$'+fmt(p.val)+'</td><td class="num '+cls(p.pl)+'">'+(p.pl>=0?'+':'')+fmt(p.pl)+'</td><td class="num '+cls(p.pl_pct)+'">'+pct(p.pl_pct)+'</td><td class="num">'+(p.score?p.score:'--')+'</td><td class="num">'+p.wt+'%</td></tr>';});
+  h+='</table>';document.getElementById('lt-table').innerHTML=h;
+  document.getElementById('lt-strat').innerHTML='<div class="log"><span class="lt">Rebalance</span><span class="lm">'+(d.long_meta&&d.long_meta.rebalance||'--')+'</span></div><div class="log"><span class="lt">Cash</span><span class="lm">$'+fmt(l.cash)+'</span></div>';
+}
+function renderStops(d){
+  var stops=d.short_stops||[];if(!stops.length){document.getElementById('sp-table').innerHTML='<div class="empty">No trailing stops</div>';return;}
+  var h='<table><tr><th>Sym</th><th>Entry</th><th>Highest</th><th>Stop</th><th>Trail%</th><th>Risk%</th><th>Distance</th></tr>';
+  stops.forEach(function(sp){
+    var price=0;if(_S&&_S.short&&_S.short.pos){var f=_S.short.pos.filter(function(p){return p.sym===sp.sym;});if(f.length)price=f[0].price;}
+    var dist=price>0&&sp.stop>0?((price-sp.stop)/price*100):0;
+    h+='<tr><td class="sym">'+sp.sym+'</td><td class="num">$'+fmt(sp.entry)+'</td><td class="num">$'+fmt(sp.high)+'</td><td class="num down">$'+fmt(sp.stop)+'</td><td class="num">'+sp.trail+'%</td><td class="num">'+(sp.risk>0?'<span class="'+(sp.risk>8?'down':sp.risk>5?'warn':'up')+'">'+sp.risk+'%</span>':'0%')+'</td><td class="num">'+(dist>0?'<span class="'+(dist<3?'down':dist<8?'warn':'up')+'">'+dist.toFixed(1)+'%</span>':'--')+'</td></tr>';
+  });
+  h+='</table>';document.getElementById('sp-table').innerHTML=h;
+}
+function renderTrades(d){
+  var trades=d.trades||[];if(!trades.length){document.getElementById('tr-table').innerHTML='<div class="empty">No trades yet</div>';return;}
+  var h='<table><tr><th>Time</th><th>Sym</th><th>Action</th><th>Qty</th><th>Price</th><th>P&L</th><th>Reason</th></tr>';
+  trades.slice().reverse().forEach(function(t){h+='<tr><td class="num" style="font-size:10px">'+t.time.slice(5,19)+'</td><td class="sym">'+t.sym+'</td><td><span class="badge down">'+t.act+'</span></td><td class="num">'+fmt(t.qty)+'</td><td class="num">$'+fmt(t.price)+'</td><td class="num '+cls(t.pl)+'">'+(t.pl>=0?'+':'')+fmt(t.pl)+'</td><td style="font-size:10px;color:#838990;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+t.reason+'</td></tr>';});
+  h+='</table>';document.getElementById('tr-table').innerHTML=h;
+}
+function renderAI(){
+  fetch('/api/ai').then(function(r){return r.json()}).then(function(ai){
+    if(!ai||ai.error){document.getElementById('ai-dec').innerHTML='<div class="empty">Error: '+(ai?ai.error:'no data')+'</div>';return;}
+    var st=ai.stats||{};
+    document.getElementById('ai-kpis').innerHTML=kpi('Decisions',fmt(st.total||0))+kpi('Wins',fmt(st.wins||0),'',st.win_rate>50?'up':'')+kpi('Losses',fmt(st.losses||0),'WR:'+(st.win_rate||0)+'%',st.win_rate<50?'down':'')+kpi('Patterns',fmt((ai.patterns||[]).length));
+    var dec=ai.decisions||[];
+    if(!dec.length){document.getElementById('ai-dec').innerHTML='<div class="empty">No AI decisions yet</div>';}else{
+      var h='<table><tr><th>ID</th><th>Time</th><th>Sym</th><th>Action</th><th>Conf</th><th>Score</th><th>Regime</th><th>Outcome</th><th>P&L%</th></tr>';
+      dec.forEach(function(r){
+        var ac=r.action==='BUY'?'up':r.action==='SELL'?'down':'';
+        var oc=r.outcome==='WIN'?'up':r.outcome==='LOSS'?'down':'';
+        h+='<tr><td class="num">'+r.id+'</td><td class="num" style="font-size:10px">'+(r.time||'').slice(5,19)+'</td><td class="sym">'+r.sym+'</td><td><span class="badge '+(ac||'neutral')+'">'+r.action+'</span></td><td class="num">'+(r.conf*100).toFixed(0)+'%</td><td class="num">'+r.score.toFixed(2)+'</td><td>'+badge(r.regime)+'</td><td class="num '+(oc||'')+'">'+(r.outcome==='pending'?'...':r.outcome)+'</td><td class="num '+(r.pnl!==null?cls(r.pnl):'')+'">'+(r.pnl!==null?(r.pnl>=0?'+':'')+r.pnl+'%':'--')+'</td></tr>';
+      });
+      h+='</table>';document.getElementById('ai-dec').innerHTML=h;
+    }
+    var pats=ai.patterns||[];
+    if(!pats.length){document.getElementById('ai-pat').innerHTML='<div class="empty">No learning patterns yet</div>';}else{
+      var h='<table><tr><th>Type</th><th>Description</th><th>Count</th><th>Conf Impact</th></tr>';
+      pats.forEach(function(p){h+='<tr><td>'+p.type+'</td><td style="font-size:10px;color:#838990">'+p.desc+'</td><td class="num">'+p.count+'</td><td class="num '+(p.impact<0?'down':p.impact>0?'up':'')+'">'+(p.impact>=0?'+':'')+p.impact+'</td></tr>';});
+      h+='</table>';document.getElementById('ai-pat').innerHTML=h;
+    }
+    var syms=ai.sym_stats||[];
+    if(!syms.length){document.getElementById('ai-sym').innerHTML='<div class="empty">No per-symbol stats yet</div>';}else{
+      var h='<table><tr><th>Symbol</th><th>Decisions</th><th>Wins</th><th>Losses</th><th>Win Rate</th></tr>';
+      syms.forEach(function(s){h+='<tr><td class="sym">'+s.sym+'</td><td class="num">'+s.total+'</td><td class="num up">'+s.wins+'</td><td class="num down">'+s.losses+'</td><td class="num '+(s.win_rate>=50?'up':'down')+'">'+s.win_rate+'%</td></tr>';});
+      h+='</table>';document.getElementById('ai-sym').innerHTML=h;
+    }
+  }).catch(function(e){document.getElementById('ai-dec').innerHTML='<div class="empty" style="color:#ff453a">Error: '+e.message+'</div>';});
+}
+load();
+renderAI();
+setInterval(load,20000);
+setInterval(renderAI,25000);
+</script>
+</body>
+</html>

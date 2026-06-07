@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+
+# Virtual env
+venv/
+
+# Secrets & env
+.env
+*.key
+*.pem
+
+# Logs
+logs/
+*.log
+
+# Data (runtime state — don't commit live state)
+data/shadow_state.json
+data/longterm_state.json
+data/trade_stats.json
+data/strategy_config.json
+data/ai_memory.db
+state/
+
+# Reports (generated)
+reports/transparency/
+reports/phoenix_report_*.json
+reports/daily_analysis_*.json
+reports/daily_email_*.html
+reports/cron.log
+reports/live_trader.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project metadata
+.project/
+phoenix_state.json
+
+# Dashboard runtime
+dashboard_stderr.log
+dashboard_stdout.log
+dashboard.log
