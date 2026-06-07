@@ -370,11 +370,13 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
         if change_pct > 0.12:  # 止盈卖一半
             sq = pos["qty"] // 2
             if sq > 0:
-                last_decision_id = getattr(account, '_last_decision_id', 0)
+                last_decision_id = pos.get("decision_id", 0) if sym in account.positions else 0
                 account.execute(sym, "SELL", sq, px, reason=f"止盈 +{change_pct:.1%}")
                 try:
                     from atos.ai.memory import record_outcome
+                    from atos.live.kelly import save_trade
                     record_outcome(last_decision_id, "WIN", pnl_pct=change_pct, exit_reason="止盈", ai_correct=True)
+                    save_trade(change_pct)
                 except: pass
         # 🔴 动态波动率止损: 按ATR设置，最低3%，最高10%
         atr_for_stop = signals.get(sym, {}).get("atr", 0)
@@ -383,12 +385,14 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
         else:
             dynamic_stop = 0.05  # 默认5%
         if change_pct < -dynamic_stop:  # 动态止损
+            last_decision_id = pos.get("decision_id", 0) if sym in account.positions else 0
             account.execute(sym, "SELL", pos["qty"], px, reason=f"硬止损 {change_pct:.1%}")
             account.add_to_blacklist(sym)  # Bug #6: 硬止损加入黑名单
             try:
                 from atos.ai.memory import record_outcome
-                last_decision_id = getattr(account, '_last_decision_id', 0)
+                from atos.live.kelly import save_trade
                 record_outcome(last_decision_id, "LOSS", pnl_pct=change_pct, exit_reason="硬止损", ai_correct=False)
+                save_trade(change_pct)
             except: pass
 
     # 5. 专业止损 (追踪止损 + 固定止损双保险)
@@ -412,13 +416,16 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
         if ts_result["triggered"]:
             log_risk("TRAILING_STOP", f"{sym}: {ts_result['reason']}")
             pnl_pct = ts_result.get("unrealized_pnl", 0)
+            last_decision_id = pos.get("decision_id", 0)
             account.execute(sym, "SELL", pos["qty"], price, reason="追踪止损")
             account.add_to_blacklist(sym)  # 🔴 P0-1: 止损后冷却
             del account.trailing_stops[sym]
             try:
                 from atos.ai.memory import record_outcome
-                record_outcome(0, "LOSS" if pnl_pct < 0 else "WIN", pnl_pct=pnl_pct,
+                from atos.live.kelly import save_trade
+                record_outcome(last_decision_id, "LOSS" if pnl_pct < 0 else "WIN", pnl_pct=pnl_pct,
                                exit_reason="追踪止损", ai_correct=(pnl_pct > 0))
+                save_trade(pnl_pct)
             except: pass
 
     # 5b. 固定止损兜底 (strategy_config 里的 stop_loss_pct)
@@ -428,10 +435,18 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
             # 追踪止损已经触发了，跳过固定止损
             continue
         logger.warning(f"FIXED STOP LOSS: {sym} qty={order['qty']}")
+        pnl_pct = order.get("pnl_pct", 0)
+        last_decision_id = account.positions.get(sym, {}).get("decision_id", 0)
         account.execute(sym, "SELL", order["qty"],
                         signals.get(sym, {}).get("price", 0),
                         reason="固定止损")
         account.add_to_blacklist(sym)  # 🔴 P0-1: 止损后冷却
+        try:
+            from atos.ai.memory import record_outcome
+            from atos.live.kelly import save_trade
+            record_outcome(last_decision_id, "LOSS", pnl_pct=pnl_pct, exit_reason="固定止损", ai_correct=False)
+            save_trade(pnl_pct)
+        except: pass
 
     # 5c. 回撤减仓检查
     peak_equity = max(account.initial_cash, account.total_equity)
@@ -525,19 +540,33 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
     # 提前初始化 drawdown_scale（在压力测试和VaR分析前就可用）
     drawdown_scale = 1.0
 
-    # VaR + CVaR（从5分钟周期尺度缩放到日级别，×√288≈17）
-    if hasattr(account, 'cycle_returns') and len(account.cycle_returns) >= 20:
-        var_cycle = var_historical(account.cycle_returns)
-        cvar_cycle = cvar_historical(account.cycle_returns)
-        daily_var = var_cycle * 17.0   # √(288个5分钟周期/日) ≈ 17
-        daily_cvar = cvar_cycle * 17.0
-        logger.info(f"VaR_周期(95%)= {var_cycle:.2%} | VaR_日(95%)= {daily_var:.2%} | "
-                    f"CVaR_日(95%)= {daily_cvar:.2%}")
-        # 如果日VaR > 3%，风控告警
-        if daily_var > 0.03:
-            log_risk("VAR_BREACH", f"日VaR {daily_var:.2%} > 3%，风险偏高")
-    else:
-        var95, cvar95 = 0, 0
+    # VaR + CVaR — 双轨计算：历史法 + 参数法（Beta×VIX）
+    # 历史法从5分钟周期收益计算，参数法从组合Beta和VIX推算
+    # 保守取最大值：周末/数据不足时参数法补上，交易日两者互相印证
+    historical_var95 = 0.0
+    historical_cvar95 = 0.0
+    has_historical = hasattr(account, 'cycle_returns') and len(account.cycle_returns) >= 20
+    if has_historical:
+        historical_var95 = var_historical(account.cycle_returns)
+        historical_cvar95 = cvar_historical(account.cycle_returns)
+
+    # 参数法：基于组合Beta × VIX隐含波动率
+    portfolio_beta = hedge.get("portfolio_beta", 1.0) if hedge else 1.0
+    if portfolio_beta <= 0:
+        portfolio_beta = 1.0
+    daily_market_vol = current_vix / 100.0 / 15.87  # VIX年化 → 日波动率（√252≈15.87）
+    daily_portfolio_vol = daily_market_vol * abs(portfolio_beta)
+    parametric_var95 = daily_portfolio_vol * 1.645   # 95%置信度 z-score
+    parametric_cvar95 = daily_portfolio_vol * 2.063  # CVaR: σ × φ(1.645)/(1-0.95)
+
+    # 保守取最大值
+    daily_var = max(historical_var95 * 17.0, parametric_var95)
+    daily_cvar = max(historical_cvar95 * 17.0, parametric_cvar95)
+
+    logger.info(f"VaR_日(95%)= {daily_var:.2%} (历史={historical_var95*17:.2%}, 参数={parametric_var95:.2%}) | "
+                f"CVaR_日(95%)= {daily_cvar:.2%} | Beta={portfolio_beta:.1f} | VIX={current_vix:.1f}")
+    if daily_var > 0.03:
+        log_risk("VAR_BREACH", f"日VaR {daily_var:.2%} > 3%，风险偏高")
 
     # 压力测试（Bug #14: CRITICAL/HIGH → 实际减仓）
     if account.positions:
@@ -558,10 +587,11 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
     if account.cycle_count <= 7:
         logger.info(f"渐进建仓: 周期{account.cycle_count} → 最多部署{deploy_pct:.0%}")
 
-    # 🔴 P1-3: Kelly回撤调整 — 应用到总部署预算
-    drawdown_scale = dd_adj.get("scale", 1.0)
-    if drawdown_scale < 1.0:
-        logger.info(f"⚠️ Kelly回撤缩放: ×{drawdown_scale:.0%} (回撤{current_dd:.2%} → {dd_adj['status']})")
+    # 🔴 P1-3: Kelly回撤调整 + 压力测试 — 取最保守
+    kelly_scale = dd_adj.get("scale", 1.0)
+    drawdown_scale = min(drawdown_scale, kelly_scale)  # 不覆盖压力测试的结果
+    if kelly_scale < 1.0:
+        logger.info(f"⚠️ Kelly回撤缩放: ×{kelly_scale:.0%} (回撤{current_dd:.2%} → {dd_adj['status']})")
     if drawdown_scale <= 0:
         logger.warning("🔴 回撤超10%，暂停所有新开仓")
 
@@ -573,7 +603,15 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
     min_cash = max(account.total_equity * 0.10, 50000) if account.total_equity > 100000 else account.total_equity * 0.03
     cash_pct = max(cash_pct, min_cash / account.total_equity)
     deployed_this_cycle = 0.0
-    max_deploy = account.total_equity * (1.0 - cash_pct) * drawdown_scale * account.strategy_decay_factor * deploy_hedge_adjustment * trend_factor
+    # 多种风控取最保守（min而非乘法），避免多层叠加导致锁死
+    # 每个风控层独立判断 → 只取最严格的那个系数
+    risk_multiplier = min(drawdown_scale, account.strategy_decay_factor,
+                           deploy_hedge_adjustment, trend_factor)
+    max_deploy = account.total_equity * (1.0 - cash_pct) * risk_multiplier
+    if risk_multiplier < 1.0:
+        logger.info(f"风控综合系数: ×{risk_multiplier:.0%} (Kelly={drawdown_scale:.0%} "
+                    f"衰减={account.strategy_decay_factor:.0%} 对冲={deploy_hedge_adjustment:.0%} "
+                    f"趋势={trend_factor:.0%}) → 取最保守")
 
     # 🟢 SPY趋势下减少max_positions: BULL=5, CAUTIOUS=3, BEAR=2
     trend_max_pos = {"BULL": 5, "CAUTIOUS": 3, "BEAR": 2}.get(spy_trend, 5)
@@ -609,13 +647,32 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
         max_syms = min(effective_max_pos, max(2, account.cycle_count * 1))
         raw_picks = [p["symbol"] for p in top_picks[:max_syms]] if top_picks else symbols[:max_syms]
 
+        # ETF去重：持有同组ETF时跳过其他高度重叠的ETF
+        ETF_GROUPS = [
+            {"SPY", "QQQ", "IWM", "VTI", "VOO"},   # 美股宽基
+            {"GLD", "SLV", "IAU"},                   # 贵金属
+            {"TLT", "IEF", "SHY"},                   # 美债
+            {"USO", "BNO", "UNG"},                   # 能源商品
+        ]
+        held_etf_groups = set()
+        for sym in account.positions:
+            for grp in ETF_GROUPS:
+                if sym in grp:
+                    held_etf_groups.add(frozenset(grp))
+        # 从候选里移除同组ETF（已有1只就不再加同组的）
+        raw_picks = [s for s in raw_picks if not any(
+            s in grp and frozenset(grp) in held_etf_groups for grp in ETF_GROUPS
+        )]
+
         # 🔴 P1-1: 行业分散 — 优先低配行业，降低科技股优先级
+        # 科技上限30%（对标S&P500权重），其他行业20%
         DEFENSIVE_SECTORS = ["Healthcare", "Consumer", "Financial", "Industrial", "Energy"]
+        SECTOR_LIMITS = {"Tech": 0.30}  # 科技允许更高（对标大盘）
         if sector_exposure:
             tech_exposure = sector_exposure.get("Tech", 0)
-            # 如果科技敞口已超20%，把科技股排到最后
-            if tech_exposure > 0.20:
-                logger.warning(f"科技行业敞口{tech_exposure:.1%}已超20%，降低科技股优先级")
+            tech_limit = SECTOR_LIMITS.get("Tech", 0.20)
+            if tech_exposure > tech_limit:
+                logger.warning(f"科技行业敞口{tech_exposure:.1%}已超{tech_limit:.0%}，降低科技股优先级")
                 # 把候选标的中的防御性行业提前
                 defended = [s for s in raw_picks if SECTOR_MAP.get(s, "Unknown") in DEFENSIVE_SECTORS]
                 others = [s for s in raw_picks if s not in defended]
@@ -638,10 +695,11 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
             if account.is_cooling_off(sym):
                 logger.info(f"⏳ {sym} 在止损冷却期，跳过买入")
                 continue
-            # 🔴 P1-1: 行业敞口 — 单行业不超20%
+            # 🔴 P1-1: 行业敞口 — 科技30%/其他20%
             sym_sector = SECTOR_MAP.get(sym, "Unknown")
             current_sector_pct = sector_exposure.get(sym_sector, 0)
-            if current_sector_pct >= 0.20:
+            sector_limit = SECTOR_LIMITS.get(sym_sector, 0.20)
+            if current_sector_pct >= sector_limit:
                 logger.info(f"🚫 {sym} 行业{sym_sector}敞口已达{current_sector_pct:.1%}，跳过")
                 continue
             # 🔴 P2-1: 高相关性标的跳过
@@ -766,12 +824,15 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
                     px = signals.get(sym, {}).get("price", account.positions[sym].get("last_price", 0))
                     sq = account.positions[sym]["qty"]
                     pnl_pct = (px - account.positions[sym]["avg_price"]) / account.positions[sym]["avg_price"] if account.positions[sym]["avg_price"] > 0 else 0
+                    last_decision_id = account.positions[sym].get("decision_id", 0)
                     account.execute(sym, "SELL", sq, px, reason=a.get("reason", "AI卖出"))
                     account.add_to_blacklist(sym)  # AI卖出也加入冷却黑名单，避免立即重新买入
                     try:
                         from atos.ai.memory import record_outcome
+                        from atos.live.kelly import save_trade
                         oc = "WIN" if pnl_pct > 0 else "LOSS"
-                        record_outcome(0, oc, pnl_pct=pnl_pct, exit_reason=a.get("reason","AI卖出"), ai_correct=(pnl_pct > 0))
+                        record_outcome(last_decision_id, oc, pnl_pct=pnl_pct, exit_reason=a.get("reason","AI卖出"), ai_correct=(pnl_pct > 0))
+                        save_trade(pnl_pct)
                     except: pass
                     logger.info(f"AI卖出: {sq}股 {sym} PnL={pnl_pct:+.2%}")
                 continue
@@ -793,7 +854,8 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
             # 🔴 P1-1: 行业敞口检查
             sym_sector = SECTOR_MAP.get(sym, "Unknown")
             current_sector_pct = sector_exposure.get(sym_sector, 0)
-            if current_sector_pct >= 0.20:
+            sector_limit = SECTOR_LIMITS.get(sym_sector, 0.20)
+            if current_sector_pct >= sector_limit:
                 logger.info(f"🚫 AI买入跳过 {sym}：行业{sym_sector}敞口{current_sector_pct:.1%}")
                 continue
             price = signals.get(sym, {}).get("price", 0)
@@ -826,6 +888,9 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
                     ok = account.execute(sym, "BUY", shares, price, reason=a.get("reason", ""))
                     if ok:
                         available_cash -= shares * price
+                        # 追踪链路：保存decision_id到持仓，卖出时可关联结果
+                        if sym in account.positions:
+                            account.positions[sym]["decision_id"] = a.get("decision_id", 0)
                         logger.info(f"AI交易: BUY {shares}股 {sym} @ ${price:.2f} (vol调整)")
                 # Bug #5: 删除重复的SELL分支（已在上面处理）
 
@@ -856,7 +921,8 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
         "strategy_decay_factor": account.strategy_decay_factor,  # Bug #1: 保存策略衰减系数
         "trailing_stops": {
             sym: {"trail_pct": ts.trail_pct, "highest_price": ts.highest_price,
-                  "stop_price": ts.stop_price, "entry_price": ts.entry_price}
+                  "stop_price": ts.stop_price, "entry_price": ts.entry_price,
+                  "confirm_cycles": getattr(ts, 'confirm_cycles', 3)}
             for sym, ts in account.trailing_stops.items()
         },
     }
@@ -924,10 +990,14 @@ def main():
         # 恢复追踪止损状态
         saved_ts = saved.get("trailing_stops", {})
         for sym, ts_data in saved_ts.items():
-            ts = TrailingStop(trail_pct=ts_data.get("trail_pct", 0.05))
+            ts = TrailingStop(
+                trail_pct=ts_data.get("trail_pct", 0.05),
+                confirm_cycles=ts_data.get("confirm_cycles", 3),
+            )
             ts.highest_price = ts_data.get("highest_price", 0.0)
             ts.stop_price = ts_data.get("stop_price", 0.0)
             ts.entry_price = ts_data.get("entry_price", 0.0)
+            ts._breach_count = 0  # 重置确认计数（重启后重新开始）
             account.trailing_stops[sym] = ts
         account.clean_blacklist()  # 清理过期条目
         logger.info(f"恢复状态: 现金${account.cash:,.0f} | 持仓{len(account.positions)}只 | 周期#{account.cycle_count} | 冷却期{len(account.stop_loss_blacklist)}只 | 追踪止损{len(account.trailing_stops)}只")
@@ -990,7 +1060,8 @@ def main():
         "strategy_decay_factor": account.strategy_decay_factor,
         "trailing_stops": {
             sym: {"trail_pct": ts.trail_pct, "highest_price": ts.highest_price,
-                  "stop_price": ts.stop_price, "entry_price": ts.entry_price}
+                  "stop_price": ts.stop_price, "entry_price": ts.entry_price,
+                  "confirm_cycles": getattr(ts, 'confirm_cycles', 3)}
             for sym, ts in account.trailing_stops.items()
         },
     }

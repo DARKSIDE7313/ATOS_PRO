@@ -131,7 +131,7 @@ def get_advice_v2(snapshot: dict) -> dict:
             factor_score = next(
                 (r2["score"] for r2 in factor_rankings if r2["symbol"] == r["symbol"]), 0.5
             )
-            record_decision(
+            decision_id = record_decision(
                 symbol=r["symbol"],
                 action=r["final_action"],
                 confidence=r["final_confidence"],
@@ -141,6 +141,7 @@ def get_advice_v2(snapshot: dict) -> dict:
                 market_regime=regime,
                 snapshot=snapshot,
             )
+            r["decision_id"] = decision_id  # 追踪链路：BUY→SELL→outcome
 
     # 5. CIO 全组合审查（1次 API 调用替代原来的 5×N 次）
     cio_result = cio_review(snapshot)

@@ -124,24 +124,34 @@ class TrailingStop:
       - 不会在 $103 就卖出（固定止损会）
     """
 
-    def __init__(self, trail_pct: float = 0.05):
+    def __init__(self, trail_pct: float = 0.05, confirm_cycles: int = 3):
         self.trail_pct = trail_pct
         self.highest_price = 0.0
         self.stop_price = 0.0
         self.entry_price = 0.0
+        self.confirm_cycles = confirm_cycles
+        self._breach_count = 0
 
     def init(self, entry_price: float):
         self.entry_price = entry_price
         self.highest_price = entry_price
         self.stop_price = entry_price * (1 - self.trail_pct)
+        self._breach_count = 0
 
     def update(self, current_price: float) -> dict:
-        """返回是否触发止损"""
+        """返回是否触发止损（需连续N次跌破确认，防5分钟噪音误杀）"""
         if current_price > self.highest_price:
             self.highest_price = current_price
             self.stop_price = self.highest_price * (1 - self.trail_pct)
+            self._breach_count = 0
 
-        triggered = current_price <= self.stop_price
+        breached = current_price <= self.stop_price
+        if breached:
+            self._breach_count += 1
+        else:
+            self._breach_count = 0
+
+        triggered = self._breach_count >= self.confirm_cycles
         profit_pct = (current_price - self.entry_price) / self.entry_price
 
         return {
@@ -151,10 +161,13 @@ class TrailingStop:
             "stop_price": round(self.stop_price, 2),
             "profit_from_peak": round((current_price - self.highest_price) / self.highest_price, 4) if self.highest_price > 0 else 0,
             "unrealized_pnl": round(profit_pct, 4),
+            "breach_count": self._breach_count,
+            "confirm_cycles": self.confirm_cycles,
             "reason": (
-                f"追踪止损触发: ${current_price:.2f} ≤ ${self.stop_price:.2f}"
+                f"追踪止损触发: ${current_price:.2f} ≤ ${self.stop_price:.2f} (确认{self._breach_count}/{self.confirm_cycles}次)"
                 if triggered else
-                f"追踪中: 高点${self.highest_price:.2f} 止损${self.stop_price:.2f}"
+                f"追踪中: 高点${self.highest_price:.2f} 止损${self.stop_price:.2f}" +
+                (f" [跌破{self._breach_count}/{self.confirm_cycles}]" if breached else "")
             ),
         }
 
