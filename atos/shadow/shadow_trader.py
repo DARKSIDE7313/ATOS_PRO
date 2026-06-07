@@ -620,6 +620,8 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
         logger.info(f"📊 趋势限制持仓数: {account.max_positions} → {effective_max_pos}")
 
     # 🔴 P1-1: 行业分散 — 计算当前行业敞口
+    # 行业上限：科技30%（对标S&P500），其他20%
+    SECTOR_LIMITS = {"Tech": 0.30}
     sector_exposure = {}
     if account.positions:
         from atos.portfolio.correlation import get_sector_exposure, SECTOR_MAP
@@ -667,7 +669,6 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
         # 🔴 P1-1: 行业分散 — 优先低配行业，降低科技股优先级
         # 科技上限30%（对标S&P500权重），其他行业20%
         DEFENSIVE_SECTORS = ["Healthcare", "Consumer", "Financial", "Industrial", "Energy"]
-        SECTOR_LIMITS = {"Tech": 0.30}  # 科技允许更高（对标大盘）
         if sector_exposure:
             tech_exposure = sector_exposure.get("Tech", 0)
             tech_limit = SECTOR_LIMITS.get("Tech", 0.20)
