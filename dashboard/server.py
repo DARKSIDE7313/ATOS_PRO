@@ -8,31 +8,59 @@ sys.path.insert(0,BASE)
 _price_cache={};_price_ts=0
 
 def _live_price(sym):
-    global _price_cache,_price_ts
-    now=time.time()
-    if (now-_price_ts)<300 and sym in _price_cache: return _price_cache[sym]
-    return _price_cache.get(sym,0)
+    """优先从 state 文件读取最新价格"""
+    # 先查短线 state
+    fp = os.path.join(BASE, 'data', 'shadow_state.json')
+    if os.path.exists(fp):
+        try:
+            with open(fp) as f: raw = json.load(f)
+            pos = raw.get('positions', {}) or {}
+            if sym in pos and isinstance(pos[sym], dict):
+                lp = pos[sym].get('last_price', 0) or 0
+                if lp > 0: return lp
+        except: pass
+    # 再查长线 state（longterm 标的不在 shadow 中）
+    fp2 = os.path.join(BASE, 'data', 'longterm_state.json')
+    if os.path.exists(fp2):
+        try:
+            with open(fp2) as f: raw = json.load(f)
+            pos = raw.get('holdings', {}) or {}
+            if sym in pos and isinstance(pos[sym], dict):
+                lp = pos[sym].get('last_price', 0) or 0
+                if lp > 0: return lp
+        except: pass
+    # fallback 到缓存
+    if sym in _price_cache:
+        cached = _price_cache[sym]
+        if cached > 0: return cached
+    return 0
 
 def _fetch_price(sym):
     global _price_cache,_price_ts
     py=os.path.join(BASE,'venv','bin','python3')
     if not os.path.exists(py): py=sys.executable
     try:
-        code=f"import yfinance; t=yfinance.Ticker('{sym}'); i=t.info or {{}}; p=i.get('currentPrice') or i.get('regularMarketPrice') or 0; print(p) if p else print(-1)"
-        r=subprocess.run([py,'-c',code],capture_output=True,timeout=10,text=True)
+        code="import sys,yfinance; t=yfinance.Ticker(sys.argv[1]); i=t.info or {}; p=i.get('currentPrice') or i.get('regularMarketPrice') or 0; print(p) if p else print(-1)"
+        r=subprocess.run([py,'-c',code,sym],capture_output=True,timeout=10,text=True)
         p=float(r.stdout.strip())
         if p>0: _price_cache[sym]=p;_price_ts=time.time()
     except: pass
 
 def refresh_all_prices():
-    all_syms=set()
+    """仅对 state 中没有价格的标的做一次 yfinance 查询"""
+    all_syms = set()
     for fp in ['data/shadow_state.json','data/longterm_state.json']:
-        fpn=os.path.join(BASE,fp)
+        fpn = os.path.join(BASE, fp)
         if os.path.exists(fpn):
-            with open(fpn) as f: raw=json.load(f)
-            for k in ['positions','holdings']: all_syms.update((raw.get(k,{}) or {}).keys())
+            try:
+                with open(fpn) as f: raw = json.load(f)
+                for k in ['positions', 'holdings']:
+                    all_syms.update((raw.get(k, {}) or {}).keys())
+            except: pass
+    # 只获取 state 中没有 last_price 或 last_price=0 的标的
     for s in sorted(all_syms):
-        if s not in _price_cache: _fetch_price(s)
+        if s not in _price_cache or _price_cache.get(s, 0) <= 0:
+            _fetch_price(s)
 
 def read_state():
     d={'short':{},'long':{},'activity':[],'short_stops':[],'trades':[],'combined':{}}
@@ -90,7 +118,8 @@ def read_state():
                 plist.append({'sym':sym,'shares':sh,'avg':round(avg,2),'price':round(price,2),
                     'val':round(val,2),'pl':round(pl,2),
                     'pl_pct':round((price-avg)/avg*100,2) if avg>0 else 0,
-                    'score':dt.get('composite_score',''),'buy_date':dt.get('buy_date','')})
+                    'score':dt.get('composite_score',''),'buy_date':dt.get('buy_date',''),
+                    'day_chg':0,'day_pct':0})
             tv=sum(x['val'] for x in plist) or 1
             for x in plist: x['wt']=round(x['val']/tv*100,1)
             chg=(pv-init)/init*100 if init>0 else 0

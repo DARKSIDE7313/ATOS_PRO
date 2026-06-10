@@ -91,7 +91,7 @@ def enforce_cash_buffer(positions: list[dict], target_cash_pct: float,
         if sell_value < 100:  # 忽略太小的一笔
             continue
 
-        shares = int(sell_value / p["price"])
+        shares = max(1, int(sell_value / p['price']))
         if shares < 1:
             continue
 
@@ -175,7 +175,8 @@ def should_rebalance(current_positions: list[dict],
                       last_rebalance_time: float = None,
                       daily_pnl_pct: float = 0.0,
                       market_regime: str = "UNKNOWN",
-                      current_cash: float = 0.0) -> dict:
+                      current_cash: float = 0.0,
+                      vix: float = 18.0) -> dict:
     """
     决定是否触发再平衡，以及如何执行。
 
@@ -208,7 +209,7 @@ def should_rebalance(current_positions: list[dict],
         }
 
     # 2b. 现金缓冲检查
-    target_cash_pct = compute_cash_buffer(market_regime=market_regime)
+    target_cash_pct = compute_cash_buffer(vix=vix, market_regime=market_regime)
     cash_trades = enforce_cash_buffer(
         current_positions, target_cash_pct, current_cash, total_equity
     )
@@ -267,7 +268,7 @@ def should_rebalance(current_positions: list[dict],
         if price <= 0:
             price = 100.0
 
-        shares = abs(int(diff_value / price))
+        shares = abs(max(1, int(diff_value / price)))
         if shares > 0:
             trades.append({
                 "symbol": d["symbol"],

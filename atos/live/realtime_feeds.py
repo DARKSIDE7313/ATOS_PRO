@@ -27,6 +27,17 @@ import pandas as pd
 from datetime import datetime, timedelta
 from typing import Optional
 
+def safe_float(val, default=0.0) -> float:
+    """安全转换 float，防止 NaN 污染数据"""
+    try:
+        v = float(val)
+        if isinstance(v, float) and str(v) == "nan":
+            return float(default)
+        return v
+    except (TypeError, ValueError):
+        return float(default)
+
+
 from atos.core.logging import get_logger
 
 logger = get_logger("realtime_feeds")
@@ -96,8 +107,17 @@ class RealtimePriceCache:
         if quote is None:
             return None
         # 优先 last_price，其次 price，最后 close
-        return quote.get("last_price") or quote.get("price") or quote.get("close")
-
+        # 注意：必须显式检查 NaN，因为 float('nan') 在 Python 中是 truthy
+        lp = quote.get("last_price")
+        if lp is not None and isinstance(lp, (int, float)) and not (isinstance(lp, float) and str(lp) == "nan"):
+            return float(lp)
+        p = quote.get("price")
+        if p is not None and isinstance(p, (int, float)) and not (isinstance(p, float) and str(p) == "nan"):
+            return float(p)
+        c = quote.get("close")
+        if c is not None and isinstance(c, (int, float)) and not (isinstance(c, float) and str(c) == "nan"):
+            return float(c)
+        return None
     def get_all(self) -> dict[str, dict]:
         """获取所有未过期的报价"""
         now = datetime.now()
@@ -119,8 +139,8 @@ class RealtimePriceCache:
         quotes = self.get_all()
         result = {}
         for sym, q in quotes.items():
-            p = q.get("last_price") or q.get("price") or q.get("close")
-            if p is not None:
+            p = q.get("last_price") if q.get("last_price") is not None else (q.get("price") if q.get("price") is not None else q.get("close"))
+            if p is not None and isinstance(p, (int, float)) and not (isinstance(p, float) and str(p) == "nan"):
                 result[sym] = float(p)
         return result
 
@@ -388,14 +408,14 @@ class FutuRealtimeFeed:
             if symbol and data:
                 quote = {
                     "symbol": symbol,
-                    "last_price": float(data.get("last_price", 0)),
-                    "open": float(data.get("open_price", 0)),
-                    "high": float(data.get("high_price", 0)),
-                    "low": float(data.get("low_price", 0)),
+                    "last_price": safe_float(data.get("last_price", 0)),
+                    "open": safe_float(data.get("open_price", 0)),
+                    "high": safe_float(data.get("high_price", 0)),
+                    "low": safe_float(data.get("low_price", 0)),
                     "volume": int(data.get("volume", 0)),
-                    "turnover": float(data.get("turnover", 0)),
-                    "bid_price": float(data.get("bid_price", 0)),
-                    "ask_price": float(data.get("ask_price", 0)),
+                    "turnover": safe_float(data.get("turnover", 0)),
+                    "bid_price": safe_float(data.get("bid_price", 0)),
+                    "ask_price": safe_float(data.get("ask_price", 0)),
                     "bid_size": int(data.get("bid_size", 0)),
                     "ask_size": int(data.get("ask_size", 0)),
                     "timestamp": time.time(),
@@ -484,14 +504,14 @@ class FutuRealtimeFeed:
             row = data.iloc[0]
             return {
                 "symbol": symbol,
-                "last_price": float(row.get("last_price", 0)),
-                "open": float(row.get("open_price", 0)),
-                "high": float(row.get("high_price", 0)),
-                "low": float(row.get("low_price", 0)),
+                "last_price": safe_float(row.get("last_price", 0)),
+                "open": safe_float(row.get("open_price", 0)),
+                "high": safe_float(row.get("high_price", 0)),
+                "low": safe_float(row.get("low_price", 0)),
                 "volume": int(row.get("volume", 0)),
-                "turnover": float(row.get("turnover", 0)),
-                "bid_price": float(row.get("bid_price", 0)),
-                "ask_price": float(row.get("ask_price", 0)),
+                "turnover": safe_float(row.get("turnover", 0)),
+                "bid_price": safe_float(row.get("bid_price", 0)),
+                "ask_price": safe_float(row.get("ask_price", 0)),
                 "bid_size": int(row.get("bid_size", 0)),
                 "ask_size": int(row.get("ask_size", 0)),
                 "timestamp": time.time(),
@@ -542,12 +562,14 @@ class FutuRealtimeFeed:
                 try:
                     price = getattr(ticker.fast_info, 'lastPrice', None) or getattr(ticker.fast_info, 'regularMarketPrice', None) or getattr(ticker.fast_info, 'previousClose', None)
                     if price:
-                        self.cache.update(symbol, {
-                            "last_price": float(price),
-                            "source": "yfinance",
-                            "timestamp": time.time(),
-                        })
-                        return float(price)
+                        safe_p = safe_float(price)
+                        if safe_p > 0:
+                            self.cache.update(symbol, {
+                                "last_price": safe_p,
+                                "source": "yfinance",
+                                "timestamp": time.time(),
+                            })
+                            return safe_p
                 except Exception:
                     pass
 

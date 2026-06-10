@@ -11,10 +11,10 @@ AGGRESSIVE_THRESHOLD  = 200_000   # <$200k: 激进
 MODERATE_THRESHOLD    = 500_000   # <$500k: 适中
 # >=$500k: 保守
 
-VERY_AGGRESSIVE = {"short_pct": 0.00, "long_pct": 0.95, "cash_pct": 0.05, "max_positions": 3}
-AGGRESSIVE      = {"short_pct": 0.20, "long_pct": 0.70, "cash_pct": 0.10, "max_positions": 5}
-MODERATE        = {"short_pct": 0.30, "long_pct": 0.60, "cash_pct": 0.10, "max_positions": 8}
-CONSERVATIVE    = {"short_pct": 0.20, "long_pct": 0.70, "cash_pct": 0.10, "max_positions": 10}
+VERY_AGGRESSIVE = {"short_pct": 0.00, "long_pct": 0.95, "cash_pct": 0.05, "max_positions": 3, "max_single_pct": 0.25}
+AGGRESSIVE      = {"short_pct": 0.20, "long_pct": 0.70, "cash_pct": 0.10, "max_positions": 5, "max_single_pct": 0.20}
+MODERATE        = {"short_pct": 0.30, "long_pct": 0.60, "cash_pct": 0.10, "max_positions": 8, "max_single_pct": 0.15}
+CONSERVATIVE    = {"short_pct": 0.20, "long_pct": 0.70, "cash_pct": 0.05, "max_positions": 10, "max_single_pct": 0.15}  # 放宽: cash 10%→5%, max_single 10%→15%
 
 def get_tier(total: float) -> str:
     if total < VERY_SMALL_THRESHOLD: return "VERY_AGGRESSIVE"
@@ -38,8 +38,8 @@ def get_account_state():
     total  = float(acc["total_assets"].iloc[0])
     cash   = float(acc["cash"].iloc[0])
     mktval = float(acc["market_val"].iloc[0])
-    mode   = "AGGRESSIVE" if total < AGGRESSIVE_THRESHOLD else "CONSERVATIVE"
-    alloc  = AGGRESSIVE if mode == "AGGRESSIVE" else CONSERVATIVE
+    alloc  = get_alloc(total)
+    mode   = get_tier(total)  # 正确使用四档分级
     positions = []
     if ret_pos == RET_OK and not pos.empty:
         for _, row in pos.iterrows():
@@ -55,7 +55,7 @@ def get_account_state():
         "total":     total, "cash": cash, "mkt_val": mktval,
         "mode":      mode,  "alloc": alloc, "positions": positions,
         "constraints": {
-            "max_single_pct": 0.20 if mode == "AGGRESSIVE" else 0.10,
+            "max_single_pct": alloc.get("max_single_pct", 0.20),
             "short_budget":   total * alloc["short_pct"],
             "long_budget":    total * alloc["long_pct"],
             "min_cash":       total * alloc["cash_pct"],

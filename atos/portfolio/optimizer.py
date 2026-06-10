@@ -241,7 +241,7 @@ def compute_target_positions(symbols: list[str],
         price = current["last"] if current and current.get("last") else 100.0
         if price <= 0:
             price = 100.0
-        shares = int(target_value / price)
+        shares = max(1, int(target_value / price))
         target[sym] = {
             "shares": shares,
             "value": round(target_value, 2),
@@ -266,8 +266,8 @@ def compute_target_positions(symbols: list[str],
 
     logger.info(
         f"目标持仓: {len(target)} 只 | 交易: {len(trades)} 笔 | "
-        f"现金缓冲: ${cash_buffer:,.0f} ({cash_reserve_pct:.0%}) | "
-        f"预期波动: {port_vol:.1%}" if port_vol else ""
+        f"现金缓冲: ${cash_buffer:,.0f} ({cash_reserve_pct:.0%})"
+        f"{f' | 预期波动: {port_vol:.1%}' if port_vol is not None else ' | 预期波动: N/A'}"
     )
 
     return {

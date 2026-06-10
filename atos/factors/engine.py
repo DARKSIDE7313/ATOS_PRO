@@ -14,11 +14,12 @@ logger = get_logger("factors.engine")
 
 # 默认权重（会根据市场状态动态调整）
 DEFAULT_WEIGHTS = {
-    "value":      0.17,   # 价值
-    "momentum":   0.21,   # 动量
-    "quality":    0.17,   # 质量
-    "technical":  0.30,   # 技术面（RSI/MACD/趋势等）
-    "multiframe": 0.15,   # 多时间框架（v3 5m/1h/1d 信号）
+    "value":      0.12,   # 价值（降权 — RGVH 论文证实 ML 预测在短线不好）
+    "momentum":   0.18,   # 动量
+    "quality":    0.12,   # 质量（短线不看重基本面）
+    "technical":  0.30,   # 技术面（主力 — RSI/MACD/趋势/Bollinger）
+    "multiframe": 0.10,   # 多时间框架
+    "mean_rev":   0.18,   # 均值回归（新增 — Bollinger回归+RSI均值）
 }
 
 # IC 历史记录：{regime: {"last_ic": float, "weight_adjustments": {...}}}
@@ -28,13 +29,18 @@ _ic_history: dict[str, dict] = {}
 _per_factor_ic: dict[str, dict[str, float]] = {}
 
 # 不同市场环境下的权重调整
+# v4 重大修改：
+#   - BEAR: 动量权重大幅提升(0.08→0.30)，均值回归降至0.05（下跌趋势中抄底=找死）
+#   - BULL_STRONG: 动量为主，均值回归辅助(0.17→0.12)
+#   - HIGH_VOL: 质量和价值为主，均值回归降至0.12
+#   - 所有环境下：技术面保持主力地位
 REGIME_WEIGHTS = {
-    "BULL_STRONG": {"momentum": 0.31, "technical": 0.27, "value": 0.14, "quality": 0.18, "multiframe": 0.10},
-    "BULL_WEAK":   {"momentum": 0.17, "technical": 0.21, "value": 0.21, "quality": 0.26, "multiframe": 0.15},
-    "HIGH_VOL":    {"momentum": 0.08, "technical": 0.20, "value": 0.28, "quality": 0.24, "multiframe": 0.20},
-    "BEAR":        {"momentum": 0.08, "technical": 0.22, "value": 0.19, "quality": 0.26, "multiframe": 0.25},
-    "SIDEWAYS":    {"momentum": 0.20, "technical": 0.25, "value": 0.15, "quality": 0.20, "multiframe": 0.20},
-    "UNKNOWN":     {"momentum": 0.17, "technical": 0.26, "value": 0.21, "quality": 0.21, "multiframe": 0.15},
+    "BULL_STRONG": {"momentum": 0.30, "technical": 0.25, "value": 0.08, "quality": 0.10, "multiframe": 0.10, "mean_rev": 0.17},
+    "BULL_WEAK":   {"momentum": 0.20, "technical": 0.22, "value": 0.12, "quality": 0.15, "multiframe": 0.13, "mean_rev": 0.18},
+    "HIGH_VOL":    {"momentum": 0.12, "technical": 0.20, "value": 0.18, "quality": 0.18, "multiframe": 0.15, "mean_rev": 0.17},
+    "BEAR":        {"momentum": 0.30, "technical": 0.22, "value": 0.10, "quality": 0.12, "multiframe": 0.18, "mean_rev": 0.08},
+    "SIDEWAYS":    {"momentum": 0.20, "technical": 0.22, "value": 0.12, "quality": 0.15, "multiframe": 0.15, "mean_rev": 0.16},
+    "UNKNOWN":     {"momentum": 0.22, "technical": 0.25, "value": 0.13, "quality": 0.13, "multiframe": 0.12, "mean_rev": 0.15},
 }
 
 
@@ -76,6 +82,61 @@ def _tech_score(signal: dict) -> float:
     return max(0.05, min(0.95, score))
 
 
+def _mean_rev_score(signal: dict) -> float:
+    """均值回归评分——从 Bollinger Bands + RSI 判断价格是否偏离均值。
+
+    核心逻辑（受 je-suis-tm/quant-trading 的 W-Bottom 策略启发）：
+      - 价格接近下轨 + RSI 低 → 高均值回归买入信号
+      - 价格接近上轨 + RSI 高 → 高均值回归卖出信号
+      - 价格在均值附近 → 中性
+
+    返回 0-1 分，越高表示越值得买入（均值回归视角）。
+    """
+    if not signal:
+        return 0.5
+
+    rsi = signal.get("rsi", 50)
+    bb = signal.get("bollinger", {})
+    pct_b = bb.get("pct_b", 0.5)
+    trend = signal.get("trend", "NEUTRAL")
+
+    # %B = (price - lower) / (upper - lower)
+    # %B < 0.2 = 接近下轨（可能超卖），%B > 0.8 = 接近上轨（可能超买）
+    score = 0.5
+
+    # RSI 均值回归信号
+    if rsi < 30:
+        score += 0.25  # 极度超卖 → 强回归买入信号
+    elif rsi < 35:
+        score += 0.15
+    elif rsi < 40:
+        score += 0.08
+    elif rsi > 75:
+        score -= 0.20  # 极度超买 → 均值回归卖出信号
+    elif rsi > 70:
+        score -= 0.12
+    elif rsi > 65:
+        score -= 0.05
+
+    # Bollinger %B 位置
+    if pct_b < 0.15:
+        score += 0.20  # 明显低于下轨 → 回归买入
+    elif pct_b < 0.30:
+        score += 0.10
+    elif pct_b > 0.85:
+        score -= 0.20  # 明显高于上轨 → 回归卖出
+    elif pct_b > 0.70:
+        score -= 0.10
+
+    # 趋势负向时均值回归信号更强
+    if trend == "DOWN" and rsi < 35:
+        score += 0.10  # 跌势中超卖 → 更强回归信号
+    elif trend == "UP" and rsi > 70:
+        score -= 0.10  # 涨势中超买 → 更强回归卖出
+
+    return max(0.05, min(0.95, score))
+
+
 def adjust_weights_from_ic(regime: str) -> dict:
     """
     根据历史 IC 调整因子权重。
@@ -89,6 +150,7 @@ def adjust_weights_from_ic(regime: str) -> dict:
     """
     history = _ic_history.get(regime)
     if not history:
+        # IC 数据尚未积累 — 使用默认权重（ULTRA AI 会动态调整）
         return dict(REGIME_WEIGHTS.get(regime, DEFAULT_WEIGHTS))
 
     last_ic = history.get("last_ic", 0.0)
@@ -116,7 +178,7 @@ def adjust_weights_from_ic(regime: str) -> dict:
         base_weights[worst_factor] = round(base_weights[worst_factor] - reduction, 4)
         logger.info(f"IC={last_ic:.4f} < -0.05: 缩减 {worst_factor} 权重至 {base_weights[worst_factor]:.3f}")
     else:
-        logger.info(f"IC={last_ic:.4f} 在 [-0.05, 0.05] 内，使用默认权重")
+        logger.info(f"IC={last_ic:.4f} 在 [-0.05, 0.05] 内，使用默认权重（AI将在CIO阶段动态调权）")
 
     # 归一化确保权重总和为 1.0
     total = sum(base_weights.values())
@@ -180,13 +242,15 @@ def combine(signals: dict, value_factors: dict, momentum_factors: dict,
         q_score = quality_factors.get(sym, {}).get("composite", 0.5)
         t_score = _tech_score(signals[sym])
         f_score = multiframe_factors.get(sym, {}).get("composite", 0.5)
+        r_score = _mean_rev_score(signals[sym])  # 🆕 均值回归
 
         total = (
             v_score * weights["value"] +
             m_score * weights["momentum"] +
             q_score * weights["quality"] +
             t_score * weights["technical"] +
-            f_score * weights["multiframe"]
+            f_score * weights["multiframe"] +
+            r_score * weights.get("mean_rev", 0.0)  # 🆕 均值回归权重
         )
 
         scores[sym] = round(total, 4)
@@ -196,6 +260,7 @@ def combine(signals: dict, value_factors: dict, momentum_factors: dict,
             "quality": round(q_score, 3),
             "technical": round(t_score, 3),
             "multiframe": round(f_score, 3),
+            "mean_rev": round(r_score, 3),  # 🆕
             "total": round(total, 3),
         }
 

@@ -307,7 +307,7 @@ def full_health_check(account_state: dict = None) -> dict:
 def is_safe_to_trade() -> tuple[bool, str]:
     """综合判断现在是否应该交易（支持夏令时/冬令时自动切换）"""
     import datetime
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
 
     # 周末
     if now.weekday() >= 5:

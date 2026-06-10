@@ -31,7 +31,7 @@ logger = get_logger("daily_pipeline")
 
 API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 API_URL = "https://api.deepseek.com/chat/completions"
-MODEL = "deepseek-reasoner"  # R1 深度推理
+MODEL = "deepseek-chat"  # 改用 chat 模型，支持 json_object
 
 EMAIL_CONFIG = {
     "smtp_host": "smtp.gmail.com",
@@ -164,7 +164,7 @@ IMPORTANT: You MUST suggest at least 1-2 parameter adjustments based on the data
             "Authorization": f"Bearer {API_KEY}",
             "Content-Type": "application/json",
         }
-        resp = requests.post(API_URL, json=payload, headers=headers, timeout=120)
+        resp = requests.post(API_URL, json=payload, headers=headers, timeout=180)
         resp.raise_for_status()
         content = resp.json()["choices"][0]["message"]["content"]
         analysis = json.loads(content)
@@ -225,6 +225,9 @@ def auto_apply_adjustments(analysis: dict) -> list:
             "confidence": confidence,
             "reason": adj.get("reason", ""),
         })
+        # 限制历史记录最多 90 天，防止配置文件无限膨胀
+        if len(config["adjustment_history"]) > 90:
+            config["adjustment_history"] = config["adjustment_history"][-90:]
 
         applied.append({
             "parameter": param,

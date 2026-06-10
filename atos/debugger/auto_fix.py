@@ -135,7 +135,7 @@ def check_futu_readiness() -> dict:
 
     # 检查夜间不要连（收盘后 FutuOpenD 可能关）
     import datetime
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
     if now.weekday() >= 5:
         issues.append("今天是周末，FutuOpenD 可能未登录")
     elif now.hour < 13 or now.hour > 20:

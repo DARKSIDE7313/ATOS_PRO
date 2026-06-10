@@ -98,7 +98,7 @@ def vol_target_position(capital: float, price: float,
     target_weight = vol_scalar * max_position_pct
     target_weight = min(target_weight, max_position_pct)
     target_value = capital * target_weight
-    shares = int(target_value / price)
+    shares = max(1, int(target_value / price))
 
     return {
         "shares": shares,

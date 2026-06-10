@@ -66,7 +66,8 @@ def multi_timeframe_signal(symbol: str) -> dict:
 
         return signals
     except Exception as e:
-        return {"error": str(e)}
+        logger.warning(f"[strategy_v3] multi_timeframe_signal({symbol}) failed: {e}")
+        return {}
 
 
 def _rsi_val(series, period=14):

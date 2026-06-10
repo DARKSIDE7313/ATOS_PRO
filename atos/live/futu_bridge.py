@@ -109,12 +109,28 @@ US_HOLIDAYS_2026 = {
 }
 
 
+def _is_edt_now() -> bool:
+    """判断当前是否为美国东部夏令时 (EDT)"""
+    import time as _time, os as _os
+    old_tz = _os.environ.get("TZ", "")
+    _os.environ["TZ"] = "America/New_York"
+    try:
+        _time.tzset()
+        return bool(_time.daylight)
+    finally:
+        if old_tz:
+            _os.environ["TZ"] = old_tz
+        else:
+            _os.environ.pop("TZ", None)
+        _time.tzset()
+
+
 def is_market_open() -> tuple[bool, str]:
     """
-    检查美股是否在交易。
+    检查美股是否在交易（自动识别夏令时/冬令时）。
     返回 (是否开市, 原因说明)
     """
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
     today = now.date()
 
     # 周末
@@ -125,14 +141,19 @@ def is_market_open() -> tuple[bool, str]:
     if today in US_HOLIDAYS_2026:
         return False, f"假日休市: {US_HOLIDAYS_2026[today]}"
 
+    # EDT (夏令时 3月-11月): 开盘 13:30 UTC, 收盘 20:00 UTC
+    # EST (冬令时): 开盘 14:30 UTC, 收盘 21:00 UTC
+    is_edt = _is_edt_now()
+    open_hour, close_hour = (13, 20) if is_edt else (14, 21)
+
     # 半天交易日
     half_day = US_HOLIDAYS_2026.get(today, "")
     if "半天" in half_day:
-        open_t = now.replace(hour=13, minute=30, second=0)
-        close_t = now.replace(hour=17, minute=0, second=0)  # 1pm EST
+        open_t = now.replace(hour=open_hour, minute=30, second=0)
+        close_t = now.replace(hour=open_hour + 4, minute=0, second=0)  # 1pm local
     else:
-        open_t = now.replace(hour=13, minute=30, second=0)   # 9:30am EST
-        close_t = now.replace(hour=20, minute=0, second=0)    # 4:00pm EST
+        open_t = now.replace(hour=open_hour, minute=30, second=0)   # 9:30am local
+        close_t = now.replace(hour=close_hour, minute=0, second=0)   # 4:00pm local
 
     if now < open_t:
         return False, f"盘前 (距开盘 {(open_t - now).seconds // 60} 分钟)"

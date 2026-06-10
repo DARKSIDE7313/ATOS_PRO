@@ -22,7 +22,7 @@ from atos.live.signal_engine import get_signals, UNIVERSE, ALL_SYMBOLS
 from atos.live.portfolio import get_account_state
 from atos.live.ai_advisor import get_advice  # 旧版，保留兼容
 from atos.ai.engine_v2 import get_advice_v2      # 🆕 v2 引擎
-from atos.live.risk_manager import filter_orders, check_stop_losses, reset_daily, record_fill
+from atos.live.risk_manager import filter_orders, check_all_stops as check_stop_losses, reset_daily, record_fill
 from atos.market.regime.regime_engine import RegimeEngine
 from atos.live.futu_bridge import safe_place_order as place_order  # 修复：使用完整功能的桥接模块
 from atos.live.kelly import kelly_fraction, kelly_qty, save_trade
@@ -45,7 +45,7 @@ logger = get_logger("live_trader")
 
 def is_market_open():
     """美股交易时间：9:30 AM – 4:00 PM EST (UTC 13:30–20:00)"""
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
     if now.weekday() >= 5:  # 周末
         return False
     open_ = now.replace(hour=13, minute=30, second=0, microsecond=0)
@@ -82,7 +82,7 @@ def compute_order_qty(symbol, target_pct, account_state, signals):
     delta = target_val - current_val
     if delta <= 0:
         return 0
-    return int(delta / price)
+    return max(1, int(delta / price))
 
 
 def run_cycle():
@@ -143,24 +143,35 @@ def run_cycle():
         top_picks = []
 
     # 4. 止损检查
-    for order in check_stop_losses(account["positions"], account):
+    stop_signals = {
+        s["symbol"]: signals.get(s["symbol"], {})
+        for s in account["positions"]
+    }
+    for order in check_stop_losses(account["positions"], stop_signals):
         log_risk("STOP_LOSS", f"{order['symbol']} qty={order['qty']}")
         result = place_order(order["symbol"], "SELL", order["qty"])
         log_trade(order["symbol"], "SELL", order["qty"], 0,
                   reason="止损退出")
 
         try:
-            real_pnl = next(
-                (p["pnl_pct"] for p in account["positions"]
+            pos = next(
+                (p for p in account["positions"]
                  if p["symbol"] == order["symbol"]), None
             )
-            if real_pnl is None:
+            if pos:
+                sell_price = signals.get(order["symbol"], {}).get("price", pos.get("last", 0))
+                real_pnl = pos["qty"] * (sell_price - pos["avg_price"])
+            else:
                 import json
                 cfg_path = os.path.join(
                     os.path.dirname(__file__), "../../data/strategy_config.json")
-                cfg = json.load(open(cfg_path)) if os.path.exists(cfg_path) else {}
-                real_pnl = -abs(cfg.get("stop_loss_pct", 0.05))
-            record_fill(real_pnl)  # 传递实际PnL而非硬编码0
+                if os.path.exists(cfg_path):
+                    with open(cfg_path) as f:
+                        cfg = json.load(f)
+                else:
+                    cfg = {}
+                real_pnl = -abs(cfg.get("stop_loss_pct", 0.05)) * account.get("total", 100000)
+            record_fill(real_pnl, account["total"])  # 传递实际PnL而非硬编码0
             from atos.live.daily_review import log_trade as save_log
             save_log(order["symbol"], "STOP_LOSS", order["qty"], 0, pnl_pct=real_pnl)
         except Exception as e:
@@ -194,6 +205,7 @@ def run_cycle():
             total_equity=account["total"],
             daily_pnl_pct=0.0,
             market_regime=regime["regime"],
+            vix=vix,
         )
 
         logger.info(
@@ -281,18 +293,25 @@ def run_cycle():
                       reason=order.get("reason", ""))
             if action == "SELL":
                 try:
-                    real_pnl = next(
-                        (p["pnl_pct"] for p in account["positions"]
+                    pos = next(
+                        (p for p in account["positions"]
                          if p["symbol"] == sym), None
                     )
-                    if real_pnl is None:
+                    if pos:
+                        sell_price = signals.get(sym, {}).get("price", pos.get("last", 0))
+                        real_pnl = abs(qty) * (sell_price - pos["avg_price"])
+                    else:
                         import json
                         cfg_path = os.path.join(
                             os.path.dirname(__file__), "../../data/strategy_config.json")
-                        cfg = json.load(open(cfg_path)) if os.path.exists(cfg_path) else {}
+                        if os.path.exists(cfg_path):
+                            with open(cfg_path) as f:
+                                cfg = json.load(f)
+                        else:
+                            cfg = {}
                         # SELL 默认使用止损比例（负值），而非止盈比例
-                        real_pnl = -abs(cfg.get("stop_loss_pct", 0.05))
-                    record_fill(real_pnl)  # 传递实际PnL而非硬编码0
+                        real_pnl = -abs(cfg.get("stop_loss_pct", 0.05)) * account.get("total", 100000)
+                    record_fill(real_pnl, account["total"])  # 传递实际PnL而非硬编码0
                     from atos.live.daily_review import log_trade as save_log
                     save_log(sym, "SELL", abs(qty),
                              signals.get(sym, {}).get("price", 0),
@@ -301,7 +320,7 @@ def run_cycle():
                     logger.debug(f"卖出日志写入失败: {e}")
             else:
                 # BUY 操作记录为0 PnL（尚未实现盈亏）
-                record_fill(0.0)
+                record_fill(0.0, account["total"])
         else:
             log_error("live_trader", f"下单失败: {action} {qty}股 {sym}")
 

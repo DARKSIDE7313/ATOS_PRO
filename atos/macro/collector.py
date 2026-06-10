@@ -139,25 +139,26 @@ def get_employment() -> dict:
     result = {"source": "yfinance_proxy", "timestamp": datetime.datetime.now().isoformat()}
 
     try:
-        # 使用 UNRATE proxy: 没有直接 ETF，但可以用消费者信心 ETF
-        vic = yf.Ticker(" VIC")  # 或用消费类 ETF 判断
-        # 更可靠：使用 SHY/TLT 利差来判断衰退风险
-        shy = yf.Ticker("SHY")
-        tlt = yf.Ticker("TLT")
-        shy_h = shy.history(period="1mo")
-        tlt_h = tlt.history(period="1mo")
-        if not shy_h.empty and not tlt_h.empty:
-            shy_yield = (100 - float(shy_h["Close"].iloc[-1])) / 100
-            tlt_yield = float(tlt_h["Close"].iloc[-1]) / 100 if tlt_h["Close"].iloc[-1] > 100 else 0.04
-            result["short_long_yield_gap"] = round(tlt_yield - shy_yield, 4)
+        # P1-4 fix: 用 ^IRX (13周) 和 ^TNX (10Y) 的真实收益率计算利差
+        # 不再用 TLT 价格除以100当收益率（那是ETF价格不是收益率）
+        rates = get_interest_rates()
+        fed_rate = rates.get("fed_funds_rate")
+        ten_y = rates.get("treasury_10y")
+        if fed_rate is not None and ten_y is not None:
+            result["short_long_yield_gap"] = round(ten_y - fed_rate, 4)
             # 收益率曲线倒挂 → 衰退风险
-            if result.get("short_long_yield_gap", 0) < -0.02:
+            if result.get("short_long_yield_gap", 0) < -0.005:
                 result["recession_risk"] = "HIGH"
             elif result.get("short_long_yield_gap", 0) < 0:
                 result["recession_risk"] = "MODERATE"
             else:
                 result["recession_risk"] = "LOW"
-    except: pass
+        else:
+            result["recession_risk"] = "UNKNOWN"
+            result["short_long_yield_gap"] = None
+    except Exception:
+        result["recession_risk"] = "UNKNOWN"
+        result["short_long_yield_gap"] = None
 
     _set_cache(cache_key, result)
     return result

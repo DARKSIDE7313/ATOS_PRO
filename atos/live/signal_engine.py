@@ -11,6 +11,7 @@ ATOS PRO v2 — 信号引擎
 """
 import os
 import time
+import threading
 import pandas as pd
 import yfinance as yf
 from functools import lru_cache
@@ -28,14 +29,26 @@ try:
 except ImportError:
     pass
 
-# Bug #10: yfinance 缓存层 — 5 分钟内不重复下载
+# Bug #10: yfinance 缓存层 — 仅在交易日内缓存，周末不缓存
 _cache = {}  # {symbol: (timestamp, dataframe)}
-_CACHE_TTL = timedelta(minutes=5)
+_CACHE_TTL = timedelta(minutes=3)  # 3 分钟短缓存（比原来的5分钟更短）
+
+def _should_skip_cache() -> bool:
+    """如果是非交易日或盘后，跳过缓存使用实时数据"""
+    try:
+        from atos.live.realtime_feeds import get_feed
+        feed = get_feed()
+        if feed and feed.is_connected():
+            return True  # 有实时数据 → 跳过 yfinance 缓存
+    except Exception:
+        pass
+    return False
 
 def _get_cached_data(symbol: str, period: str = "1y", interval: str = "1d"):
-    """带缓存的 yfinance 下载，同一标的 5 分钟内只下载一次"""
+    """带缓存的 yfinance 下载，同一标的 3 分钟内只下载一次。
+    有实时数据时跳过缓存直接下载最新。"""
     key = f"{symbol}:{period}:{interval}"
-    now = datetime.now()  # naïvedatetime — 仅用于缓存TTL比较，不涉及时区转换，安全无歧义
+    now = datetime.now()
     if key in _cache:
         ts, df = _cache[key]
         if now - ts < _CACHE_TTL:
@@ -48,21 +61,25 @@ def clear_cache():
     """强制清空缓存（手动更新用）"""
     _cache.clear()
 
+_EDT_LOCK = threading.Lock()
+
 def _is_edt() -> bool:
     """Check if US Eastern time is currently in EDT (Daylight Saving).
-    Uses system timezone database via time.daylight flag."""
-    # Save current TZ, set to US Eastern, check DST
-    old_tz = os.environ.get('TZ', '')
-    os.environ['TZ'] = 'America/New_York'
-    try:
-        time.tzset()
-        return time.daylight != 0
-    finally:
-        if old_tz:
-            os.environ['TZ'] = old_tz
-        else:
-            os.environ.pop('TZ', None)
-        time.tzset()
+    Uses system timezone database via time.daylight flag.
+    Thread-safe via _EDT_LOCK."""
+    with _EDT_LOCK:
+        # Save current TZ, set to US Eastern, check DST
+        old_tz = os.environ.get('TZ', '')
+        os.environ['TZ'] = 'America/New_York'
+        try:
+            time.tzset()
+            return time.daylight != 0
+        finally:
+            if old_tz:
+                os.environ['TZ'] = old_tz
+            else:
+                os.environ.pop('TZ', None)
+            time.tzset()
 
 
 def is_nasdaq_open() -> bool:
@@ -201,8 +218,13 @@ def get_signals(symbols: list[str] = None) -> dict:
             else:
                 trend = "NEUTRAL"
 
+            # 防御 nan：price 不能是 nan 或 0
+            safe_price = price if not (isinstance(price, float) and str(price) == "nan") else 0
+            if safe_price <= 0 and len(close) > 1:
+                safe_price = _scalar(close.iloc[-2])  # 用前一天收盘价
+
             results[sym] = {
-                "price":        round(price, 2),
+                "price":        round(safe_price, 2),
                 "ma50":         round(ma50, 2),
                 "ma200":        round(ma200, 2),
                 "rsi":          round(rsi_val, 1),

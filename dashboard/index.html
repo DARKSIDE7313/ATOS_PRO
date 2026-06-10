@@ -93,7 +93,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
   });
 })();
 function fmt(n){if(n===undefined||n===null||n==='--')return'--';if(typeof n==='number')return n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});return String(n);}
-function pct(n){if(n===undefined||n===null)return'--';var v=typeof n==='number'?n:parseFloat(n)||0;return(v>=0?'+':'')+v.toFixed(2)+'%';}
+function pct(n){if(n===undefined||n===null||typeof n==='string'&&n==='nan')return'--';var v=typeof n==='number'?n:parseFloat(n)||0;if(isNaN(v))return'--';return(v>=0?'+':'')+v.toFixed(2)+'%';}
 function cls(n){return(typeof n!=='number'?parseFloat(n)||0:n)>=0?'up':'down';}
 function kpi(l,v,s,c){return'<div class="kpi'+(c?' '+c:'')+'"><div class="lbl">'+l+'</div><div class="val">'+v+'</div>'+(s?'<div class="sub">'+s+'</div>':'')+'</div>';}
 function badge(v){if(!v)return'<span class="badge neutral">?</span>';if(v==='BULL'||v.indexOf('BULL')>=0)return'<span class="badge up">'+v+'</span>';if(v==='BEAR'||v.indexOf('BEAR')>=0)return'<span class="badge down">'+v+'</span>';if(v==='NEUTRAL')return'<span class="badge neutral">'+v+'</span>';return'<span class="badge warn">'+v+'</span>';}
@@ -158,7 +158,7 @@ function renderAI(){
       dec.forEach(function(r){
         var ac=r.action==='BUY'?'up':r.action==='SELL'?'down':'';
         var oc=r.outcome==='WIN'?'up':r.outcome==='LOSS'?'down':'';
-        h+='<tr><td class="num">'+r.id+'</td><td class="num" style="font-size:10px">'+(r.time||'').slice(5,19)+'</td><td class="sym">'+r.sym+'</td><td><span class="badge '+(ac||'neutral')+'">'+r.action+'</span></td><td class="num">'+(r.conf*100).toFixed(0)+'%</td><td class="num">'+r.score.toFixed(2)+'</td><td>'+badge(r.regime)+'</td><td class="num '+(oc||'')+'">'+(r.outcome==='pending'?'...':r.outcome)+'</td><td class="num '+(r.pnl!==null?cls(r.pnl):'')+'">'+(r.pnl!==null?(r.pnl>=0?'+':'')+r.pnl+'%':'--')+'</td></tr>';
+        h+='<tr><td class="num">'+r.id+'</td><td class="num" style="font-size:10px">'+(r.time||'').slice(5,19)+'</td><td class="sym">'+r.sym+'</td><td><span class="badge '+(ac||'neutral')+'">'+r.action+'</span></td><td class="num">'+(r.conf!==undefined?(r.conf*100).toFixed(0):'--')+'%</td><td class="num">'+(r.score!==undefined?r.score.toFixed(2):'--')+'</td><td>'+badge(r.regime)+'</td><td class="num '+(oc||'')+'">'+(r.outcome==='pending'?'...':r.outcome)+'</td><td class="num '+(r.pnl!==null?cls(r.pnl):'')+'">'+(r.pnl!==null?(r.pnl>=0?'+':'')+r.pnl+'%':'--')+'</td></tr>';
       });
       h+='</table>';document.getElementById('ai-dec').innerHTML=h;
     }

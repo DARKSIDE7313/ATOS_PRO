@@ -26,7 +26,6 @@ DB_PATH = os.path.join(
 )
 
 _db_lock = threading.Lock()
-_db_write_lock = Lock()
 
 
 def _get_db() -> sqlite3.Connection:
@@ -39,52 +38,54 @@ def _get_db() -> sqlite3.Connection:
 def init_db():
     """初始化数据库表"""
     conn = _get_db()
-    conn.executescript("""
-        CREATE TABLE IF NOT EXISTS decisions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT NOT NULL,
-            market_regime TEXT,
-            symbol TEXT NOT NULL,
-            action TEXT NOT NULL,          -- BUY / SELL / HOLD
-            confidence REAL,                -- AI 自评置信度 0-1
-            factor_score REAL,              -- 当时的因子评分
-            reasons TEXT,                   -- JSON: 各理论视角的理由
-            debate_summary TEXT,            -- 辩论总结
-            snapshot_json TEXT,             -- 完整快照（压缩）
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        );
+    try:
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS decisions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                market_regime TEXT,
+                symbol TEXT NOT NULL,
+                action TEXT NOT NULL,          -- BUY / SELL / HOLD
+                confidence REAL,                -- AI 自评置信度 0-1
+                factor_score REAL,              -- 当时的因子评分
+                reasons TEXT,                   -- JSON: 各理论视角的理由
+                debate_summary TEXT,            -- 辩论总结
+                snapshot_json TEXT,             -- 完整快照（压缩）
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            );
 
-        CREATE TABLE IF NOT EXISTS outcomes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            decision_id INTEGER NOT NULL,
-            outcome_type TEXT NOT NULL,     -- WIN / LOSS / BREAKEVEN
-            pnl_pct REAL,
-            days_held INTEGER,
-            exit_reason TEXT,
-            ai_correct BOOLEAN,             -- AI 判断是否正确
-            notes TEXT,
-            recorded_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (decision_id) REFERENCES decisions(id)
-        );
+            CREATE TABLE IF NOT EXISTS outcomes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                decision_id INTEGER NOT NULL,
+                outcome_type TEXT NOT NULL,     -- WIN / LOSS / BREAKEVEN
+                pnl_pct REAL,
+                days_held INTEGER,
+                exit_reason TEXT,
+                ai_correct BOOLEAN,             -- AI 判断是否正确
+                notes TEXT,
+                recorded_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (decision_id) REFERENCES decisions(id)
+            );
 
-        CREATE TABLE IF NOT EXISTS patterns (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            pattern_type TEXT NOT NULL,     -- RECURRING_MISTAKE / SUCCESS_PATTERN
-            description TEXT,
-            conditions TEXT,                -- JSON: 触发条件
-            occurrence_count INTEGER DEFAULT 1,
-            last_seen TEXT,
-            confidence_impact REAL DEFAULT 0.0,  -- 对 AI 置信度的影响
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        );
+            CREATE TABLE IF NOT EXISTS patterns (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pattern_type TEXT NOT NULL,     -- RECURRING_MISTAKE / SUCCESS_PATTERN
+                description TEXT,
+                conditions TEXT,                -- JSON: 触发条件
+                occurrence_count INTEGER DEFAULT 1,
+                last_seen TEXT,
+                confidence_impact REAL DEFAULT 0.0,  -- 对 AI 置信度的影响
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            );
 
-        CREATE INDEX IF NOT EXISTS idx_decisions_symbol ON decisions(symbol);
-        CREATE INDEX IF NOT EXISTS idx_decisions_regime ON decisions(market_regime);
-        CREATE INDEX IF NOT EXISTS idx_decisions_timestamp ON decisions(timestamp);
-        CREATE INDEX IF NOT EXISTS idx_outcomes_decision ON outcomes(decision_id);
-    """)
-    conn.commit()
-    conn.close()
+            CREATE INDEX IF NOT EXISTS idx_decisions_symbol ON decisions(symbol);
+            CREATE INDEX IF NOT EXISTS idx_decisions_regime ON decisions(market_regime);
+            CREATE INDEX IF NOT EXISTS idx_decisions_timestamp ON decisions(timestamp);
+            CREATE INDEX IF NOT EXISTS idx_outcomes_decision ON outcomes(decision_id);
+        """)
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def record_decision(symbol: str, action: str, confidence: float,
@@ -95,25 +96,27 @@ def record_decision(symbol: str, action: str, confidence: float,
     init_db()
     with _db_lock:
         conn = _get_db()
-        cursor = conn.execute(
-            """INSERT INTO decisions (timestamp, market_regime, symbol, action,
-               confidence, factor_score, reasons, debate_summary, snapshot_json)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                datetime.datetime.now().isoformat(),
-                market_regime,
-                symbol,
-                action,
-                round(confidence, 4),
-                round(factor_score, 4),
-                json.dumps(reasons, ensure_ascii=False),
-                debate_summary,
-                json.dumps(snapshot, ensure_ascii=False) if snapshot else None,
+        try:
+            cursor = conn.execute(
+                """INSERT INTO decisions (timestamp, market_regime, symbol, action,
+                   confidence, factor_score, reasons, debate_summary, snapshot_json)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    datetime.datetime.now().isoformat(),
+                    market_regime,
+                    symbol,
+                    action,
+                    round(confidence, 4),
+                    round(factor_score, 4),
+                    json.dumps(reasons, ensure_ascii=False),
+                    debate_summary,
+                    json.dumps(snapshot, ensure_ascii=False) if snapshot else None,
+                )
             )
-        )
-        conn.commit()
-        decision_id = cursor.lastrowid
-    conn.close()
+            conn.commit()
+            decision_id = cursor.lastrowid
+        finally:
+            conn.close()
     logger.info(f"决策已记录 #{decision_id}: {action} {symbol} conf={confidence:.2f}")
     return decision_id
 
@@ -125,15 +128,17 @@ def record_outcome(decision_id: int, outcome_type: str, pnl_pct: float = 0,
     init_db()
     with _db_lock:
         conn = _get_db()
-        conn.execute(
-            """INSERT INTO outcomes (decision_id, outcome_type, pnl_pct, days_held,
-               exit_reason, ai_correct, notes)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (decision_id, outcome_type, round(pnl_pct, 6), days_held,
-             exit_reason, ai_correct, notes)
-        )
-        conn.commit()
-    conn.close()
+        try:
+            conn.execute(
+                """INSERT INTO outcomes (decision_id, outcome_type, pnl_pct, days_held,
+                   exit_reason, ai_correct, notes)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (decision_id, outcome_type, round(pnl_pct, 6), days_held,
+                 exit_reason, ai_correct, notes)
+            )
+            conn.commit()
+        finally:
+            conn.close()
     logger.info(f"结果已记录: #{decision_id} → {outcome_type} pnl={pnl_pct:.2%}")
 
     # 自动学习：更新该标的+市场环境的置信度调整
@@ -158,88 +163,87 @@ def auto_learn_from_outcome(decision_id: int, outcome_type: str, pnl_pct: float 
     init_db()
     with _db_lock:
         conn = _get_db()
+        try:
+            # 获取该决策的 symbol 和 regime
+            row = conn.execute(
+                "SELECT symbol, market_regime, confidence FROM decisions WHERE id = ?",
+                (decision_id,)
+            ).fetchone()
 
-        # 获取该决策的 symbol 和 regime
-        row = conn.execute(
-            "SELECT symbol, market_regime, confidence FROM decisions WHERE id = ?",
-            (decision_id,)
-        ).fetchone()
+            if not row:
+                return
 
-        if not row:
-            conn.close()
-            return
+            symbol = row["symbol"]
+            regime = row["market_regime"]
+            ai_confidence = row["confidence"]
 
-        symbol = row["symbol"]
-        regime = row["market_regime"]
-        ai_confidence = row["confidence"]
+            # 计算该 symbol+regime 的历史胜率
+            stats = conn.execute(
+                """SELECT COUNT(*) as total,
+                          SUM(CASE WHEN o.outcome_type='WIN' THEN 1 ELSE 0 END) as wins,
+                          SUM(CASE WHEN o.outcome_type='LOSS' THEN 1 ELSE 0 END) as losses
+                   FROM decisions d
+                   JOIN outcomes o ON d.id = o.decision_id
+                   WHERE d.symbol = ? AND d.market_regime = ?""",
+                (symbol, regime)
+            ).fetchone()
 
-        # 计算该 symbol+regime 的历史胜率
-        stats = conn.execute(
-            """SELECT COUNT(*) as total,
-                      SUM(CASE WHEN o.outcome_type='WIN' THEN 1 ELSE 0 END) as wins,
-                      SUM(CASE WHEN o.outcome_type='LOSS' THEN 1 ELSE 0 END) as losses
-               FROM decisions d
-               JOIN outcomes o ON d.id = o.decision_id
-               WHERE d.symbol = ? AND d.market_regime = ?""",
-            (symbol, regime)
-        ).fetchone()
+            total = stats["total"] or 0
+            wins = stats["wins"] or 0
+            losses = stats["losses"] or 0
 
-        total = stats["total"] or 0
-        wins = stats["wins"] or 0
-        losses = stats["losses"] or 0
+            if total < 2:
+                logger.debug(f"Auto-learn {symbol}/{regime}: only {total} outcomes, skipping")
+                return
 
-        if total < 2:
-            conn.close()
-            logger.debug(f"Auto-learn {symbol}/{regime}: only {total} outcomes, skipping")
-            return
+            win_rate = wins / total if total > 0 else 0.5
 
-        win_rate = wins / total if total > 0 else 0.5
+            # 更新 patterns 表中的 confidence_impact
+            # 查找该 symbol+regime 的 pattern
+            existing = conn.execute(
+                "SELECT id FROM patterns WHERE conditions LIKE ?",
+                (f"%{symbol}%{regime}%",)
+            ).fetchone()
 
-        # 更新 patterns 表中的 confidence_impact
-        # 查找该 symbol+regime 的 pattern
-        existing = conn.execute(
-            "SELECT id FROM patterns WHERE conditions LIKE ?",
-            (f"%{symbol}%{regime}%",)
-        ).fetchone()
+            if existing:
+                # 根据胜率更新置信度影响
+                # win_rate 低于 0.4 → 负向调整（降低置信度）
+                # win_rate 高于 0.6 → 正向调整（提高置信度）
+                if win_rate < 0.4:
+                    impact = round((win_rate - 0.5) * 0.5, 3)  # negative
+                elif win_rate > 0.6:
+                    impact = round((win_rate - 0.5) * 0.3, 3)  # slightly positive
+                else:
+                    impact = 0.0
 
-        if existing:
-            # 根据胜率更新置信度影响
-            # win_rate 低于 0.4 → 负向调整（降低置信度）
-            # win_rate 高于 0.6 → 正向调整（提高置信度）
-            if win_rate < 0.4:
-                impact = round((win_rate - 0.5) * 0.5, 3)  # negative
-            elif win_rate > 0.6:
-                impact = round((win_rate - 0.5) * 0.3, 3)  # slightly positive
-            else:
-                impact = 0.0
-
-            conn.execute(
-                "UPDATE patterns SET confidence_impact = ?, last_seen = date('now'), "
-                "occurrence_count = occurrence_count + 1 WHERE id = ?",
-                (impact, existing["id"])
-            )
-            logger.info(f"Auto-learn {symbol}/{regime}: win_rate={win_rate:.2%}, "
-                         f"impact={impact:+.3f} (pattern #{existing['id']})")
-        else:
-            # 记录为新 pattern
-            if win_rate < 0.4:
-                impact = round((win_rate - 0.5) * 0.5, 3)
                 conn.execute(
-                    """INSERT INTO patterns (pattern_type, description, conditions,
-                       occurrence_count, last_seen, confidence_impact)
-                       VALUES (?, ?, ?, ?, date('now'), ?)""",
-                    (
-                        "LEARNED_ADJUSTMENT",
-                        f"Auto-learn: {symbol} in {regime} has {wins}W/{losses}L ({win_rate:.0%})",
-                        f'{{"symbol": "{symbol}", "regime": "{regime}"}}',
-                        total,
-                        impact,
-                    )
+                    "UPDATE patterns SET confidence_impact = ?, last_seen = date('now'), "
+                    "occurrence_count = occurrence_count + 1 WHERE id = ?",
+                    (impact, existing["id"])
                 )
-                logger.info(f"Auto-learn {symbol}/{regime}: new pattern, impact={impact:+.3f}")
+                logger.info(f"Auto-learn {symbol}/{regime}: win_rate={win_rate:.2%}, "
+                             f"impact={impact:+.3f} (pattern #{existing['id']})")
+            else:
+                # 记录为新 pattern
+                if win_rate < 0.4:
+                    impact = round((win_rate - 0.5) * 0.5, 3)
+                    conn.execute(
+                        """INSERT INTO patterns (pattern_type, description, conditions,
+                           occurrence_count, last_seen, confidence_impact)
+                           VALUES (?, ?, ?, ?, date('now'), ?)""",
+                        (
+                            "LEARNED_ADJUSTMENT",
+                            f"Auto-learn: {symbol} in {regime} has {wins}W/{losses}L ({win_rate:.0%})",
+                            f'{{"symbol": "{symbol}", "regime": "{regime}"}}',
+                            total,
+                            impact,
+                        )
+                    )
+                    logger.info(f"Auto-learn {symbol}/{regime}: new pattern, impact={impact:+.3f}")
 
-        conn.commit()
-    conn.close()
+            conn.commit()
+        finally:
+            conn.close()
 
 
 def get_similar_history(market_regime: str, symbol: str = None,
@@ -247,34 +251,38 @@ def get_similar_history(market_regime: str, symbol: str = None,
     """查询历史中相似市场环境下的决策"""
     init_db()
     conn = _get_db()
-    query = """SELECT d.*, o.outcome_type, o.pnl_pct, o.ai_correct
-               FROM decisions d
-               LEFT JOIN outcomes o ON d.id = o.decision_id
-               WHERE d.market_regime = ?"""
-    params = [market_regime]
-    if symbol:
-        query += " AND d.symbol = ?"
-        params.append(symbol)
-    query += " ORDER BY d.timestamp DESC LIMIT ?"
-    params.append(limit)
+    try:
+        query = """SELECT d.*, o.outcome_type, o.pnl_pct, o.ai_correct
+                   FROM decisions d
+                   LEFT JOIN outcomes o ON d.id = o.decision_id
+                   WHERE d.market_regime = ?"""
+        params = [market_regime]
+        if symbol:
+            query += " AND d.symbol = ?"
+            params.append(symbol)
+        query += " ORDER BY d.timestamp DESC LIMIT ?"
+        params.append(limit)
 
-    rows = conn.execute(query, params).fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+        rows = conn.execute(query, params).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
 
 
 def get_mistake_patterns(min_count: int = 2) -> list[dict]:
     """查询重复出现的错误模式"""
     init_db()
     conn = _get_db()
-    rows = conn.execute(
-        """SELECT p.* FROM patterns p
-           WHERE p.occurrence_count >= ?
-           ORDER BY p.occurrence_count DESC""",
-        (min_count,)
-    ).fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+    try:
+        rows = conn.execute(
+            """SELECT p.* FROM patterns p
+               WHERE p.occurrence_count >= ?
+               ORDER BY p.occurrence_count DESC""",
+            (min_count,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
 
 
 def detect_and_record_pattern():
@@ -282,56 +290,57 @@ def detect_and_record_pattern():
     init_db()
     with _db_lock:
         conn = _get_db()
+        try:
+            # 找到所有亏损的决策
+            rows = conn.execute(
+                """SELECT d.symbol, d.market_regime, d.action, d.reasons,
+                          o.pnl_pct, o.exit_reason
+                   FROM decisions d
+                   JOIN outcomes o ON d.id = o.decision_id
+                   WHERE o.outcome_type = 'LOSS'
+                     AND o.recorded_at > datetime('now', '-7 days')
+                   ORDER BY d.timestamp DESC"""
+            ).fetchall()
 
-        # 找到所有亏损的决策
-        rows = conn.execute(
-            """SELECT d.symbol, d.market_regime, d.action, d.reasons,
-                      o.pnl_pct, o.exit_reason
-               FROM decisions d
-               JOIN outcomes o ON d.id = o.decision_id
-               WHERE o.outcome_type = 'LOSS'
-                 AND o.recorded_at > datetime('now', '-7 days')
-               ORDER BY d.timestamp DESC"""
-        ).fetchall()
+            # 按 symbol+regime 分组
+            from collections import Counter
+            pattern_counter = Counter()
+            for r in rows:
+                key = f"{r['action']}_{r['symbol']}_{r['market_regime']}"
+                pattern_counter[key] += 1
 
-        # 按 symbol+regime 分组
-        from collections import Counter
-        pattern_counter = Counter()
-        for r in rows:
-            key = f"{r['action']}_{r['symbol']}_{r['market_regime']}"
-            pattern_counter[key] += 1
-
-        # 记录出现 >=2 次的
-        for key, count in pattern_counter.items():
-            if count >= 2:
-                parts = key.split("_", 2)
-                if len(parts) < 3:
-                    continue
-                action, symbol, regime = parts
-                # 检查是否已存在
-                existing = conn.execute(
-                    "SELECT id FROM patterns WHERE description LIKE ?",
-                    (f"%{symbol}%{regime}%",)
-                ).fetchone()
-                if existing:
-                    conn.execute(
-                        "UPDATE patterns SET occurrence_count = ?, last_seen = date('now') WHERE id = ?",
-                        (count, existing["id"])
-                    )
-                else:
-                    conn.execute(
-                        """INSERT INTO patterns (pattern_type, description, conditions,
-                           occurrence_count, last_seen)
-                           VALUES (?, ?, ?, ?, date('now'))""",
-                        (
-                            "RECURRING_MISTAKE",
-                            f"重复亏损: {action} {symbol} 在 {regime} 市场",
-                            json.dumps({"symbol": symbol, "regime": regime, "action": action}),
-                            count,
+            # 记录出现 >=2 次的
+            for key, count in pattern_counter.items():
+                if count >= 2:
+                    parts = key.split("_", 2)
+                    if len(parts) < 3:
+                        continue
+                    action, symbol, regime = parts
+                    # 检查是否已存在
+                    existing = conn.execute(
+                        "SELECT id FROM patterns WHERE description LIKE ?",
+                        (f"%{symbol}%{regime}%",)
+                    ).fetchone()
+                    if existing:
+                        conn.execute(
+                            "UPDATE patterns SET occurrence_count = ?, last_seen = date('now') WHERE id = ?",
+                            (count, existing["id"])
                         )
-                    )
-        conn.commit()
-    conn.close()
+                    else:
+                        conn.execute(
+                            """INSERT INTO patterns (pattern_type, description, conditions,
+                               occurrence_count, last_seen)
+                               VALUES (?, ?, ?, ?, date('now'))""",
+                            (
+                                "RECURRING_MISTAKE",
+                                f"重复亏损: {action} {symbol} 在 {regime} 市场",
+                                json.dumps({"symbol": symbol, "regime": regime, "action": action}),
+                                count,
+                            )
+                        )
+            conn.commit()
+        finally:
+            conn.close()
     logger.info("错误模式检测完成")
 
 
@@ -345,35 +354,35 @@ def get_ai_confidence_adjustment(symbol: str, regime: str) -> float:
     init_db()
     with _db_lock:
         conn = _get_db()
+        try:
+            # 1. 基于 outcomes 的统计调整（原始逻辑）
+            row = conn.execute(
+                """SELECT COUNT(*) as total,
+                          SUM(CASE WHEN o.outcome_type='WIN' THEN 1 ELSE 0 END) as wins,
+                          SUM(CASE WHEN o.outcome_type='LOSS' THEN 1 ELSE 0 END) as losses
+                   FROM decisions d
+                   JOIN outcomes o ON d.id = o.decision_id
+                   WHERE d.symbol = ? AND d.market_regime = ?""",
+                (symbol, regime)
+            ).fetchone()
 
-        # 1. 基于 outcomes 的统计调整（原始逻辑）
-        row = conn.execute(
-            """SELECT COUNT(*) as total,
-                      SUM(CASE WHEN o.outcome_type='WIN' THEN 1 ELSE 0 END) as wins,
-                      SUM(CASE WHEN o.outcome_type='LOSS' THEN 1 ELSE 0 END) as losses
-               FROM decisions d
-               JOIN outcomes o ON d.id = o.decision_id
-               WHERE d.symbol = ? AND d.market_regime = ?""",
-            (symbol, regime)
-        ).fetchone()
+            total = row["total"] or 0
+            if total >= 2:
+                win_rate = row["wins"] / total if total > 0 else 0.5
+                outcome_adjustment = (win_rate - 0.5) * 0.3
+            else:
+                outcome_adjustment = 0.0
 
-        total = row["total"] or 0
-        if total >= 2:
-            win_rate = row["wins"] / total if total > 0 else 0.5
-            outcome_adjustment = (win_rate - 0.5) * 0.3
-        else:
-            outcome_adjustment = 0.0
-
-        # 2. 基于 patterns 的学习调整（auto_learn 写入的 confidence_impact）
-        pattern_row = conn.execute(
-            """SELECT confidence_impact FROM patterns
-               WHERE conditions LIKE ?
-               ORDER BY last_seen DESC LIMIT 1""",
-            (f"%{symbol}%{regime}%",)
-        ).fetchone()
-        pattern_adjustment = pattern_row["confidence_impact"] if pattern_row else 0.0
-
-    conn.close()
+            # 2. 基于 patterns 的学习调整（auto_learn 写入的 confidence_impact）
+            pattern_row = conn.execute(
+                """SELECT confidence_impact FROM patterns
+                   WHERE conditions LIKE ?
+                   ORDER BY last_seen DESC LIMIT 1""",
+                (f"%{symbol}%{regime}%",)
+            ).fetchone()
+            pattern_adjustment = pattern_row["confidence_impact"] if pattern_row else 0.0
+        finally:
+            conn.close()
 
     # 综合调整
     adjustment = outcome_adjustment + pattern_adjustment
@@ -386,24 +395,26 @@ def get_memory_stats() -> dict:
     """获取记忆系统统计"""
     init_db()
     conn = _get_db()
-    total_decisions = conn.execute("SELECT COUNT(*) FROM decisions").fetchone()[0]
-    total_outcomes = conn.execute("SELECT COUNT(*) FROM outcomes").fetchone()[0]
-    win_count = conn.execute(
-        "SELECT COUNT(*) FROM outcomes WHERE outcome_type='WIN'"
-    ).fetchone()[0]
-    loss_count = conn.execute(
-        "SELECT COUNT(*) FROM outcomes WHERE outcome_type='LOSS'"
-    ).fetchone()[0]
-    patterns = conn.execute("SELECT COUNT(*) FROM patterns").fetchone()[0]
-    conn.close()
-    return {
-        "total_decisions": total_decisions,
-        "total_outcomes": total_outcomes,
-        "win_count": win_count,
-        "loss_count": loss_count,
-        "win_rate": win_count / total_outcomes if total_outcomes > 0 else 0.0,
-        "patterns_detected": patterns,
-    }
+    try:
+        total_decisions = conn.execute("SELECT COUNT(*) FROM decisions").fetchone()[0]
+        total_outcomes = conn.execute("SELECT COUNT(*) FROM outcomes").fetchone()[0]
+        win_count = conn.execute(
+            "SELECT COUNT(*) FROM outcomes WHERE outcome_type='WIN'"
+        ).fetchone()[0]
+        loss_count = conn.execute(
+            "SELECT COUNT(*) FROM outcomes WHERE outcome_type='LOSS'"
+        ).fetchone()[0]
+        patterns = conn.execute("SELECT COUNT(*) FROM patterns").fetchone()[0]
+        return {
+            "total_decisions": total_decisions,
+            "total_outcomes": total_outcomes,
+            "win_count": win_count,
+            "loss_count": loss_count,
+            "win_rate": win_count / total_outcomes if total_outcomes > 0 else 0.0,
+            "patterns_detected": patterns,
+        }
+    finally:
+        conn.close()
 
 
 def write_trade_journal(merged_result: dict, snapshot: dict, regime: str):

@@ -39,7 +39,8 @@ def load_market_summary():
     summary_path = os.path.join(BASE, "data", "market_summary.json")
     if os.path.exists(summary_path):
         try:
-            return json.load(open(summary_path, encoding="utf-8"))
+            with open(summary_path, encoding="utf-8") as f:
+                return json.load(f)
         except Exception:
             pass
     return {"note": "no market_summary.json found"}
@@ -85,7 +86,8 @@ def main():
     history = []
     for rp in sorted(glob.glob(os.path.join(BASE, "reports", "review_*.json")))[-7:]:
         try:
-            r = json.load(open(rp, encoding="utf-8"))
+            with open(rp, encoding="utf-8") as f:
+                r = json.load(f)
             history.append({
                 "date": os.path.basename(rp)[7:17],
                 "performance_summary": r.get("performance_summary", ""),

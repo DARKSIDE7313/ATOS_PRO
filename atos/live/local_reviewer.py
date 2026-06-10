@@ -6,7 +6,8 @@ API Key 放在环境变量 DEEPSEEK_API_KEY 里。
 import json, os, datetime, requests
 
 API_URL = "https://api.deepseek.com/chat/completions"
-MODEL   = "deepseek-reasoner"   # R1，有深度推理
+MODEL   = "deepseek-chat"   # 先用 chat 模型，支持 json_object response_format
+# 若想用 R1 深度推理，可改为 "deepseek-reasoner"，但需删除下面第68行的 response_format
 API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 
 DATA_PATH   = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data")

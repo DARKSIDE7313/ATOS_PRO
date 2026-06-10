@@ -111,4 +111,4 @@ def kelly_qty(symbol_price: float, total_equity: float,
     delta_value  = target_value - current_position_value
     if delta_value <= 0 or symbol_price <= 0:
         return 0
-    return int(delta_value / symbol_price)
+    return max(1, int(delta_value / symbol_price))

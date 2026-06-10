@@ -21,6 +21,8 @@ UNIVERSE_FULL: dict[str, list[str]] = {
     "industrial":  ["CAT", "BA", "GE", "HON", "UPS", "XOM", "CVX"],
     # 防御/ETF
     "defensive":   ["SPY", "QQQ", "IWM", "TLT", "GLD", "SLV", "USO"],
+    # 新增: 生物科技/云计算/清洁能源（扩展覆盖面，增加候选池）
+    "extended":    ["IBB", "CRM", "ADBE", "NFLX", "PANW"],
 }
 
 # 展平为全列表
@@ -63,9 +65,9 @@ def get_active_symbols(signals: dict) -> dict[str, list[str]]:
         trend = s.get("trend", "NEUTRAL")
         rsi = s.get("rsi", 50)
         vol_r = s.get("volume_ratio", 1.0)
-        if trend == "DOWN" or rsi > 80:
+        if trend == "DOWN" or rsi > 85:  # 放宽: 80→85, 只有极度超买才回避
             active["avoid"].append(sym)
-        elif trend == "UP" and 40 <= rsi <= 70 and vol_r >= 0.7:
+        elif trend == "UP" and 35 <= rsi <= 75 and vol_r >= 0.5:  # 放宽: RSI范围40-70→35-75, vol_r 0.7→0.5
             active["quality"].append(sym)
         else:
             active["watch"].append(sym)

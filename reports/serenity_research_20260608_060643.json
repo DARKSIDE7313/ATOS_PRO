@@ -1,0 +1,346 @@
+{
+  "timestamp": "2026-06-08T06:06:43.270799",
+  "symbols_scanned": 29,
+  "primary_chokepoints": [],
+  "strong_chokepoints": [],
+  "watch_chokepoints": [],
+  "deep_chokepoints": [],
+  "supply_chain_map": {},
+  "signals": [
+    {
+      "symbol": "NVDA",
+      "signal_type": "monopoly_margin",
+      "intensity": "HIGH",
+      "description": "\u6bdb\u5229\u738774% \u2014 \u9876\u7ea7\u5b9a\u4ef7\u6743",
+      "price": 205.1,
+      "gross_margins": 0.7414
+    },
+    {
+      "symbol": "AVGO",
+      "signal_type": "monopoly_margin",
+      "intensity": "HIGH",
+      "description": "\u6bdb\u5229\u738776% \u2014 \u9876\u7ea7\u5b9a\u4ef7\u6743",
+      "price": 385.73,
+      "gross_margins": 0.7628
+    },
+    {
+      "symbol": "KLAC",
+      "signal_type": "short_interest",
+      "intensity": "HIGH",
+      "description": "\u505a\u7a7a28.9% \u2014 \u6781\u5ea6\u505a\u7a7a\uff0c\u8f67\u7a7a\u7206\u70b8\u6f5c\u529b",
+      "price": 1929.2,
+      "short_pct": 0.2889,
+      "change": null
+    },
+    {
+      "symbol": "KLAC",
+      "signal_type": "monopoly_margin",
+      "intensity": "HIGH",
+      "description": "\u6bdb\u5229\u738761% \u2014 \u9876\u7ea7\u5b9a\u4ef7\u6743",
+      "price": 1929.2,
+      "gross_margins": 0.6145
+    },
+    {
+      "symbol": "NBIS",
+      "signal_type": "short_interest",
+      "intensity": "HIGH",
+      "description": "\u505a\u7a7a20.7% \u2014 \u6781\u5ea6\u505a\u7a7a\uff0c\u8f67\u7a7a\u7206\u70b8\u6f5c\u529b",
+      "price": 227.81,
+      "short_pct": 0.2068,
+      "change": null
+    },
+    {
+      "symbol": "NBIS",
+      "signal_type": "monopoly_margin",
+      "intensity": "HIGH",
+      "description": "\u6bdb\u5229\u738772% \u2014 \u9876\u7ea7\u5b9a\u4ef7\u6743",
+      "price": 227.81,
+      "gross_margins": 0.7206
+    },
+    {
+      "symbol": "IREN",
+      "signal_type": "monopoly_margin",
+      "intensity": "HIGH",
+      "description": "\u6bdb\u5229\u738768% \u2014 \u9876\u7ea7\u5b9a\u4ef7\u6743",
+      "price": 54.35,
+      "gross_margins": 0.684
+    },
+    {
+      "symbol": "MRVL",
+      "signal_type": "volume_spike",
+      "intensity": "MEDIUM",
+      "description": "\u6210\u4ea4\u91cf\u5f02\u5e38: 3.1x \u5747\u503c",
+      "price": 263.47,
+      "vol_ratio": 3.1
+    },
+    {
+      "symbol": "LITE",
+      "signal_type": "short_interest",
+      "intensity": "MEDIUM",
+      "description": "\u505a\u7a7a13.0% \u2014 \u663e\u8457\u505a\u7a7a\uff0c\u6709\u673a\u4f1a",
+      "price": 863.66,
+      "short_pct": 0.1302,
+      "change": null
+    },
+    {
+      "symbol": "AAOI",
+      "signal_type": "short_interest",
+      "intensity": "MEDIUM",
+      "description": "\u505a\u7a7a12.1% \u2014 \u663e\u8457\u505a\u7a7a\uff0c\u6709\u673a\u4f1a",
+      "price": 177.0,
+      "short_pct": 0.1207,
+      "change": null
+    },
+    {
+      "symbol": "AXTI",
+      "signal_type": "short_interest",
+      "intensity": "MEDIUM",
+      "description": "\u505a\u7a7a13.2% \u2014 \u663e\u8457\u505a\u7a7a\uff0c\u6709\u673a\u4f1a",
+      "price": 89.053,
+      "short_pct": 0.1319,
+      "change": null
+    },
+    {
+      "symbol": "AMKR",
+      "signal_type": "short_interest",
+      "intensity": "MEDIUM",
+      "description": "\u505a\u7a7a12.2% \u2014 \u663e\u8457\u505a\u7a7a\uff0c\u6709\u673a\u4f1a",
+      "price": 64.95,
+      "short_pct": 0.1222,
+      "change": null
+    },
+    {
+      "symbol": "IREN",
+      "signal_type": "short_interest",
+      "intensity": "MEDIUM",
+      "description": "\u505a\u7a7a14.7% \u2014 \u663e\u8457\u505a\u7a7a\uff0c\u6709\u673a\u4f1a",
+      "price": 54.35,
+      "short_pct": 0.1472,
+      "change": null
+    },
+    {
+      "symbol": "CIFR",
+      "signal_type": "short_interest",
+      "intensity": "MEDIUM",
+      "description": "\u505a\u7a7a16.4% \u2014 \u663e\u8457\u505a\u7a7a\uff0c\u6709\u673a\u4f1a",
+      "price": 22.45,
+      "short_pct": 0.1635,
+      "change": null
+    },
+    {
+      "symbol": "WDC",
+      "signal_type": "short_interest",
+      "intensity": "LOW",
+      "description": "\u505a\u7a7a9.7% \u2014 \u8f7b\u5ea6\u505a\u7a7a",
+      "price": 511.72,
+      "short_pct": 0.0974,
+      "change": null
+    },
+    {
+      "symbol": "COHR",
+      "signal_type": "short_interest",
+      "intensity": "LOW",
+      "description": "\u505a\u7a7a5.2% \u2014 \u8f7b\u5ea6\u505a\u7a7a",
+      "price": 376.99,
+      "short_pct": 0.052,
+      "change": null
+    },
+    {
+      "symbol": "LUMN",
+      "signal_type": "short_interest",
+      "intensity": "LOW",
+      "description": "\u505a\u7a7a6.6% \u2014 \u8f7b\u5ea6\u505a\u7a7a",
+      "price": 8.91,
+      "short_pct": 0.0655,
+      "change": null
+    },
+    {
+      "symbol": "ENTG",
+      "signal_type": "short_interest",
+      "intensity": "LOW",
+      "description": "\u505a\u7a7a7.3% \u2014 \u8f7b\u5ea6\u505a\u7a7a",
+      "price": 125.41,
+      "short_pct": 0.0735,
+      "change": null
+    }
+  ],
+  "heat_map": {
+    "NVDA": "HOT",
+    "AVGO": "HOT",
+    "KLAC": "HOT",
+    "NBIS": "HOT",
+    "IREN": "HOT",
+    "MRVL": "WARM",
+    "LITE": "WARM",
+    "AAOI": "WARM",
+    "AXTI": "WARM",
+    "AMKR": "WARM",
+    "CIFR": "WARM",
+    "WDC": "WARM",
+    "COHR": "WARM",
+    "LUMN": "WARM",
+    "ENTG": "WARM"
+  },
+  "quality_scores": {
+    "NVDA": {
+      "composite": 0.35,
+      "serenity_score": 0,
+      "decision": "PASS"
+    },
+    "AMD": {
+      "composite": 0.35,
+      "serenity_score": 0,
+      "decision": "PASS"
+    },
+    "MRVL": {
+      "composite": 0.35,
+      "serenity_score": 0,
+      "decision": "PASS"
+    },
+    "AVGO": {
+      "composite": 0.35,
+      "serenity_score": 0,
+      "decision": "PASS"
+    },
+    "INTC": {
+      "composite": 0.25,
+      "serenity_score": 0,
+      "decision": "PASS"
+    },
+    "MU": {
+      "composite": 0.35,
+      "serenity_score": 0,
+      "decision": "PASS"
+    },
+    "STX": {
+      "composite": 0.35,
+      "serenity_score": 0,
+      "decision": "PASS"
+    },
+    "WDC": {
+      "composite": 0.35,
+      "serenity_score": 0,
+      "decision": "PASS"
+    },
+    "SIVE": {
+      "composite": 0.25,
+      "serenity_score": 0,
+      "decision": "PASS"
+    },
+    "LITE": {
+      "composite": 0.35,
+      "serenity_score": 0,
+      "decision": "PASS"
+    },
+    "AAOI": {
+      "composite": 0.25,
+      "serenity_score": 0,
+      "decision": "PASS"
+    },
+    "COHR": {
+      "composite": 0.25,
+      "serenity_score": 0,
+      "decision": "PASS"
+    },
+    "LUMN": {
+      "composite": 0.35,
+      "serenity_score": 0,
+      "decision": "PASS"
+    },
+    "AMAT": {
+      "composite": 0.35,
+      "serenity_score": 0,
+      "decision": "PASS"
+    },
+    "ASML": {
+      "composite": 0.35,
+      "serenity_score": 0,
+      "decision": "PASS"
+    },
+    "LRCX": {
+      "composite": 0.35,
+      "serenity_score": 0,
+      "decision": "PASS"
+    },
+    "KLAC": {
+      "composite": 0.35,
+      "serenity_score": 0,
+      "decision": "PASS"
+    },
+    "TER": {
+      "composite": 0.35,
+      "serenity_score": 0,
+      "decision": "PASS"
+    },
+    "ENTG": {
+      "composite": 0.35,
+      "serenity_score": 0,
+      "decision": "PASS"
+    },
+    "AXTI": {
+      "composite": 0.25,
+      "serenity_score": 0,
+      "decision": "PASS"
+    },
+    "IQE": {
+      "composite": 0.25,
+      "serenity_score": 0,
+      "decision": "PASS"
+    },
+    "SOI": {
+      "composite": 0.25,
+      "serenity_score": 0,
+      "decision": "PASS"
+    },
+    "WOLF": {
+      "composite": 0.25,
+      "serenity_score": 0,
+      "decision": "PASS"
+    },
+    "CCMP": {
+      "composite": 0.25,
+      "serenity_score": 0,
+      "decision": "PASS"
+    },
+    "AMKR": {
+      "composite": 0.25,
+      "serenity_score": 0,
+      "decision": "PASS"
+    },
+    "STAT": {
+      "composite": 0.25,
+      "serenity_score": 0,
+      "decision": "PASS"
+    },
+    "NBIS": {
+      "composite": 0.35,
+      "serenity_score": 0,
+      "decision": "PASS"
+    },
+    "IREN": {
+      "composite": 0.35,
+      "serenity_score": 0,
+      "decision": "PASS"
+    },
+    "CIFR": {
+      "composite": 0.25,
+      "serenity_score": 0,
+      "decision": "PASS"
+    }
+  },
+  "summary": {
+    "total_scanned": 29,
+    "strong_count": 0,
+    "watch_count": 0,
+    "deep_count": 0,
+    "hot_signals": 5,
+    "top_5_strong": [],
+    "top_5_hot": [
+      "NVDA",
+      "AVGO",
+      "KLAC",
+      "NBIS",
+      "IREN"
+    ]
+  }
+}
