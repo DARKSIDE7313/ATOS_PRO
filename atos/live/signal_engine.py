@@ -61,25 +61,21 @@ def clear_cache():
     """强制清空缓存（手动更新用）"""
     _cache.clear()
 
-_EDT_LOCK = threading.Lock()
-
 def _is_edt() -> bool:
     """Check if US Eastern time is currently in EDT (Daylight Saving).
-    Uses system timezone database via time.daylight flag.
-    Thread-safe via _EDT_LOCK."""
-    with _EDT_LOCK:
-        # Save current TZ, set to US Eastern, check DST
-        old_tz = os.environ.get('TZ', '')
-        os.environ['TZ'] = 'America/New_York'
+    Thread-safe via zoneinfo (no os.environ mutation)."""
+    import zoneinfo
+    try:
+        tz = zoneinfo.ZoneInfo("America/New_York")
+        now_ny = datetime.now(tz)
+        # EDT is UTC-4, EST is UTC-5. If utc_offset == -4 hours → EDT.
+        return now_ny.utcoffset().total_seconds() / 3600 == -4
+    except Exception:
+        # Fallback: use time.daylight (not thread-safe but only reached on zoneinfo failure)
         try:
-            time.tzset()
             return time.daylight != 0
-        finally:
-            if old_tz:
-                os.environ['TZ'] = old_tz
-            else:
-                os.environ.pop('TZ', None)
-            time.tzset()
+        except Exception:
+            return False
 
 
 def is_nasdaq_open() -> bool:
@@ -228,11 +224,37 @@ def _calc_news_score(symbol: str) -> float:
         # 封顶0.20
         score = min(score, 0.20)
 
-    except Exception:
-        pass  # 新闻抓取失败不报错，返回0分
+        _NEWS_CACHE[symbol] = (now, score)
+        return round(score, 3)
 
-    _NEWS_CACHE[symbol] = (now, score)
-    return round(score, 3)
+    except Exception:
+        _NEWS_CACHE[symbol] = (now, 0.0)
+        return 0.0  # 新闻抓取失败不报错，返回0分
+
+
+# 🆕 SMC 聪明钱分数 — 缓存版本（避免每个标的都重算K线数据）
+_SMC_CACHE = {}
+_SMC_TTL = timedelta(hours=1)
+
+
+def _calc_smc_score(symbol: str, df: pd.DataFrame) -> dict:
+    """"计算SMC聪明钱分数，带缓存（1小时有效）"""
+    now = datetime.now()
+    if symbol in _SMC_CACHE:
+        ts, score = _SMC_CACHE[symbol]
+        if now - ts < _SMC_TTL:
+            return score
+    
+    try:
+        from atos.factors.smc import compute_smc_score
+        result = compute_smc_score(symbol, df)
+        # 确保所有数值都是原生Python类型（不是numpy）
+        _SMC_CACHE[symbol] = (now, result)
+        return result
+    except Exception as e:
+        logger.debug(f"SMC计算失败 {sym}: {e}")
+        _SMC_CACHE[symbol] = (now, {"smc_score": 0.0, "smc_breakdown": {}, "ob": {}, "fvg": {}, "structure": {}, "liquidity": {}, "stop_hunt": {}})
+        return {"smc_score": 0.0, "smc_breakdown": {}, "ob": {}, "fvg": {}, "structure": {}, "liquidity": {}, "stop_hunt": {}}
 
 
 def get_signals(symbols: list[str] = None) -> dict:
@@ -299,6 +321,7 @@ def get_signals(symbols: list[str] = None) -> dict:
                 "atr":          round(atr_val, 2),
                 "bollinger":    boll,
                 "news_score":   _calc_news_score(sym),  # 🆕 新闻催化剂分数
+                "smc_score":    _calc_smc_score(sym, df),  # 🆕 SMC聪明钱分数
             }
             log_signal(sym, results[sym])
 

@@ -49,7 +49,7 @@ try:
     s.connect(("127.0.0.1", 19999))
     s.close()
     print("Socket 锁端口 19999 已被占用 → 表明 Shadow 仍在运行")
-except:
+except Exception:
     print("Socket 锁已释放")
 
 # 3. 杀旧进程
@@ -61,7 +61,7 @@ try:
             pid = int(parts[1])
             os.kill(pid, signal.SIGTERM)
             print(f"已终止 Shadow Trader PID: {pid}")
-except:
+except Exception:
     pass
 
 time.sleep(2)

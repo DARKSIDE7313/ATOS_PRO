@@ -8,15 +8,16 @@ from atos.core.logging import get_logger
 
 logger = get_logger("price_updater")
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SHORT_FILE = "/Users/benson/ATOS_PRO/data/shadow_state.json"
-LONG_FILE = "/Users/benson/ATOS_PRO/data/longterm_state.json"
+DATA_DIR = os.path.join(os.path.dirname(BASE), "data")
+SHORT_FILE = os.path.join(DATA_DIR, "shadow_state.json")
+LONG_FILE = os.path.join(DATA_DIR, "longterm_state.json")
 
 def safe_price(v):
     try:
         v = float(v)
         if str(v) == "nan": return 0.0
         return v
-    except: return 0.0
+    except Exception: return 0.0
 
 
 def update_prices(state_file, pos_key, price_key, equity_key):

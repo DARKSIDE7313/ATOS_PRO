@@ -124,7 +124,6 @@ def cio_analysis(market_snapshot: dict) -> dict:
                 {"role": "system", "content": CIO_SYSTEM_PROMPT},
                 {"role": "user", "content": json.dumps(prompt_input, ensure_ascii=False)},
             ],
-            "response_format": {"type": "json_object"},
         }
         headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
         resp = requests.post(API_URL, json=payload, headers=headers, timeout=60)
@@ -206,7 +205,6 @@ def review_position(position_data: dict) -> dict:
                 {"role": "system", "content": POSITION_REVIEW_PROMPT},
                 {"role": "user", "content": json.dumps(position_data, ensure_ascii=False)},
             ],
-            "response_format": {"type": "json_object"},
         }
         headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
         resp = requests.post(API_URL, json=payload, headers=headers, timeout=30)
@@ -283,7 +281,6 @@ def analyze_candidate(candidate_data: dict) -> dict:
                 {"role": "system", "content": OPEN_TRADE_PROMPT},
                 {"role": "user", "content": json.dumps(candidate_data, ensure_ascii=False)},
             ],
-            "response_format": {"type": "json_object"},
         }
         headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
         resp = requests.post(API_URL, json=payload, headers=headers, timeout=30)
@@ -425,7 +422,6 @@ def veto_candidate(candidate: dict) -> dict:
                 {"role": "system", "content": VETO_PROMPT},
                 {"role": "user", "content": json.dumps(candidate, ensure_ascii=False)},
             ],
-            "response_format": {"type": "json_object"},
         }
         headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
         resp = requests.post(API_URL, json=payload, headers=headers, timeout=30)
@@ -695,7 +691,6 @@ def get_advice_v4_ultra(snapshot: dict) -> dict:
                 {"role": "system", "content": ULTRA_PROMPT},
                 {"role": "user", "content": json.dumps(ultra_input, ensure_ascii=False)},
             ],
-            "response_format": {"type": "json_object"},
         }
         headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
         resp = requests.post(API_URL, json=payload, headers=headers, timeout=120)

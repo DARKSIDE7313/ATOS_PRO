@@ -70,7 +70,7 @@ class LongTermPortfolio:
                 if price <= 0:
                     continue
 
-                shares = int(per_position / price)
+                shares = max(1, int(per_position / price))
                 if shares == 0 or shares * price > self.cash:
                     continue
 

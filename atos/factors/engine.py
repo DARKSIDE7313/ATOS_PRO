@@ -243,6 +243,13 @@ def combine(signals: dict, value_factors: dict, momentum_factors: dict,
         t_score = _tech_score(signals[sym])
         f_score = multiframe_factors.get(sym, {}).get("composite", 0.5)
         r_score = _mean_rev_score(signals[sym])  # 🆕 均值回归
+        smc_score_raw = signals[sym].get("smc_score", {}).get("smc_score", 0.0)  # 🆕 SMC聪明钱
+
+        # SMC得分范围-0.6~0.6，映射到0~1区间（中线0.5）
+        # smc_score_raw > 0 → 看涨信号 → 加分
+        # smc_score_raw < 0 → 看跌信号 → 减分
+        smc_normalized = 0.5 + smc_score_raw  # -0.6~0.6 → -0.1~1.1, clamp to 0~1
+        smc_normalized = max(0.0, min(1.0, smc_normalized))
 
         total = (
             v_score * weights["value"] +
@@ -250,7 +257,8 @@ def combine(signals: dict, value_factors: dict, momentum_factors: dict,
             q_score * weights["quality"] +
             t_score * weights["technical"] +
             f_score * weights["multiframe"] +
-            r_score * weights.get("mean_rev", 0.0)  # 🆕 均值回归权重
+            r_score * weights.get("mean_rev", 0.0) +  # 🆕 均值回归权重
+            smc_normalized * 0.08  # 🆕 SMC因子权重8%
         )
 
         scores[sym] = round(total, 4)

@@ -29,12 +29,15 @@ UNIVERSE_FULL: dict[str, list[str]] = {
 
 # 展平为全列表 — 保留NVDA权重翻倍（出现在tech_mega和high_beta两组）
 ALL_SYMBOLS: list[str] = []
+ALL_SYMBOLS_DEDUPED: list[str] = []
 seen = set()
 for sym in [s for g in UNIVERSE_FULL.values() for s in g]:
     if sym == "NVDA" or sym not in seen:
         ALL_SYMBOLS.append(sym)
         seen.add(sym)
 # NVDA 在展平时出现2次（科技大盘+high_beta）, 保持在list中2次 = 权重翻倍
+# ALL_SYMBOLS_DEDUPED 用于循环遍历（不重复）
+ALL_SYMBOLS_DEDUPED = list(dict.fromkeys(ALL_SYMBOLS))
 
 # === 策略分配 ===
 LONG_TERM_SYMBOLS: list[str] = [

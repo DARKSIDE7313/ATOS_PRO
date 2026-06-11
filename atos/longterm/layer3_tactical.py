@@ -256,7 +256,7 @@ class Layer3Tactical:
                     price = float(stock.info.get("currentPrice", 0) or
                                  stock.history(period="1d")["Close"].iloc[-1])
                     if price > 0:
-                        shares = int(per_etf / price)
+                        shares = max(1, int(per_etf / price))
                         orders.append({
                             "layer": "tactical",
                             "sub": "factor_rotation",
@@ -281,7 +281,7 @@ class Layer3Tactical:
                     price = float(stock.info.get("currentPrice", 0) or
                                  stock.history(period="1d")["Close"].iloc[-1])
                     if price > 0:
-                        shares = int(per_sec / price)
+                        shares = max(1, int(per_sec / price))
                         orders.append({
                             "layer": "tactical",
                             "sub": "sector_rotation",

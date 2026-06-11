@@ -649,8 +649,10 @@ def get_chokepoint_candidates(symbols: list[str] = None,
     boosts = {}
 
     for c in candidates:
-        sym = c["symbol"]
-        decision = c["decision"]
+        sym = c.get("symbol", "")
+        if not sym:
+            continue
+        decision = c.get("decision", "PASS")
         short_pct = c.get("short_pct", 0) or 0
 
         if decision == "STRONG_CHOKEPOINT":

@@ -153,7 +153,7 @@ def hedge_suggestion(positions: list[dict], betas: dict,
     except Exception:
         spy_price = 600.0
 
-    spy_shares = int(hedge_value / spy_price) if spy_price > 0 else 0
+    spy_shares = max(1, int(hedge_value / spy_price)) if spy_price > 0 else 0
 
     logger.info(
         f"对冲建议: 组合Beta={portfolio_beta:.2f} → "

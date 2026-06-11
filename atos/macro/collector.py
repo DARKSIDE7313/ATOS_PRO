@@ -51,14 +51,14 @@ def get_interest_rates() -> dict:
         irx = tb.history(period="1mo")
         result["fed_funds_rate"] = round(float(irx["Close"].iloc[-1]) / 100, 4) if not irx.empty else None
         result["fed_funds_rate_1m_ago"] = round(float(irx["Close"].iloc[0]) / 100, 4) if not irx.empty and len(irx) > 1 else None
-    except: pass
+    except Exception: pass
 
     try:
         tnx = yf.Ticker("^TNX")  # 10Y Treasury
         tnx_h = tnx.history(period="1mo")
         result["treasury_10y"] = round(float(tnx_h["Close"].iloc[-1]) / 100, 4) if not tnx_h.empty else None
         result["treasury_10y_1m_ago"] = round(float(tnx_h["Close"].iloc[0]) / 100, 4) if not tnx_h.empty and len(tnx_h) > 1 else None
-    except: pass
+    except Exception: pass
 
     try:
         two = yf.Ticker("^2Y") if hasattr(yf.Ticker("^2Y"), 'history') else None
@@ -69,13 +69,13 @@ def get_interest_rates() -> dict:
             # SHY yield ≈ 1 - price/100 (approximate)
             shy_yield = (100 - float(shy_h["Close"].iloc[-1])) / 100 * 2  # rough 2Y proxy
             result["treasury_2y"] = round(shy_yield, 4)
-    except: pass
+    except Exception: pass
 
     try:
         tyx = yf.Ticker("^TYX")  # 30Y Treasury
         tyx_h = tyx.history(period="1mo")
         result["treasury_30y"] = round(float(tyx_h["Close"].iloc[-1]) / 100, 4) if not tyx_h.empty else None
-    except: pass
+    except Exception: pass
 
     # 收益率曲线 (10Y - 2Y)
     if result.get("treasury_10y") and result.get("treasury_2y"):
@@ -110,7 +110,7 @@ def get_inflation() -> dict:
             if tip_3m_chg > 0.02: result["inflation_trend"] = "rising"
             elif tip_3m_chg < -0.01: result["inflation_trend"] = "falling"
             else: result["inflation_trend"] = "stable"
-    except: pass
+    except Exception: pass
 
     try:
         # Breakeven inflation rate via TIP vs IEI (7-10Y Treasury)
@@ -124,7 +124,7 @@ def get_inflation() -> dict:
             if iei_p > 0:
                 # 近似盈亏平衡通胀率
                 result["breakeven_inflation"] = round((iei_p - tip_p) / iei_p * 100, 2)
-    except: pass
+    except Exception: pass
 
     _set_cache(cache_key, result)
     return result
@@ -199,7 +199,7 @@ def get_global_markets() -> dict:
                     "change_1m_pct": round(change_1m * 100, 2),
                     "trend": "up" if change_1m > 0.02 else ("down" if change_1m < -0.02 else "flat"),
                 }
-        except: pass
+        except Exception: pass
 
     _set_cache(cache_key, result)
     return result
@@ -232,7 +232,7 @@ def get_fear_greed() -> dict:
             elif vix_current > 15: result["fear_greed"] = "NEUTRAL"
             elif vix_current > 12: result["fear_greed"] = "GREED"
             else: result["fear_greed"] = "EXTREME_GREED"
-    except: pass
+    except Exception: pass
 
     _set_cache(cache_key, result)
     return result
@@ -256,7 +256,7 @@ def get_fed_policy() -> dict:
             month_ago_rate = 100 - float(zq_h["Close"].iloc[0])
             result["fed_futures_implied_rate"] = round(current_rate, 2)
             result["fed_rate_change_expectation"] = "HIKING" if current_rate > month_ago_rate else ("CUTTING" if current_rate < month_ago_rate else "HOLDING")
-    except: pass
+    except Exception: pass
 
     # 如果 ZQ 取不到，用 ^IRX
     if "fed_futures_implied_rate" not in result:
@@ -268,7 +268,7 @@ def get_fed_policy() -> dict:
                 prev = float(irx_h["Close"].iloc[0]) if len(irx_h) > 1 else current
                 result["fed_futures_implied_rate"] = round(current, 2)
                 result["fed_rate_change_expectation"] = "HIKING" if current > prev else ("CUTTING" if current < prev else "HOLDING")
-        except: pass
+        except Exception: pass
 
     _set_cache(cache_key, result)
     return result

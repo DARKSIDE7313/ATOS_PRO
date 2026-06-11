@@ -41,6 +41,7 @@ import yfinance as yf
 
 INTERVAL_MINUTES = 30
 logger = get_logger("live_trader")
+_REGIME_ENGINE = None  # 模块级全局变量，避免每次创建新实例
 
 
 def is_market_open():
@@ -55,9 +56,12 @@ def is_market_open():
 
 def get_regime():
     """获取当前市场状态"""
+    global _REGIME_ENGINE
+    if _REGIME_ENGINE is None:
+        _REGIME_ENGINE = RegimeEngine()
     spy = yf.download("SPY", period="1y", interval="1d", progress=False, auto_adjust=True)
     vix = yf.download("^VIX", period="1y", interval="1d", progress=False, auto_adjust=True)
-    engine = RegimeEngine()
+    engine = _REGIME_ENGINE
     spy_c = spy["Close"].squeeze().tolist()
     vix_c = vix["Close"].squeeze().tolist()
     for i in range(min(len(spy_c), len(vix_c))):
@@ -80,7 +84,7 @@ def compute_order_qty(symbol, target_pct, account_state, signals, score=0.5):
         drawdown = rs.get("drawdown", 0.0) or 0.0
     except Exception:
         drawdown = 0.0
-    crouching_pct = crouching_allocation(score=score, drawdown=drawdown)
+    crouching_pct = crouching_allocation(score=score, drawdown=drawdown, has_news_catalyst=False)
     kelly_pct = kelly_fraction()
     final_pct = max(crouching_pct, min(kelly_pct, target_pct))
     final_pct = min(final_pct, 0.20)  # hard cap
@@ -142,7 +146,7 @@ def run_cycle():
         momentum_factors = batch_momentum_factors(candidate_symbols)
         quality_factors = batch_quality_factors(candidate_symbols)
         factor_result = combine(signals, value_factors, momentum_factors,
-                                quality_factors, regime["regime"])
+                                quality_factors, regime["regime"], use_v3_signals=True)
         top_picks = get_top_picks(factor_result, n=15)
         logger.info(
             f"因子合成完成 | Top5: {[(p['symbol'], p['score']) for p in top_picks[:5]]}"

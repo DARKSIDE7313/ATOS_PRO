@@ -251,7 +251,7 @@ class Layer1Foundation:
                 if price > 0:
                     orders.append({
                         "layer": "foundation", "symbol": a["symbol"],
-                        "action": "BUY", "quantity": int(capital_per / price),
+                        "action": "BUY", "quantity": max(1, int(capital_per / price)),
                         "price": round(price, 2),
                         "reason": f"股息贵族 #{a['score']}分 股息率{a['div_yield']*100:.1f}%",
                     })

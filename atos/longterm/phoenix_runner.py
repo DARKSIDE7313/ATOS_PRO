@@ -223,7 +223,7 @@ class PhoenixRunner:
                     capital = l2_capital * weight_per
                     orders.append({
                         "layer": "core", "symbol": p["symbol"],
-                        "action": "BUY", "quantity": int(capital / price),
+                        "action": "BUY", "quantity": max(1, int(capital / price)),
                         "price": round(price, 2),
                         "reason": f"多因子排名 #{p.get('composite_score', 0):.0f}分",
                     })

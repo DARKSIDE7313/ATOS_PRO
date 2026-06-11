@@ -537,12 +537,9 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
             
             if veto_candidate_list:
                 raw_veto_map = veto_candidates(veto_candidate_list)
-                # 转为 shadow_trader 格式
-                ai_veto_map = {
-                    sym: {"veto": veto, "reason": "AI否决"} 
-                    for sym, veto in raw_veto_map.items() if veto
-                }
-                vetoed_count = sum(1 for v in ai_veto_map.values() if v.get("veto"))
+                # 直接用 bool dict
+                ai_veto_map = raw_veto_map
+                vetoed_count = sum(1 for v in ai_veto_map.values() if v)
                 if vetoed_count:
                     logger.info(f"🧠 AI否决: {vetoed_count}/{len(veto_candidate_list)} 被阻止")
                 else:
