@@ -22,6 +22,10 @@ data/longterm_state.json
 data/trade_stats.json
 data/strategy_config.json
 data/ai_memory.db
+data/last_*
+data/health_check_state.json
+data/risk_state.json
+data/.shadow_trader.lock
 state/
 
 # Reports (generated)
@@ -31,6 +35,8 @@ reports/daily_analysis_*.json
 reports/daily_email_*.html
 reports/cron.log
 reports/live_trader.log
+reports/report_*.html
+reports/serenity_*
 
 # IDE
 .vscode/

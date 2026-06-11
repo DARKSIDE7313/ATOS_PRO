@@ -14,12 +14,12 @@ logger = get_logger("factors.engine")
 
 # 默认权重（会根据市场状态动态调整）
 DEFAULT_WEIGHTS = {
-    "value":      0.12,   # 价值（降权 — RGVH 论文证实 ML 预测在短线不好）
-    "momentum":   0.18,   # 动量
-    "quality":    0.12,   # 质量（短线不看重基本面）
+    "value":      0.05,   # 价值（短线不看估值 — 降权）
+    "momentum":   0.25,   # 动量（提升 — 趋势跟踪）
+    "quality":    0.05,   # 质量（短线不看重基本面 — 降权）
     "technical":  0.30,   # 技术面（主力 — RSI/MACD/趋势/Bollinger）
-    "multiframe": 0.10,   # 多时间框架
-    "mean_rev":   0.18,   # 均值回归（新增 — Bollinger回归+RSI均值）
+    "multiframe": 0.15,   # 多时间框架（提升 — 多时间确认）
+    "mean_rev":   0.20,   # 均值回归（提升 — CAUTIOUS/BULL_WEAK 中回归策略有效）
 }
 
 # IC 历史记录：{regime: {"last_ic": float, "weight_adjustments": {...}}}
@@ -35,12 +35,12 @@ _per_factor_ic: dict[str, dict[str, float]] = {}
 #   - HIGH_VOL: 质量和价值为主，均值回归降至0.12
 #   - 所有环境下：技术面保持主力地位
 REGIME_WEIGHTS = {
-    "BULL_STRONG": {"momentum": 0.30, "technical": 0.25, "value": 0.08, "quality": 0.10, "multiframe": 0.10, "mean_rev": 0.17},
-    "BULL_WEAK":   {"momentum": 0.20, "technical": 0.22, "value": 0.12, "quality": 0.15, "multiframe": 0.13, "mean_rev": 0.18},
-    "HIGH_VOL":    {"momentum": 0.12, "technical": 0.20, "value": 0.18, "quality": 0.18, "multiframe": 0.15, "mean_rev": 0.17},
-    "BEAR":        {"momentum": 0.30, "technical": 0.22, "value": 0.10, "quality": 0.12, "multiframe": 0.18, "mean_rev": 0.08},
-    "SIDEWAYS":    {"momentum": 0.20, "technical": 0.22, "value": 0.12, "quality": 0.15, "multiframe": 0.15, "mean_rev": 0.16},
-    "UNKNOWN":     {"momentum": 0.22, "technical": 0.25, "value": 0.13, "quality": 0.13, "multiframe": 0.12, "mean_rev": 0.15},
+    "BULL_STRONG": {"momentum": 0.35, "technical": 0.25, "value": 0.05, "quality": 0.05, "multiframe": 0.15, "mean_rev": 0.15},
+    "BULL_WEAK":   {"momentum": 0.25, "technical": 0.30, "value": 0.05, "quality": 0.05, "multiframe": 0.15, "mean_rev": 0.20},
+    "HIGH_VOL":    {"momentum": 0.20, "technical": 0.25, "value": 0.08, "quality": 0.07, "multiframe": 0.15, "mean_rev": 0.25},
+    "BEAR":        {"momentum": 0.30, "technical": 0.22, "value": 0.05, "quality": 0.08, "multiframe": 0.18, "mean_rev": 0.17},
+    "SIDEWAYS":    {"momentum": 0.22, "technical": 0.28, "value": 0.07, "quality": 0.08, "multiframe": 0.15, "mean_rev": 0.20},
+    "UNKNOWN":     {"momentum": 0.25, "technical": 0.30, "value": 0.07, "quality": 0.08, "multiframe": 0.15, "mean_rev": 0.15},
 }
 
 

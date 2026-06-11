@@ -56,6 +56,59 @@ def save_trade(pnl_pct: float):
     return stats
 
 
+def crouching_allocation(score: float, drawdown: float,
+                          has_news_catalyst: bool = False) -> float:
+    """
+    Crouching Method allocation: more aggressive than half-Kelly but still risk-controlled.
+    Uses factor score confidence bands to determine base allocation, then applies
+    drawdown penalty and news catalyst boost.
+
+    Parameters
+    ----------
+    score : float
+        Factor score (0.0-1.0). Determines confidence tier:
+        0.5-0.7 → 5% base, 0.7-0.8 → 8% base, 0.8+ → 12% base
+    drawdown : float
+        Current drawdown as a decimal (e.g., 0.03 = 3% drawdown).
+        Each 1% drawdown reduces allocation by 10%.
+    has_news_catalyst : bool
+        Whether this stock has a recent positive news catalyst.
+        If True, allocation is multiplied by 1.5.
+
+    Returns
+    -------
+    float
+        Allocation fraction of total equity (0.0-0.30)
+    """
+    # Base allocation by confidence tier
+    if score >= 0.80:
+        base_pct = 0.12
+    elif score >= 0.70:
+        base_pct = 0.08
+    elif score >= 0.50:
+        base_pct = 0.05
+    else:
+        return 0.0  # Below threshold, no allocation
+
+    # Drawdown penalty: each 1% DD reduces allocation by 10%
+    dd_penalty = max(0.0, 1.0 - (drawdown / 0.01) * 0.10)
+    dd_penalty = max(0.0, dd_penalty)  # floor at 0 (100% reduction possible)
+
+    after_dd = base_pct * dd_penalty
+
+    # News catalyst boost
+    if has_news_catalyst:
+        after_dd *= 1.5
+
+    # Hard cap at 30% (aggressive but not reckless)
+    final = min(after_dd, 0.30)
+
+    print(f"[crouching] score={score:.2f} base={base_pct:.2%} "
+          f"DD={drawdown:.2%} penalty={dd_penalty:.2f} "
+          f"catalyst={has_news_catalyst} final={final:.2%}")
+    return final
+
+
 def kelly_fraction(win_rate=None, win_loss_r=None, num_positions: int = 0) -> float:
     """
     Compute half-Kelly fraction.

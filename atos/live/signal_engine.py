@@ -170,6 +170,71 @@ def _scalar(val):
     return float(val)
 
 
+# 🆕 新闻催化剂分数 — 从Yahoo Finance RSS获取标题，关键词匹配加分
+_NEWS_CACHE = {}
+_NEWS_TTL = timedelta(hours=2)
+
+NEWS_KEYWORDS = {
+    'surge': 0.10, 'rally': 0.12, 'upgrade': 0.15, 'beat': 0.10,
+    'positive': 0.08, 'breakthrough': 0.15, 'AI': 0.05, 'growth': 0.05,
+    'record': 0.08, 'bullish': 0.12, 'outperform': 0.12,
+    'buy': 0.05, 'strong': 0.05, 'up': 0.03, 'raise': 0.08,
+    'partner': 0.08, 'launch': 0.06,
+}
+
+
+def _calc_news_score(symbol: str) -> float:
+    """基于新闻标题关键词匹配计算催化剂分数 (0.0 - 0.20)"""
+    import urllib.request
+    import xml.etree.ElementTree as ET
+    from datetime import datetime
+
+    now = datetime.now()
+    if symbol in _NEWS_CACHE:
+        ts, score = _NEWS_CACHE[symbol]
+        if now - ts < _NEWS_TTL:
+            return score
+
+    score = 0.0
+    try:
+        url = f"https://finance.yahoo.com/rss/headline?s={symbol}"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            tree = ET.parse(resp)
+            root = tree.getroot()
+            titles = []
+            for item in root.iter('item'):
+                title_el = item.find('title')
+                if title_el is not None and title_el.text:
+                    titles.append(title_el.text.lower())
+
+        if not titles:
+            _NEWS_CACHE[symbol] = (now, 0.0)
+            return 0.0
+
+        # 匹配前5条标题
+        matches = 0
+        for title in titles[:5]:
+            for keyword, boost in NEWS_KEYWORDS.items():
+                if keyword.lower() in title:
+                    score += boost
+                    matches += 1
+                    break  # 一条标题只计最高分关键词
+
+        # 如果有3条以上含正面关键词的标题，额外加成
+        if matches >= 3:
+            score += 0.05
+
+        # 封顶0.20
+        score = min(score, 0.20)
+
+    except Exception:
+        pass  # 新闻抓取失败不报错，返回0分
+
+    _NEWS_CACHE[symbol] = (now, score)
+    return round(score, 3)
+
+
 def get_signals(symbols: list[str] = None) -> dict:
     """
     计算所有标的的技术信号。
@@ -233,6 +298,7 @@ def get_signals(symbols: list[str] = None) -> dict:
                 "volume_ratio": round(vol_today / vol_avg, 2) if vol_avg > 0 else 1.0,
                 "atr":          round(atr_val, 2),
                 "bollinger":    boll,
+                "news_score":   _calc_news_score(sym),  # 🆕 新闻催化剂分数
             }
             log_signal(sym, results[sym])
 

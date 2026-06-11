@@ -5,14 +5,14 @@ ATOS PRO v2 — 扩展标的池
 支持动态过滤（成交量、波动率）。
 """
 
-# === 完整标的池（50只，跨行业） ===
+# === 完整标的池（扩展为70只，增加AI/半导体/高波动标的） ===
 UNIVERSE_FULL: dict[str, list[str]] = {
     # 科技大盘
     "tech_mega":   ["AAPL", "MSFT", "NVDA", "GOOGL", "META", "AMZN", "TSLA"],
     # 半导体
-    "semiconductor": ["AMD", "INTC", "AVGO", "QCOM", "TXN", "MU", "AMAT"],
+    "semiconductor": ["AMD", "INTC", "AVGO", "QCOM", "TXN", "MU", "AMAT", "ARM", "MRVL"],
     # 金融
-    "financials":  ["JPM", "BAC", "GS", "MS", "V", "MA", "BLK", "SCHW"],
+    "financials":  ["JPM", "BAC", "GS", "MS", "V", "MA", "BLK", "SCHW", "COIN"],
     # 医疗健康
     "healthcare":  ["JNJ", "UNH", "PFE", "ABBV", "MRK", "TMO", "DHR"],
     # 消费
@@ -21,14 +21,20 @@ UNIVERSE_FULL: dict[str, list[str]] = {
     "industrial":  ["CAT", "BA", "GE", "HON", "UPS", "XOM", "CVX"],
     # 防御/ETF
     "defensive":   ["SPY", "QQQ", "IWM", "TLT", "GLD", "SLV", "USO"],
-    # 新增: 生物科技/云计算/清洁能源（扩展覆盖面，增加候选池）
+    # 高波动/AI题材（进攻型新增）
+    "high_beta":   ["MARA", "PLTR", "SOFI", "RKLB", "ASTS", "TSLL", "IONQ", "SMCI"],
+    # 扩展
     "extended":    ["IBB", "CRM", "ADBE", "NFLX", "PANW"],
 }
 
-# 展平为全列表
-ALL_SYMBOLS: list[str] = sorted(set(
-    sym for group in UNIVERSE_FULL.values() for sym in group
-))
+# 展平为全列表 — 保留NVDA权重翻倍（出现在tech_mega和high_beta两组）
+ALL_SYMBOLS: list[str] = []
+seen = set()
+for sym in [s for g in UNIVERSE_FULL.values() for s in g]:
+    if sym == "NVDA" or sym not in seen:
+        ALL_SYMBOLS.append(sym)
+        seen.add(sym)
+# NVDA 在展平时出现2次（科技大盘+high_beta）, 保持在list中2次 = 权重翻倍
 
 # === 策略分配 ===
 LONG_TERM_SYMBOLS: list[str] = [

@@ -53,6 +53,8 @@ from atos.debugger.safety_net import (
 )
 from atos.factors.advanced_signals import get_all_advanced_signals, intermarket_signals
 from atos.market.regime_gate import evaluate_regime_gate, adjust_exposure_for_regime_gate  # 🆕 v4 宏观门控
+from atos.live.kelly import kelly_fraction, kelly_qty, crouching_allocation  # 🆕 Crouching 仓位方法
+from atos.longterm.serenity import get_chokepoint_candidates  # 🆕 Serenity 瓶颈扫描集成
 import yfinance as yf
 
 logger = get_logger("shadow_trader")
@@ -173,15 +175,15 @@ class ShadowAccount:
 
     @property
     def max_positions(self) -> int:
-        return {"VERY_AGGRESSIVE": 3, "AGGRESSIVE": 5, "MODERATE": 8, "CONSERVATIVE": 5}[self.mode]
+        return {"VERY_AGGRESSIVE": 3, "AGGRESSIVE": 15, "MODERATE": 8, "CONSERVATIVE": 10}[self.mode]
 
     @property
     def max_single_pct(self) -> float:
-        return {"VERY_AGGRESSIVE": 0.35, "AGGRESSIVE": 0.25, "MODERATE": 0.20, "CONSERVATIVE": 0.12}[self.mode]
+        return {"VERY_AGGRESSIVE": 0.35, "AGGRESSIVE": 0.35, "MODERATE": 0.20, "CONSERVATIVE": 0.25}[self.mode]
 
     @property
     def min_cash_pct(self) -> float:
-        return {"VERY_AGGRESSIVE": 0.03, "AGGRESSIVE": 0.05, "MODERATE": 0.10, "CONSERVATIVE": 0.05}[self.mode]  # 放宽: 15%→5% 释放$96K投入市场
+        return {"VERY_AGGRESSIVE": 0.03, "AGGRESSIVE": 0.03, "MODERATE": 0.10, "CONSERVATIVE": 0.03}[self.mode]
 
     def get_state(self) -> dict:
         pos_val = sum(p["qty"] * p.get("last_price", p["avg_price"]) for p in self.positions.values())
@@ -495,17 +497,14 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
                         "circuit_open", spy_trend)
         return
 
-    # ---- 5. AI 否决审查（在因子开仓之前，每24周期，仅前3候选） ----
-    # v4重写: AI从主决策者降级为否决层
-    #   - 每24周期运行一次（不是12）
-    #   - 只审查前3候选（不是5）
-    #   - 每个候选只问一个YES/NO问题
-    #   - AI不卖（卖出由止损/止盈/追踪止损处理）
-    AI_CYCLE_INTERVAL = 24  # 每24周期≈2小时（从12降频）
-    # 闭市时段降频: 每 3 个 AI 周期才调用一次 API
-    ai_interval = AI_CYCLE_INTERVAL * 3 if not is_market_hours else AI_CYCLE_INTERVAL
+    # ---- 5. AI 否决审查（进攻版: 每12周期，闭市时也检查持仓紧急情况） ----
+    # 进攻模式:
+    #   - 每12周期运行一次（从24提频）
+    #   - 交易时段: 跑全部候选审查
+    #   - 闭市时段: 只跑持仓检查（紧急情况）
+    AI_CYCLE_INTERVAL = 12  # 每12周期≈1小时（从24提频）
     ai_veto_map = {}
-    if account.cycle_count % ai_interval == 0 and is_market_hours:
+    if account.cycle_count % AI_CYCLE_INTERVAL == 0:
         try:
             from atos.ai.engine_v4 import veto_candidates
             
@@ -573,11 +572,11 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
 def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy_trend, gate_exposure=1.0, ai_veto_map=None):
     """基于因子评分开仓。AI只有否决权，没有开仓权。
 
-    v4 修改:
-      - BEAR/CAUTIOUS 环境下不开新仓（只做风控不抄底）
-      - 趋势过滤优先级高于因子评分
-      - 放宽追高过滤（RSI>65→75, 给强势股空间）
-      - AI否决在调用前已执行，这里跳过被veto的候选
+    v5 (Crouching) 修改:
+      - 集成 Serenity 瓶颈扫描：当天瓶颈候选+0.15因子加分
+      - 使用 Crouching 方法计算仓位（比 Kelly 更激进但有回撤保护）
+      - 做空比例>10%的标的额外加分
+      - 保留波动率目标作为下限保护
 
     Args:
         gate_exposure: RGVH风格宏观门控暴露系数（0.0-1.0）
@@ -593,6 +592,23 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
     if spy_trend in ("BEAR", "CAUTIOUS"):
         logger.info(f"🐻 趋势{spy_trend} — 不开新仓，仅维持风控")
         return
+
+    # 🆕 v5: 运行 Serenity 瓶颈扫描，获取候选加分
+    serenity_boosts = {}
+    try:
+        # 从 signal_engine 获取当前有信号的标的（或全量池）
+        scan_symbols = list(signals.keys()) if signals else None
+        if scan_symbols and len(scan_symbols) > 5:
+            # 只扫描前50只最高分的，避免yfinance请求过多
+            scan_top = sorted(scan_symbols,
+                key=lambda s: signals[s].get("score", 0), reverse=True)[:50]
+            serenity_boosts = get_chokepoint_candidates(scan_top)
+            if serenity_boosts:
+                logger.info(f"🧩 Serenity瓶颈加分: {len(serenity_boosts)}只")
+                for sym, b in sorted(serenity_boosts.items(), key=lambda x: -x[1])[:5]:
+                    logger.info(f"  +{b:.2f} {sym}")
+    except Exception as e:
+        logger.debug(f"Serenity瓶颈扫描跳过: {e}")
 
     # 趋势限制（放宽: BULL 5→10, CAUTIOUS 3→5, BEAR 2→3, 配合5%现金下限可部署8个仓位）
     trend_max_pos = {"BULL": 10, "CAUTIOUS": 5, "BEAR": 3}.get(spy_trend, 10)
@@ -616,10 +632,42 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
     max_deploy = account.total_equity * (1.0 - account.min_cash_pct) * gate_exposure
     if gate_exposure < 1.0:
         logger.info(f"📊 宏观门控后部署预算: ${max_deploy:,.0f} (系数×{gate_exposure:.0%})")
+
+    # 🆕 v5: 当前回撤（用于 Crouching 方法）
+    current_dd = 0.0
+    try:
+        from atos.live.risk_manager import get_state as get_risk_state
+        rs = get_risk_state()
+        current_dd = rs.get("drawdown", 0.0)
+        if current_dd is None:
+            current_dd = 0.0
+    except Exception:
+        current_dd = 0.0
+
     deployed = 0
 
-    # 候选：因子评分 > 0.60（放宽: 0.65→0.60, 更多候选进入筛选环节）
-    candidates = [p for p in top_picks if p.get("score", 0) > 0.60 and p["symbol"] not in account.positions]
+    # 候选：因子评分 > 0.55（放宽: 0.60→0.55, 让瓶颈标的更容易进入）
+    # 应用 Serenity 加分后重新排序
+    enhanced_candidates = []
+    for p in top_picks:
+        sym = p["symbol"]
+        if sym in account.positions:
+            continue
+        base_score = p.get("score", 0)
+        # 应用 Serenity 瓶颈加分
+        serenity_boost = serenity_boosts.get(sym, 0.0)
+        enhanced_score = base_score + serenity_boost
+        enhanced_candidates.append({
+            "symbol": sym,
+            "score": enhanced_score,
+            "base_score": base_score,
+            "serenity_boost": serenity_boost,
+            "original": p,
+        })
+
+    # 按增强后的评分排序
+    enhanced_candidates.sort(key=lambda x: -x["score"])
+    candidates = [c for c in enhanced_candidates if c["score"] > 0.55]
 
     for pick in candidates:
         sym = pick["symbol"]
@@ -669,7 +717,18 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
             logger.debug(f"⏭ {sym} 价格偏离MA200>25%")
             continue
 
-        # 波动率目标仓位
+        # 🆕 v5: Crouching 方法计算仓位
+        enhanced_score = pick["score"]
+        serenity_boost = pick["serenity_boost"]
+        has_catalyst = (serenity_boost >= 0.10)  # STRONG_CHOKEPOINT = has catalyst
+
+        crouching_pct = crouching_allocation(
+            score=min(enhanced_score, 1.0),
+            drawdown=current_dd,
+            has_news_catalyst=has_catalyst,
+        )
+
+        # 波动率目标仓位（作为下限保护）
         atr_val = signals.get(sym, {}).get("atr", 0)
         daily_vol = atr_val / price if atr_val > 0 else 0.02
         per_symbol_budget = max_deploy / max(effective_max_pos - len(account.positions), 1)
@@ -679,7 +738,19 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
             price=price, volatility=daily_vol,
             target_annual_vol=0.15, max_position_pct=account.max_single_pct,
         )
-        shares = vol_result["shares"]
+
+        # 取两者中的较大值（Crouching 更激进）
+        target_pct = max(crouching_pct, vol_result["pct"] if vol_result else 0)
+        target_pct = min(target_pct, account.max_single_pct)  # 不超过单仓上限
+        target_val = account.total_equity * target_pct
+
+        # 考虑已有持仓（加仓情况）
+        current_val = account.positions[sym]["qty"] * price if sym in account.positions else 0
+        delta_val = target_val - current_val
+        if delta_val <= 0:
+            continue
+
+        shares = max(1, int(delta_val / price))
 
         if shares < 1 or shares * price < 100:
             continue
@@ -689,11 +760,16 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
         if price * shares * 0.005 < est_cost:
             continue
 
+        reason_parts = [f"因子开仓 score={pick['base_score']:.2f}"]
+        if serenity_boost > 0:
+            reason_parts.append(f"Serenity+{serenity_boost:.2f}")
+        reason_parts.append(f"仓位{target_pct:.1%}")
+
         ok = account.execute(sym, "BUY", shares, price,
-                             reason=f"因子开仓 score={pick['score']:.2f}")
+                             reason=" | ".join(reason_parts))
         if ok:
             deployed += shares * price
-            logger.info(f"✅ 开仓 {sym}: {shares}股 @${price:.2f} (score={pick['score']:.2f})")
+            logger.info(f"✅ 开仓 {sym}: {shares}股 @${price:.2f} (crouching={target_pct:.1%}, score={pick['base_score']:.2f})")
 
     logger.info(f"开仓完成: {len(account.positions)}持仓, 部署${deployed:,.0f}")
 

@@ -628,6 +628,51 @@ def serenity_quality_filter(symbols: list[str]) -> dict:
     return results
 
 
+def get_chokepoint_candidates(symbols: list[str] = None,
+                               min_serenity_score: int = 45) -> dict[str, float]:
+    """
+    获取瓶颈扫描候选标的，供 Shadow Trader 使用。
+    返回 {symbol: score_boost (0.0-0.15)}，其中：
+    - STRONG_CHOKEPOINT (score>=55) → +0.15 加分
+    - CHOKEPOINT_WATCH (score>=35) → +0.08 加分
+    - 做空比例>10% 的候选 → 额外 +0.05
+
+    这是 Serenity → Shadow Trader 的桥梁函数。
+    当天扫描到的瓶颈标的会给因子评分加 bonus。
+    """
+    if symbols is None:
+        # 如果没有指定标的，从 universe 获取全量
+        from atos.core.universe import ALL_SYMBOLS
+        symbols = ALL_SYMBOLS
+
+    candidates = find_chokepoint_stocks(symbols)
+    boosts = {}
+
+    for c in candidates:
+        sym = c["symbol"]
+        decision = c["decision"]
+        short_pct = c.get("short_pct", 0) or 0
+
+        if decision == "STRONG_CHOKEPOINT":
+            boost = 0.15
+        elif decision == "CHOKEPOINT_WATCH":
+            boost = 0.08
+        else:
+            continue  # PASS 的不加分
+
+        # 做空比例>10% 的额外加分
+        if short_pct > 0.10:
+            boost += 0.05
+
+        boosts[sym] = round(min(boost, 0.20), 4)  # cap at 0.20
+
+    if boosts:
+        top = sorted(boosts.items(), key=lambda x: -x[1])[:5]
+        logger.info(f"瓶颈候选加入选股池: {len(boosts)}只, Top: {top}")
+
+    return boosts
+
+
 # ── Serenity 核心原则（注入 AI）──
 SERENITY_PRINCIPLES = """
 SERENITY'S CHOKEPOINT INVESTING PRINCIPLES (v3):

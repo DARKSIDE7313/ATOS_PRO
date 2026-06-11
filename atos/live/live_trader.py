@@ -25,7 +25,7 @@ from atos.ai.engine_v2 import get_advice_v2      # 🆕 v2 引擎
 from atos.live.risk_manager import filter_orders, check_all_stops as check_stop_losses, reset_daily, record_fill
 from atos.market.regime.regime_engine import RegimeEngine
 from atos.live.futu_bridge import safe_place_order as place_order  # 修复：使用完整功能的桥接模块
-from atos.live.kelly import kelly_fraction, kelly_qty, save_trade
+from atos.live.kelly import kelly_fraction, kelly_qty, save_trade, crouching_allocation
 from atos.core.logging import get_logger, log_trade, log_risk, log_error
 from atos.core.universe import filter_by_volume, filter_by_trend, get_active_symbols
 from atos.factors import (
@@ -65,15 +65,25 @@ def get_regime():
     return engine.get_regime()
 
 
-def compute_order_qty(symbol, target_pct, account_state, signals):
-    """计算实际下单数量（结合Kelly公式）"""
+def compute_order_qty(symbol, target_pct, account_state, signals, score=0.5):
+    """计算实际下单数量（使用 Crouching 方法）"""
     if symbol not in signals:
         return 0
     price = signals[symbol]["price"]
     if price <= 0:
         return 0
+    # Use crouching (more aggressive) then compare with Kelly, take larger
+    import datetime
+    try:
+        from atos.live.risk_manager import get_state as get_risk_state
+        rs = get_risk_state()
+        drawdown = rs.get("drawdown", 0.0) or 0.0
+    except Exception:
+        drawdown = 0.0
+    crouching_pct = crouching_allocation(score=score, drawdown=drawdown)
     kelly_pct = kelly_fraction()
-    final_pct = min(kelly_pct, target_pct)
+    final_pct = max(crouching_pct, min(kelly_pct, target_pct))
+    final_pct = min(final_pct, 0.20)  # hard cap
     target_val = account_state["total"] * final_pct
     current_val = next(
         (p["mkt_val"] for p in account_state["positions"] if p["symbol"] == symbol),
