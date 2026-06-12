@@ -60,37 +60,40 @@ tr:hover td{background:rgba(255,255,255,.03)}
 <body>
 <nav id="nav">
   <a href="#" data-page="overview" class="active">Overview</a>
-  <a href="#" data-page="backtest">Backtest</a>
+  <a href="#" data-page="short">Short-Term</a>
+  <a href="#" data-page="long">Long-Term</a>
   <a href="#" data-page="trades">Trades</a>
-  <a href="#" data-page="analysis">Analysis</a>
+  <a href="#" data-page="backtest">Backtest</a>
 </nav>
 <div id="app">
 
 <!-- ============ OVERVIEW PAGE ============ -->
 <div class="page show" id="p-overview">
-  <div class="kpis" id="ov-kpis">
-    <div class="kpi"><div class="lbl">Win Rate</div><div class="val" id="ov-wr">—</div><div class="sub">All strategies combined</div></div>
-    <div class="kpi up"><div class="lbl">Total Trades</div><div class="val" id="ov-trades">0</div><div class="sub">Last 2 years</div></div>
-    <div class="kpi"><div class="lbl">Best Strategy</div><div class="val" id="ov-best">—</div><div class="sub" id="ov-best-wr"></div></div>
-    <div class="kpi"><div class="lbl">Total P&amp;L</div><div class="val" id="ov-pnl">$0</div><div class="sub" id="ov-pnl-sub"></div></div>
-  </div>
+  <div class="kpis" id="ov-kpis"><div class="loading">Loading...</div></div>
   <div class="grid2">
-    <div class="card"><h2>Quick Backtest</h2>
-      <div class="controls" style="margin-bottom:0">
-        <label>Ticker</label><input type="text" id="ov-ticker" value="NVDA" style="width:80px">
-        <label>Strategy</label>
-        <select id="ov-strategy">
-          <option value="rsi2">RSI-2</option><option value="bollinger">Bol</option><option value="momentum">Mom</option><option value="trend">EMA</option>
-        </select>
-        <button class="btn-run" id="ov-run" onclick="quickRun()">Run</button>
-      </div>
-      <div id="ov-quick-result" class="loading" style="display:none"></div>
-    </div>
-    <div class="card"><h2>Strategy Comparison</h2>
-      <div id="ov-compare"><div class="loading">Click Run to compare all strategies</div></div>
-    </div>
+    <div class="card"><h2>Short-Term</h2><div id="ov-short-info"><div class="loading">Loading...</div></div></div>
+    <div class="card"><h2>Long-Term</h2><div id="ov-long-info"><div class="loading">Loading...</div></div></div>
   </div>
-  <div class="card"><h2>Activity Log</h2><div id="ov-log"><div class="empty">No activity</div></div></div>
+  <div class="card"><h2>Activity Log</h2><div id="ov-log"><div class="loading">Loading...</div></div></div>
+</div>
+
+<!-- ============ SHORT-TERM PAGE ============ -->
+<div class="page" id="p-short">
+  <div class="kpis" id="st-kpis"><div class="loading">Loading...</div></div>
+  <div class="card"><h2>Positions</h2><div id="st-table"><div class="loading">Loading...</div></div></div>
+  <div class="card"><h2>System</h2><div id="st-sys"><div class="loading">Loading...</div></div></div>
+</div>
+
+<!-- ============ LONG-TERM PAGE ============ -->
+<div class="page" id="p-long">
+  <div class="kpis" id="lt-kpis"><div class="loading">Loading...</div></div>
+  <div class="card"><h2>Holdings</h2><div id="lt-table"><div class="loading">Loading...</div></div></div>
+  <div class="card"><h2>Strategy</h2><div id="lt-strat"><div class="loading">Loading...</div></div></div>
+</div>
+
+<!-- ============ TRADES PAGE ============ -->
+<div class="page" id="p-trades">
+  <div class="card"><h2>Trade History</h2><div id="tr-table"><div class="loading">Loading...</div></div></div>
 </div>
 
 <!-- ============ BACKTEST PAGE ============ -->
@@ -107,39 +110,12 @@ tr:hover td{background:rgba(255,255,255,.03)}
     <button class="btn-run" id="bt-run" onclick="runBacktest()">▶ Run Backtest</button>
   </div>
   <div class="kpis" id="bt-kpis" style="display:none"></div>
-  <div class="chart-card" id="bt-charts" style="display:none">
-    <h2>Equity Curve</h2>
-    <canvas id="equityChart" height="200"></canvas>
-  </div>
-  <div class="card" id="bt-table" style="display:none">
-    <h2>Trade History</h2>
+  <div class="chart-card" id="bt-charts" style="display:none"><h2>Equity Curve</h2><canvas id="equityChart" height="200"></canvas></div>
+  <div class="card" id="bt-table" style="display:none"><h2>Trade History</h2>
     <table><thead><tr><th>Time</th><th>Sym</th><th>Action</th><th>Qty</th><th>Price</th><th>P&amp;L</th><th>Reason</th></tr></thead><tbody id="bt-tbody"></tbody></table>
   </div>
   <div class="loading" id="bt-loading" style="display:none">Running backtest...</div>
   <div class="empty" id="bt-empty">Enter a ticker and select a strategy, then click Run Backtest</div>
-</div>
-
-<!-- ============ TRADES PAGE ============ -->
-<div class="page" id="p-trades">
-  <div class="card"><h2>Trade History</h2>
-    <div id="tr-table"><div class="empty">Run a backtest first to see trades</div></div>
-  </div>
-</div>
-
-<!-- ============ ANALYSIS PAGE ============ -->
-<div class="page" id="p-analysis">
-  <div class="grid2">
-    <div class="chart-card"><h2>Win Rate Over Time</h2><canvas id="wrChart" height="200"></canvas></div>
-    <div class="chart-card"><h2>P&amp;L Distribution</h2><canvas id="pnlDistChart" height="200"></canvas></div>
-  </div>
-  <div class="card"><h2>Strategy Parameters</h2>
-    <div id="an-params">
-      <div class="log"><span class="lt">RSI-2</span><span class="lm">Buy: RSI(2)&lt;15 | Sell: RSI(2)&gt;70 or SMA5 | Stop: -5% | Take: +5%</span></div>
-      <div class="log"><span class="lt">Bollinger</span><span class="lm">Buy: &lt;Lower Band + RSI&lt;35 | Sell: &gt;SMA20 | Stop: -5% | Take: +8%</span></div>
-      <div class="log"><span class="lt">Momentum</span><span class="lm">Buy: 3M&gt;12M | Sell: flip | Stop: -8% | Take: +20%</span></div>
-      <div class="log"><span class="lt">EMA Trend</span><span class="lm">Buy: EMA20&gt;50 + &gt;200 + filters | Sell: DC/Stop/TP | Stop: -2.5ATR | Take: +4ATR</span></div>
-    </div>
-  </div>
 </div>
 
 </div>
@@ -158,6 +134,106 @@ document.querySelectorAll('nav a').forEach(a=>{
 
 let allResults = {};  // strategy -> {trades, signals, price_data, etc}
 let equityChart=null, wrChart=null, pnlDistChart=null;
+
+// ---- Load live data on startup ----
+async function loadLiveData(){
+  try{
+    const d=await (await fetch('/api/live?'+Date.now())).json();
+    renderOverview(d);
+    renderShortTerm(d.short_term);
+    renderLongTerm(d.long_term);
+    renderTrades(d.trades||[]);
+    renderActivityLog(d.activity_log||[]);
+  }catch(e){console.error('live data error:',e)}
+}
+loadLiveData();
+setInterval(loadLiveData, 60000); // refresh every 60s
+
+function renderOverview(d){
+  const ov=d.overview;
+  const pnlCls=ov.combined_pnl>=0?'up':'down';
+  const retCls=ov.return_pct>=0?'up':'down';
+  document.getElementById('ov-kpis').innerHTML=`
+    <div class="kpi"><div class="lbl">Combined PV</div><div class="val">$${ov.combined_pv.toLocaleString('en',{minimumFractionDigits:2})}</div><div class="sub">Short + Long</div></div>
+    <div class="kpi ${pnlCls}"><div class="lbl">Combined P&amp;L</div><div class="val">${ov.combined_pnl>=0?'+':''}$${Math.abs(ov.combined_pnl).toLocaleString('en',{minimumFractionDigits:2})}</div><div class="sub">${ov.combined_pnl>=0?'Profit':'Loss'}</div></div>
+    <div class="kpi ${retCls}"><div class="lbl">Return</div><div class="val">${ov.return_pct>=0?'+':''}${ov.return_pct.toFixed(2)}%</div><div class="sub">From $${ov.initial_capital.toLocaleString()}</div></div>
+    <div class="kpi"><div class="lbl">Total Cash</div><div class="val">$${ov.total_cash.toLocaleString('en',{minimumFractionDigits:2})}</div><div class="sub">Available</div></div>
+  `;
+  document.getElementById('ov-short-info').innerHTML=`
+    <div class="log"><span class="lt">Value</span><span class="lm">$${ov.short.value.toLocaleString('en',{minimumFractionDigits:2})}</span></div>
+    <div class="log"><span class="lt">Cash</span><span class="lm">$${ov.short.cash.toLocaleString('en',{minimumFractionDigits:2})}</span></div>
+    <div class="log"><span class="lt">Return</span><span class="lm ${ov.short.return_pct>=0?'up':'down'}">${ov.short.return_pct>=0?'+':''}${ov.short.return_pct.toFixed(2)}%</span></div>
+    <div class="log"><span class="lt">Positions</span><span class="lm">${ov.short.positions}</span></div>
+    <div class="log"><span class="lt">Cycles</span><span class="lm">${ov.short.cycles}</span></div>
+  `;
+  document.getElementById('ov-long-info').innerHTML=`
+    <div class="log"><span class="lt">Value</span><span class="lm">$${ov.long.value.toLocaleString('en',{minimumFractionDigits:2})}</span></div>
+    <div class="log"><span class="lt">Cash</span><span class="lm">$${ov.long.cash.toLocaleString('en',{minimumFractionDigits:2})}</span></div>
+    <div class="log"><span class="lt">Return</span><span class="lm ${ov.long.return_pct>=0?'up':'down'}">${ov.long.return_pct>=0?'+':''}${ov.long.return_pct.toFixed(2)}%</span></div>
+    <div class="log"><span class="lt">Holdings</span><span class="lm">${ov.long.holdings}</span></div>
+    <div class="log"><span class="lt">Rebalance</span><span class="lm">${ov.long.rebalance}</span></div>
+  `;
+}
+
+function renderShortTerm(st){
+  document.getElementById('st-kpis').innerHTML=`
+    <div class="kpi"><div class="lbl">Portfolio Value</div><div class="val">$${st.portfolio_value.toLocaleString('en',{minimumFractionDigits:2})}</div></div>
+    <div class="kpi ${st.pnl>=0?'up':'down'}"><div class="lbl">P&amp;L</div><div class="val">${st.pnl>=0?'+':''}$${Math.abs(st.pnl).toLocaleString('en',{minimumFractionDigits:2})}</div></div>
+    <div class="kpi ${st.return_pct>=0?'up':'down'}"><div class="lbl">Return</div><div class="val">${st.return_pct>=0?'+':''}${st.return_pct.toFixed(2)}%</div></div>
+    <div class="kpi"><div class="lbl">Cash</div><div class="val">$${st.cash.toLocaleString('en',{minimumFractionDigits:2})}</div></div>
+    <div class="kpi"><div class="lbl">Positions</div><div class="val">${st.positions_count}</div></div>
+  `;
+  if(st.positions&&st.positions.length){
+    document.getElementById('st-table').innerHTML=`<table><thead><tr><th>Sym</th><th>Shares</th><th>Avg</th><th>Price</th><th>Value</th><th>P&amp;L</th><th>Return</th><th>Day Chg</th><th>Weight</th></tr></thead>
+    <tbody>${st.positions.map(p=>`
+      <tr><td class="sym">${p.sym}</td><td class="num">${p.shares}</td><td class="num">$${p.avg.toFixed(2)}</td><td class="num">$${p.price.toFixed(2)}</td><td class="num">$${p.value.toLocaleString('en',{minimumFractionDigits:2})}</td><td class="num ${p.pnl>=0?'up':'down'}">${p.pnl>=0?'+':''}${p.pnl.toFixed(2)}</td><td class="num ${p.return>=0?'up':'down'}">${p.return>=0?'+':''}${p.return.toFixed(2)}%</td><td class="num ${(p.day_chg||0)>=0?'up':'down'}">${p.day_chg>=0?'+':''}${(p.day_chg||0).toFixed(2)} (${(p.day_chg_pct||0)>=0?'+':''}${(p.day_chg_pct||0).toFixed(2)}%)</td><td class="num">${p.weight.toFixed(1)}%</td></tr>
+    `).join('')}</tbody></table>`;
+  }
+  if(st.system){
+    document.getElementById('st-sys').innerHTML=`
+      <div class="log"><span class="lt">Cycles</span><span class="lm">${st.system.cycles}</span></div>
+      <div class="log"><span class="lt">Last Cycle</span><span class="lm">${st.system.last_cycle}</span></div>
+      <div class="log"><span class="lt">Equity</span><span class="lm">$${st.system.equity.toLocaleString('en',{minimumFractionDigits:2})}</span></div>
+    `;
+  }
+}
+
+function renderLongTerm(lt){
+  document.getElementById('lt-kpis').innerHTML=`
+    <div class="kpi"><div class="lbl">Portfolio Value</div><div class="val">$${lt.portfolio_value.toLocaleString('en',{minimumFractionDigits:2})}</div></div>
+    <div class="kpi ${lt.pnl>=0?'up':'down'}"><div class="lbl">P&amp;L</div><div class="val">${lt.pnl>=0?'+':''}$${Math.abs(lt.pnl).toLocaleString('en',{minimumFractionDigits:2})}</div></div>
+    <div class="kpi ${lt.return_pct>=0?'up':'down'}"><div class="lbl">Return</div><div class="val">${lt.return_pct>=0?'+':''}${lt.return_pct.toFixed(2)}%</div></div>
+    <div class="kpi"><div class="lbl">Cash</div><div class="val">$${lt.cash.toLocaleString('en',{minimumFractionDigits:2})}</div></div>
+    <div class="kpi"><div class="lbl">Holdings</div><div class="val">${lt.holdings_count}</div></div>
+  `;
+  if(lt.holdings&&lt.holdings.length){
+    document.getElementById('lt-table').innerHTML=`<table><thead><tr><th>Sym</th><th>Shares</th><th>Avg</th><th>Price</th><th>Value</th><th>P&amp;L</th><th>Return</th><th>Score</th><th>Weight</th></tr></thead>
+    <tbody>${lt.holdings.map(h=>`
+      <tr><td class="sym">${h.sym}</td><td class="num">${h.shares}</td><td class="num">$${h.avg.toFixed(2)}</td><td class="num">$${h.price.toFixed(2)}</td><td class="num">$${h.value.toLocaleString('en',{minimumFractionDigits:2})}</td><td class="num ${h.pnl>=0?'up':'down'}">${h.pnl>=0?'+':''}${h.pnl.toFixed(2)}</td><td class="num ${h.return>=0?'up':'down'}">${h.return>=0?'+':''}${h.return.toFixed(2)}%</td><td class="num">${h.score.toFixed(1)}</td><td class="num">${h.weight.toFixed(1)}%</td></tr>
+    `).join('')}</tbody></table>`;
+  }
+  if(lt.strategy){
+    document.getElementById('lt-strat').innerHTML=`
+      <div class="log"><span class="lt">Rebalance</span><span class="lm">${lt.strategy.rebalance}</span></div>
+      <div class="log"><span class="lt">Cash</span><span class="lm">$${lt.strategy.cash.toLocaleString('en',{minimumFractionDigits:2})}</span></div>
+    `;
+  }
+}
+
+function renderTrades(trades){
+  if(!trades||!trades.length){document.getElementById('tr-table').innerHTML='<div class="empty">No trade history</div>';return}
+  document.getElementById('tr-table').innerHTML=`<table><thead><tr><th>Time</th><th>Sym</th><th>Action</th><th>Price</th><th>P&amp;L%</th></tr></thead>
+  <tbody>${trades.map(t=>`
+    <tr><td style="color:#838990;font-size:10px">${t.date}</td><td class="sym">${t.symbol}</td><td class="${t.action==='SELL'?(t.pnl_pct>=0?'up':'down'):t.action==='STOP_LOSS'?'down':''}">${t.action}</td><td class="num">$${t.price}</td><td class="num ${(t.pnl_pct||0)>=0?'up':'down'}">${(t.pnl_pct||0)>=0?'+':''}${((t.pnl_pct||0)*100).toFixed(1)}%</td></tr>
+  `).join('')}</tbody></table>`;
+}
+
+function renderActivityLog(log){
+  if(!log||!log.length){document.getElementById('ov-log').innerHTML='<div class="empty">No activity</div>';return}
+  document.getElementById('ov-log').innerHTML=log.map(l=>`
+    <div class="log"><span class="lt">${(l.time||'').replace('T',' ')}</span><span class="lm">${l.msg}</span></div>
+  `).join('');
+}
 
 // ---- API Calls ----
 async function apiRun(ticker, strategy){

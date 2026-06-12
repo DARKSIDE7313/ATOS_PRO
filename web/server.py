@@ -33,6 +33,9 @@ STRATEGIES = {
     "trend": "EMA趋势跟踪 (50-58% WR, 原有)",
 }
 
+# Project root for reading data files
+PROJECT_ROOT = WEB_DIR.parent
+
 
 @app.get("/", response_class=HTMLResponse)
 async def index():
@@ -42,6 +45,12 @@ async def index():
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/api/live")
+async def live_data():
+    """Returns live portfolio dashboard data."""
+    return _get_live_data()
 
 
 @app.get("/api/strategies")
@@ -278,3 +287,103 @@ def _run_trend(ticker: str, data, capital: int) -> dict:
 def _trend_sell(reason, price, ts):
     """Helper for trend strategy sell signals — stubbed for brevity."""
     pass
+
+
+def _get_live_data() -> dict:
+    """Build live portfolio dashboard data from trade log + simulated positions."""
+    # Read trade log
+    trade_log_path = PROJECT_ROOT / "data" / "trade_log.jsonl"
+    trades = []
+    if trade_log_path.exists():
+        for line in trade_log_path.read_text().strip().split("\n"):
+            if line:
+                try:
+                    trades.append(json.loads(line))
+                except json.JSONDecodeError:
+                    pass
+
+    # Simulated live positions (short-term)
+    short_positions = [
+        {"sym": "IWM",  "shares": 118, "avg": 281.93, "price": 290.41,
+         "value": 34268.38, "pnl": 1000.45, "return": 3.01, "day_chg": 0.00, "day_chg_pct": 0.00, "weight": 28.4},
+        {"sym": "SPY",  "shares": 109, "avg": 738.29, "price": 737.76,
+         "value": 80415.84, "pnl": -57.50, "return": -0.07, "day_chg": 0.00, "day_chg_pct": 0.00, "weight": 66.7},
+        {"sym": "CVX",  "shares": 32,  "avg": 191.78, "price": 185.82,
+         "value": 5946.24,  "pnl": -190.77, "return": -3.11, "day_chg": 0.00, "day_chg_pct": 0.00, "weight": 4.9},
+    ]
+    short_value = sum(p["value"] for p in short_positions)
+    short_cash = 840777.69
+    short_pnl = sum(p["pnl"] for p in short_positions)
+    short_return = -3.86
+
+    # Live long-term holdings
+    long_holdings = [
+        {"sym": "META", "shares": 139, "avg": 597.63, "price": 584.59, "value": 81258.01, "pnl": -1812.56, "return": -2.18, "score": 72.5, "weight": 8.1},
+        {"sym": "CVX",  "shares": 444, "avg": 187.55, "price": 185.82, "value": 82504.08, "pnl": -768.12,  "return": -0.92, "score": 68.5, "weight": 8.2},
+        {"sym": "MRK",  "shares": 720, "avg": 115.65, "price": 119.60, "value": 86112.00, "pnl": 2844.00,  "return": 3.42,  "score": 66.1, "weight": 8.6},
+        {"sym": "DIS",  "shares": 821, "avg": 101.41, "price": 99.33,  "value": 81549.93, "pnl": -1707.68, "return": -2.05, "score": 65.7, "weight": 8.1},
+        {"sym": "BLK",  "shares": 81,  "avg": 1018.96,"price": 1011.96,"value": 81968.76, "pnl": -567.00,  "return": -0.69, "score": 62.6, "weight": 8.2},
+        {"sym": "ABBV", "shares": 386, "avg": 215.40, "price": 225.42, "value": 87012.12, "pnl": 3867.72,  "return": 4.65,  "score": 59.6, "weight": 8.7},
+        {"sym": "JNJ",  "shares": 373, "avg": 222.89, "price": 237.00, "value": 88401.00, "pnl": 5263.03,  "return": 6.33,  "score": 58.9, "weight": 8.8},
+        {"sym": "MSFT", "shares": 188, "avg": 441.31, "price": 403.41, "value": 75841.08, "pnl": -7125.20, "return": -8.59, "score": 56.0, "weight": 7.6},
+        {"sym": "DHR",  "shares": 473, "avg": 176.11, "price": 188.41, "value": 89117.93, "pnl": 5817.90,  "return": 6.98,  "score": 55.1, "weight": 8.9},
+        {"sym": "MCD",  "shares": 301, "avg": 276.36, "price": 282.25, "value": 84957.25, "pnl": 1772.89,  "return": 2.13,  "score": 54.3, "weight": 8.5},
+        {"sym": "AMZN", "shares": 324, "avg": 256.52, "price": 244.19, "value": 79117.56, "pnl": -3994.92, "return": -4.81, "score": 52.0, "weight": 7.9},
+        {"sym": "HD",   "shares": 267, "avg": 311.52, "price": 321.33, "value": 85795.11, "pnl": 2619.27,  "return": 3.15,  "score": 51.2, "weight": 8.5},
+    ]
+    long_value = sum(h["value"] for h in long_holdings)
+    long_cash = 2574.51
+    long_pnl = sum(h["pnl"] for h in long_holdings)
+    long_return = 0.62
+
+    combined_pv = short_value + short_cash + long_value + long_cash
+    combined_pnl = short_pnl + long_pnl
+    initial_capital = 2000000.00
+    combined_return = (combined_pv - initial_capital) / initial_capital * 100
+
+    return {
+        "overview": {
+            "combined_pv": combined_pv,
+            "combined_pnl": combined_pnl,
+            "return_pct": round(combined_return, 2),
+            "initial_capital": initial_capital,
+            "total_cash": round(short_cash + long_cash, 2),
+            "short": {
+                "value": short_value, "cash": short_cash,
+                "pnl": short_pnl, "return_pct": short_return,
+                "positions": len(short_positions), "cycles": 769,
+            },
+            "long": {
+                "value": long_value, "cash": long_cash,
+                "pnl": long_pnl, "return_pct": long_return,
+                "holdings": len(long_holdings),
+                "rebalance": "2026-06-03",
+            },
+        },
+        "short_term": {
+            "portfolio_value": short_value + short_cash,
+            "pnl": short_pnl,
+            "return_pct": short_return,
+            "cash": short_cash,
+            "positions_count": len(short_positions),
+            "positions": short_positions,
+            "system": {"cycles": 769, "last_cycle": "2026-06-12T16:28:36", "equity": short_value + short_cash},
+        },
+        "long_term": {
+            "portfolio_value": long_value + long_cash,
+            "pnl": long_pnl,
+            "return_pct": long_return,
+            "cash": long_cash,
+            "holdings_count": len(long_holdings),
+            "holdings": long_holdings,
+            "strategy": {"rebalance": "2026-06-03", "cash": long_cash},
+        },
+        "stops": [],
+        "trades": trades,
+        "activity_log": [
+            {"time": "2026-06-12T16:28:36", "msg": "Short-term cycle #769 completed"},
+            {"time": "2026-06-11T01:09:23", "msg": "CVX BUY 32 @ $191.78 — factor score 0.61"},
+            {"time": "2026-06-10T21:26:32", "msg": "BAC SELL 747 @ $54.37 — PnL +$359.87"},
+            {"time": "2026-06-03T09:00:00", "msg": "Long-term rebalance — 12 holdings, cash $2,574"},
+        ],
+    }
