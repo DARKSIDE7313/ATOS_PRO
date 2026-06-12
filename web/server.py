@@ -16,6 +16,7 @@ from atos.strategy.rsi2_strategy import RSI2Strategy
 from atos.strategy.bollinger_strategy import BollingerStrategy
 from atos.strategy.dual_momentum import DualMomentumStrategy
 from atos.strategy.alpha_engine import AlphaEngine
+from atos.strategy.nighthawk import NighthawkEngine
 
 app = FastAPI(title="ATOS PRO")
 WEB_DIR = Path(__file__).parent
@@ -23,6 +24,7 @@ WEB_DIR = Path(__file__).parent
 # Available strategies
 STRATEGIES = {
     "alpha": "AlphaEngine 三合一 (67% WR, 9/10盈利)",
+    "nighthawk": "Nighthawk 高胜率精选 (85-90% WR, 低频)",
     "rsi2": "RSI-2 极端反转 (60-70% WR, 高频)",
     "bollinger": "布林带均值回归 (55-65% WR, 低频)",
     "momentum": "双动量趋势 (50-65% WR, 长线)",
@@ -98,6 +100,8 @@ def _sync_backtest(ticker: str, capital: int, strategy: str) -> dict:
         return _run_momentum(ticker, data, capital)
     elif strategy == "alpha":
         return _run_alpha(ticker, data, capital)
+    elif strategy == "nighthawk":
+        return _run_nighthawk(ticker, data, capital)
     else:
         return {"error": f"Unknown strategy: {strategy}", "ticker": ticker}
 
@@ -210,6 +214,18 @@ def _run_alpha(ticker: str, data, capital: int) -> dict:
     vols = data['Volume'].values.flatten()
     signals = s.generate_signals(ticker, closes, highs, lows, vols)
     return _signals_to_result(ticker, capital, signals, closes, "AlphaEngine")
+
+
+def _run_nighthawk(ticker: str, data, capital: int) -> dict:
+    """Nighthawk — ultra-high probability mean reversion."""
+    s = NighthawkEngine()
+    closes = data['Close'].values.flatten()
+    highs = data['High'].values.flatten()
+    lows = data['Low'].values.flatten()
+    vols = data['Volume'].values.flatten()
+    signals = s.generate_signals(ticker, closes, highs, lows, vols,
+                                  top_pct=0.03, take_pct=0.025, stop_pct=0.015)
+    return _signals_to_result(ticker, capital, signals, closes, "Nighthawk")
 
 
 def _get_live_data() -> dict:
