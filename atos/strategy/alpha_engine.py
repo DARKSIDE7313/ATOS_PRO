@@ -68,8 +68,8 @@ class AlphaEngine:
         cp = s.iloc[-1]
         vol_ratio = self._volume_ratio(vs, 20)
 
-        # Buy: price near/below lower band + RSI oversold + volume spike
-        if cp <= lower * 1.02 and rsi14 < 40 and vol_ratio > 0.8:
+        # Buy: price near/below lower band + RSI oversold + volume confirmation
+        if cp <= lower * 1.02 and rsi14 < 40 and vol_ratio > 1.0:
             return 1, f"BB_rev RSI={rsi14:.0f} vol={vol_ratio:.1f}x"
 
         # Sell: price near/above upper band + RSI overbought
@@ -93,7 +93,7 @@ class AlphaEngine:
         if wr < -80: buy_score += 1
         if cp < sma5: buy_score += 1  # price below short MA = discount
 
-        if buy_score >= 3:
+        if buy_score >= 2:
             return 1, f"REV RSI2={rsi2:.0f} RSI14={rsi14:.0f} WR={wr:.0f}"
 
         # Sell: extreme overbought
@@ -103,7 +103,7 @@ class AlphaEngine:
         if wr > -20: sell_score += 1
         if cp > sma5 * 1.03: sell_score += 1
 
-        if sell_score >= 3:
+        if sell_score >= 2:
             return -1, f"REV_exit RSI2={rsi2:.0f}"
 
         return 0, ""
@@ -116,8 +116,8 @@ class AlphaEngine:
         vol_ratio = self._volume_ratio(vs, 20)
         cp = s.iloc[-1]
 
-        # Buy: strong uptrend + volume confirmation
-        if ema10 > ema30 > ema50 and cp > ema10 and vol_ratio > 1.1:
+        # Buy: uptrend (short MA above long MA) + volume confirmation
+        if ema10 > ema50 and cp > ema10 and vol_ratio > 1.1:
             return 1, f"MOM ema_aligned vol={vol_ratio:.1f}x"
 
         # Sell: trend breaks down
@@ -129,11 +129,17 @@ class AlphaEngine:
     # ---------- Main Strategy ----------
 
     def generate_signals(self, ticker: str, closes, highs=None, lows=None, volumes=None,
-                         stop_atr: float = 2.0, take_atr: float = 3.0) -> list:
+                         stop_atr: float = 2.5, take_atr: float = 3.0) -> list:
         """
         Run ensemble strategy. Requires 2+ confirmations to enter.
         Uses trailing ATR stop for exits.
         """
+        # Bug 1: Clear state on each call to prevent leakage across tickers
+        self.prices = []
+        self.highs = []
+        self.lows = []
+        self.volumes = []
+
         if highs is None:
             highs = closes
         if lows is None:
@@ -181,8 +187,9 @@ class AlphaEngine:
                 if sell_votes >= 2:
                     reasons = [r for s, r in [(b_sig, b_reason), (r_sig, r_reason), (m_sig, m_reason)] if s == -1]
                     exit_reason.append("|".join(reasons))
-                # Take profit
-                if cp >= entry_price * (1 + take_atr * atr / cp):
+                # Take profit: use ATR/entry_price for consistent % across tickers
+                atr_pct = atr / entry_price
+                if cp >= entry_price * (1 + take_atr * atr_pct):
                     exit_reason.append(f"TP +{take_atr}ATR")
                 # Max hold: 20 bars
                 if len(self.prices) - self._entry_bar > 20:

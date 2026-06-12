@@ -42,6 +42,7 @@ class RSI2Strategy:
         signals = []
         in_position = False
         entry_price = 0
+        peak_price = 0
 
         for i, close in enumerate(closes):
             prices.append(float(close))
@@ -54,7 +55,8 @@ class RSI2Strategy:
             sma5 = s.rolling(5).mean().iloc[-1] if len(prices) >= 5 else close
 
             if in_position:
-                # Exit: RSI recovers OR price crosses above SMA5
+                peak_price = max(peak_price, close)
+                # Exit 1: RSI recovery (classic Connors exit)
                 if rsi2 > exit_rsi:
                     signals.append({
                         'ticker': ticker, 'action': 'SELL',
@@ -62,15 +64,17 @@ class RSI2Strategy:
                         'pnl_pct': (close - entry_price) / entry_price
                     })
                     in_position = False
-                elif close > sma5 and rsi2 > 50:
+                # Exit 2: price crosses above SMA5 (trend reversal signal)
+                # Bug 10: removed rsi2>50 requirement — RSI2 almost always >50 after rebound
+                elif close > sma5 and rsi2 > 60:
                     signals.append({
                         'ticker': ticker, 'action': 'SELL',
-                        'price': close, 'reason': 'price > SMA5',
+                        'price': close, 'reason': 'price > SMA5 + RSI2>60',
                         'pnl_pct': (close - entry_price) / entry_price
                     })
                     in_position = False
-                # Stop loss
-                elif close <= entry_price * (1 - stop_pct):
+                # Exit 3: trailing stop from peak (Bug 4)
+                elif close <= peak_price * (1 - stop_pct):
                     signals.append({
                         'ticker': ticker, 'action': 'SELL',
                         'price': close, 'reason': f'STOP -{stop_pct:.0%}',
@@ -94,6 +98,7 @@ class RSI2Strategy:
                         'pnl_pct': 0
                     })
                     entry_price = close
+                    peak_price = close
                     in_position = True
 
         return signals

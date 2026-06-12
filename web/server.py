@@ -141,7 +141,9 @@ def _signals_to_result(ticker: str, capital: int, signals: list, close_values,
         elif action == 'SELL':
             trade_count += 1
             pnl_pct = sig.get('pnl_pct', 0)
-            pnl_dollar = pnl_pct * capital * 0.05  # ~5% position size
+            # Use position_pct from signal, default 10% of capital
+            pos_pct = sig.get('position_pct', 0.10)
+            pnl_dollar = pnl_pct * capital * pos_pct
             trades.append({
                 "ticker": ticker, "side": "SELL",
                 "price": round(price, 2),

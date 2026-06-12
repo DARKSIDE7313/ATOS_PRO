@@ -18,7 +18,7 @@ class DualMomentumStrategy:
     def __init__(self):
         self.prices = []
 
-    def generate_signals(self, ticker: str, closes,
+    def generate_signals(self, ticker: str, closes, volumes=None,
                          short_window: int = 63,
                          long_window: int = 252,
                          stop_pct: float = 0.08,
@@ -33,6 +33,7 @@ class DualMomentumStrategy:
         signals = []
         in_position = False
         entry_price = 0
+        peak_price = 0
 
         for i, close in enumerate(closes):
             prices.append(float(close))
@@ -44,6 +45,7 @@ class DualMomentumStrategy:
             long_ret = prices[-1] / prices[-long_window] - 1
 
             if in_position:
+                peak_price = max(peak_price, close)
                 # Exit: momentum flips
                 if short_ret < long_ret:
                     signals.append({
@@ -53,11 +55,11 @@ class DualMomentumStrategy:
                         'pnl_pct': (close - entry_price) / entry_price
                     })
                     in_position = False
-                # Trailing stop: 8% from peak
-                elif close <= entry_price * (1 - stop_pct):
+                # Trailing stop: from peak (not entry)
+                elif close <= peak_price * (1 - stop_pct):
                     signals.append({
                         'ticker': ticker, 'action': 'SELL',
-                        'price': close, 'reason': f'STOP -{stop_pct:.0%}',
+                        'price': close, 'reason': f'TrailStop -{stop_pct:.0%} from peak',
                         'pnl_pct': (close - entry_price) / entry_price
                     })
                     in_position = False
@@ -70,15 +72,23 @@ class DualMomentumStrategy:
                     })
                     in_position = False
             else:
-                # Entry: short momentum > long momentum AND short > 0
-                if short_ret > long_ret and short_ret > 0:
+                # Entry: short momentum > long AND positive + trend confirmation
+                volumes_list = []
+                for j in range(len(prices) - 20, len(prices)):
+                    volumes_list.append(float(volumes[j]) if volumes is not None else 1)
+                avg_vol = sum(volumes_list) / len(volumes_list) if volumes_list else 1
+                current_vol = float(volumes[-1]) if volumes is not None else 1
+                vol_ok = current_vol > avg_vol * 0.7  # no volume collapse
+
+                if short_ret > long_ret and short_ret > 0 and vol_ok:
                     signals.append({
                         'ticker': ticker, 'action': 'BUY',
                         'price': close,
-                        'reason': f'mom SR={short_ret:.1%}>LR={long_ret:.1%}',
+                        'reason': f'mom SR={short_ret:.1%}>LR={long_ret:.1%} vol={current_vol/avg_vol:.1f}x',
                         'pnl_pct': 0
                     })
                     entry_price = close
+                    peak_price = close
                     in_position = True
 
         return signals

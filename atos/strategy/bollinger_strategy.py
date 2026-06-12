@@ -58,8 +58,8 @@ class BollingerStrategy:
             rsi14 = self._rsi(s, 14)
 
             if in_position:
-                # Exit: price returns to middle band
-                if close >= sma and rsi14 > 50:
+                # Exit: price returns to middle band + RSI confirms (Bug 8: RSI>60 not 50, avoid early exit)
+                if close >= sma and rsi14 > 60:
                     signals.append({
                         'ticker': ticker, 'action': 'SELL',
                         'price': close, 'reason': f'return to SMA pnl_pct={(close-entry_price)/entry_price:.2%}',
