@@ -267,6 +267,10 @@ class ShadowAccount:
                 if px <= 0:
                     continue
                 p["last_price"] = px
+                # Fix #10: 存储 ATR 供滑点计算
+                atr = signals[sym].get("atr", 0)
+                if atr > 0:
+                    p["atr"] = atr
 
     # ---- 执行 ----
     def execute(self, symbol: str, action: str, shares: int,
@@ -323,8 +327,14 @@ class ShadowAccount:
                 if estimated_shares < shares:
                     shares = estimated_shares
 
-        # 滑点 + 佣金
-        slip = price * self.slippage_pct
+        # 滑点 — Fix #10: 动态滑点，基于波动率
+        daily_vol = 0.005
+        if symbol in self.positions:
+            atr_val = self.positions[symbol].get("atr", 0)
+            if atr_val > 0 and price > 0:
+                daily_vol = atr_val / price
+        dynamic_slip = max(0.0005, min(0.005, daily_vol * 0.25))
+        slip = price * dynamic_slip
         fill = price + slip if action == "BUY" else price - slip
         comm = max(self.min_commission, shares * self.commission_per_share)
 
@@ -362,6 +372,7 @@ class ShadowAccount:
                 "symbol": symbol, "action": action, "shares": shares,
                 "price": round(fill, 2), "pnl": 0,
                 "reason": reason,
+                "source": "factor_engine",  # Fix #8: 策略归因
             })
 
         elif action == "SELL":
@@ -530,6 +541,8 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
 
     # ---- 4. 风控阶段（硬止损/追踪止损/止盈）— 每个标的独立！ ----
     # 4a. 硬止损 + 硬止盈（统一检查）
+    # Fix #9: 相关性崩盘熔断
+    stp_count = 0
     for order in check_all_stops(account.position_list, signals):
         sym = order["symbol"]
         px = signals.get(sym, {}).get("price", 0)
@@ -540,6 +553,12 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
             continue
         account.execute(sym, "SELL", qty, px, reason=order["reason"])
         logger.info(f"🚨 {order['exit_type']}: {sym} {qty}股 {order['reason']}")
+        stp_count += 1
+
+    # Fix #9: 相关性崩盘检测 — 单周期多止损 → 熔断新开仓
+    if stp_count >= 3:
+        logger.critical(f"🚨 相关性崩盘: {stp_count}只持仓触发止损 — 本周期暂停新开仓")
+        is_market_hours = False  # 强制跳过新开仓
 
     # 4b. 追踪止损（每个标的独立判断）
     # BUGFIX 2026-06-11: 
@@ -654,13 +673,29 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
             
             if veto_candidate_list:
                 raw_veto_map = veto_candidates(veto_candidate_list)
-                # 直接用 bool dict
                 ai_veto_map = raw_veto_map
                 vetoed_count = sum(1 for v in ai_veto_map.values() if v)
                 if vetoed_count:
                     logger.info(f"🧠 AI否决: {vetoed_count}/{len(veto_candidate_list)} 被阻止")
                 else:
                     logger.info(f"🧠 AI否决: 全部批准 ({len(veto_candidate_list)}候选)")
+
+                # Fix #5: 记录 AI 决策到记忆库
+                try:
+                    from atos.ai.memory import record_decision
+                    for c in veto_candidate_list:
+                        vetoed = bool(ai_veto_map.get(c["symbol"], False))
+                        record_decision(
+                            symbol=c["symbol"],
+                            action="VETO" if vetoed else "APPROVE",
+                            confidence=0.7,
+                            factor_score=c.get("factor_score", 0.5),
+                            reasons={"vetoed": vetoed, "regime": regime.get("regime", "UNKNOWN")},
+                            debate_summary=f"AI veto {'blocked' if vetoed else 'approved'} {c['symbol']}",
+                            market_regime=regime.get("regime", "UNKNOWN") if isinstance(regime, dict) else "UNKNOWN",
+                        )
+                except Exception as mem_err:
+                    logger.debug(f"AI记忆写入失败: {mem_err}")
         except Exception as e:
             logger.error(f"AI否决审查失败: {e}")
             ai_veto_map = {}
@@ -752,6 +787,13 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
     max_deploy = account.total_equity * (1.0 - account.min_cash_pct) * gate_exposure
     if gate_exposure < 1.0:
         logger.info(f"📊 宏观门控后部署预算: ${max_deploy:,.0f} (系数×{gate_exposure:.0%})")
+
+    # Fix #2: 组合优化检查 — 现金不足时强制筹资
+    current_cash_pct = account.cash / account.total_equity if account.total_equity > 0 else 0
+    target_cash_pct = 0.05 if spy_trend == "BULL" else (0.10 if spy_trend == "CAUTIOUS" else 0.15)
+    if current_cash_pct < target_cash_pct:
+        logger.warning(f"💰 现金不足 {current_cash_pct:.1%} < {target_cash_pct:.0%}，只卖不买")
+        return  # 不开新仓，等现有仓位止盈/止损释放现金
 
     # 🆕 v5: 当前回撤（用于 Crouching 方法）
     current_dd = 0.0
@@ -1137,6 +1179,11 @@ def main():
     logger.info("Press Ctrl+C to stop")
 
     cycle = 0
+    # Fix #9: 相关性崩盘熔断追踪器
+    _crash_tracker = {"stop_count": 0, "window_start": time.time(), "halted": False}
+    _CRASH_WINDOW_SEC = 300  # 5分钟窗口
+    _CRASH_THRESHOLD = 3     # 窗口内3次止损 → 熔断
+
     while True:
         try:
             # 🔴 External kill-switch: if /tmp/atos_EMERGENCY_STOP exists, halt immediately
@@ -1184,16 +1231,38 @@ def main():
             os.remove(lock_file) if os.path.exists(lock_file) else None
             break
         except Exception as e:
-            err = str(e)[:100]
-            logger.error(f"周期崩溃: {err}，60秒后继续")
-            if "402" in err or "Payment Required" in err:
+            err = str(e)[:200]
+            # Fix #7: 区分瞬时错误 vs 永久性错误
+            TRANSIENT_PATTERNS = [
+                "timeout", "Connection", "Timed out", "Too Many Requests",
+                "429", "503", "502", "temporarily", "SSLError", "reset by peer",
+                "ConnectionError", "RemoteDisconnected", "ReadTimeout",
+            ]
+            PERMANENT_PATTERNS = [
+                "ImportError", "ModuleNotFoundError", "SyntaxError",
+                "NameError", "AttributeError", "KeyError: 'long_term'",
+                "No module named", "cannot import",
+            ]
+            err_type = type(e).__name__
+            is_transient = any(p.lower() in err.lower() for p in TRANSIENT_PATTERNS) or \
+                          (err_type in ("TimeoutError", "ConnectionError", "HTTPError"))
+            is_permanent = any(p.lower() in err.lower() for p in PERMANENT_PATTERNS) or \
+                          err_type in ("ImportError", "ModuleNotFoundError", "SyntaxError")
+
+            if is_permanent:
+                logger.critical(f"💀 永久性错误，系统退出: {err_type}: {err}")
+                os.remove(lock_file) if os.path.exists(lock_file) else None
+                sys.exit(1)
+            elif "402" in err or "Payment Required" in err or "insufficient_quota" in err:
                 logger.warning("⚠️ DeepSeek API 余额不足！降频到30分钟。")
                 time.sleep(30 * 60)
+            elif is_transient:
+                backoff = min(300, 30 * (1 + (cycle % 5)))
+                logger.warning(f"⏳ 瞬时错误，{backoff}s后重试: {err_type}: {err[:80]}")
+                time.sleep(backoff)
             else:
-                try:
-                    time.sleep(60)
-                except KeyboardInterrupt:
-                    break
+                logger.error(f"⚠️ 未知错误，60s后继续: {err_type}: {err[:80]}")
+                time.sleep(60)
 
     # 保存最终状态
     state = {

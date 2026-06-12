@@ -277,7 +277,9 @@ def _get_live_data() -> dict:
 
     combined_pv = short_value + short_cash + long_value + long_cash
     combined_pnl = short_pnl + long_pnl
-    initial_capital = 2000000.00
+    # Fix #1: 从 config_shared 读取真实资金，不再编造 $2M
+    from atos.config_shared import TOTAL_CAPITAL
+    initial_capital = TOTAL_CAPITAL
     combined_return = (combined_pv - initial_capital) / initial_capital * 100
 
     return {

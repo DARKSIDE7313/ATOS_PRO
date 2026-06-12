@@ -10,11 +10,11 @@ Phoenix 长线综合策略所有可调参数集中管理。
 from atos.config_shared import ALLOCATION
 
 CAPITAL = {
-    "total": 200_000,               # 硬编码：来自 config_shared 长期分配 $200K
-    "layer1_pct": 0.30,            # 基础层占比
-    "layer2_pct": 0.50,            # 核心层占比
-    "layer3_pct": 0.20,            # 战术层占比
-    "cash_reserve_pct": 0.05,      # 额外现金储备（从总资金外计算）
+    "total": ALLOCATION["long_term"],   # Fix #1: 从 config_shared 读取，不再硬编码
+    "layer1_pct": 0.30,
+    "layer2_pct": 0.50,
+    "layer3_pct": 0.20,
+    "cash_reserve_pct": 0.05,
 }
 
 # 现金储备绝对值（简化 CASH_RESERVE 访问）

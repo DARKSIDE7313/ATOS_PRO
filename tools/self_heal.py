@@ -38,8 +38,9 @@ def probe_processes() -> list:
     
     # Define expected services
     services = {
-        'shadow_trader': 19999,
-        'dashboard': 9000,
+        'shadow_trader': 19999,    # lock port (socket-based mutex)
+        'web_dashboard': 8000,     # Fix #11: 实际 web 仪表盘端口
+        'dashboard_legacy': 9000,  # 旧版仪表盘
         'futu_opend': 11111,
     }
     
