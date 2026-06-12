@@ -42,7 +42,6 @@ class RSI2Strategy:
         signals = []
         in_position = False
         entry_price = 0
-        peak_price = 0
 
         for i, close in enumerate(closes):
             prices.append(float(close))
@@ -53,10 +52,16 @@ class RSI2Strategy:
             s = pd.Series(prices)
             rsi2 = self._rsi(s, 2)
             sma5 = s.rolling(5).mean().iloc[-1] if len(prices) >= 5 else close
+            sma10 = s.rolling(10).mean().iloc[-1] if len(prices) >= 10 else sma5
+
+            # ATR filter: skip if stock is too volatile for RSI-2
+            atr = s.diff().abs().rolling(14).mean().iloc[-1] if len(prices) >= 14 else 0
+            atr_pct = atr / (close + 1e-10)
+            if atr_pct > 0.035:  # ATR > 3.5% = too volatile, skip
+                continue
 
             if in_position:
-                peak_price = max(peak_price, close)
-                # Exit 1: RSI recovery (classic Connors exit) — require min +2% profit
+                # Exit 1: RSI recovery (classic Connors) — require min +2% profit
                 if rsi2 > exit_rsi and close > entry_price * 1.02:
                     signals.append({
                         'ticker': ticker, 'action': 'SELL',
@@ -64,8 +69,8 @@ class RSI2Strategy:
                         'pnl_pct': (close - entry_price) / entry_price
                     })
                     in_position = False
-                # Exit 2: price crosses above SMA5 (trend reversal signal)
-                elif close > sma5 and rsi2 > 60:
+                # Exit 2: SMA10 crossover (trend reversal — slower, fewer whipsaws)
+                elif close > sma10 and rsi2 > 65:
                     signals.append({
                         'ticker': ticker, 'action': 'SELL',
                         'price': close, 'reason': 'price > SMA5 + RSI2>60',
@@ -80,8 +85,8 @@ class RSI2Strategy:
                         'pnl_pct': (close - entry_price) / entry_price
                     })
                     in_position = False
-                # Exit 3: trailing stop from peak
-                elif close <= peak_price * (1 - stop_pct):
+                # Exit 3: fixed stop from entry (original Connors design)
+                elif close <= entry_price * (1 - stop_pct):
                     signals.append({
                         'ticker': ticker, 'action': 'SELL',
                         'price': close, 'reason': f'STOP -{stop_pct:.0%}',
@@ -105,7 +110,6 @@ class RSI2Strategy:
                         'pnl_pct': 0
                     })
                     entry_price = close
-                    peak_price = close
                     in_position = True
 
         return signals
