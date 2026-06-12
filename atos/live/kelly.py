@@ -42,12 +42,23 @@ def _load_stats():
 
 def save_trade(pnl_pct: float) -> dict:
     """Record a closed trade's PnL% and update running stats.
-    Fix #6: atomic write + retry + logging on failure."""
+    Fix #6: atomic write + retry + logging on failure.
+    Fix #14: handle old-format trade_stats.json (missing 'trades' key)."""
     os.makedirs(os.path.dirname(STATS_PATH), exist_ok=True)
 
     for attempt in range(MAX_SAVE_RETRIES):
         try:
-            stats = _load_stats() or {"trades": []}
+            stats = _load_stats() or {}
+            # Fix #14: migrate old format or init trades list
+            if "trades" not in stats:
+                # Old format — migrate any existing aggregate data
+                old_trades = []
+                old_total = stats.get("total_trades", 0)
+                old_wins = stats.get("wins", 0)
+                old_losses = stats.get("losses", 0)
+                # We can't reconstruct individual trades, but we can at least
+                # initialize the list with the new trade
+                stats["trades"] = old_trades
             stats["trades"].append(round(pnl_pct, 6))
 
             trades = stats["trades"]

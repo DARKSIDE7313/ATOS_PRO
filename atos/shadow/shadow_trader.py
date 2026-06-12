@@ -394,9 +394,10 @@ class ShadowAccount:
             # 保存到 trade_stats 供 Kelly 学习
             try:
                 from atos.live.kelly import save_trade
-                save_trade(pnl_pct)
-            except Exception:
-                pass
+                result = save_trade(pnl_pct)
+                logger.info(f"[Kelly] 交易记录: {symbol} PnL={pnl_pct:.2%} total_trades={result.get('total_trades',0)} WR={result.get('win_rate',0):.1%}")
+            except Exception as e:
+                logger.warning(f"[Kelly] save_trade failed: {e}")
 
             pos["qty"] -= shares
             if pos["qty"] <= 0:
@@ -538,6 +539,38 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
     except Exception as e:
         logger.error(f"因子失败: {e}")
 
+    # 🆕 IC 反馈环：根据实盘收益评估因子预测能力
+    try:
+        from atos.factors.engine import ic_analysis
+        # 用函数属性存储上周期分数（跨周期持久化）
+        prev_scores = getattr(run_shadow_cycle, '_prev_scores', {})
+        prev_breakdown = getattr(run_shadow_cycle, '_prev_breakdown', {})
+
+        # 计算本周期实际收益（%）
+        if prev_scores and factor_result:
+            current_returns = {}
+            for sym in prev_scores:
+                sig = signals.get(sym, {})
+                price_now = sig.get("price", 0)
+                prev_price = getattr(run_shadow_cycle, '_prev_prices', {}).get(sym, 0)
+                if price_now > 0 and prev_price > 0:
+                    current_returns[sym] = (price_now - prev_price) / prev_price
+
+            if len(current_returns) >= 10:
+                ic_result = ic_analysis(prev_scores, current_returns,
+                                        regime["regime"], prev_breakdown)
+                logger.info(f"[IC反馈] IC={ic_result['ic']:.4f} | {ic_result.get('verdict','')} | n={ic_result['n']}")
+
+        # 存储本周期分数和价格，供下周期使用
+        run_shadow_cycle._prev_scores = factor_result.get("scores", {}) if factor_result else {}
+        run_shadow_cycle._prev_breakdown = factor_result.get("breakdown", {}) if factor_result else {}
+        run_shadow_cycle._prev_prices = {
+            sym: sig.get("price", 0)
+            for sym, sig in signals.items() if sig.get("price", 0) > 0
+        }
+    except Exception as ic_err:
+        logger.debug(f"IC反馈环跳过: {ic_err}")
+
     # 更新价格
     account.update_prices(signals)
 
@@ -640,7 +673,7 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
     #   - 每12周期运行一次（从24提频）
     #   - 交易时段: 跑全部候选审查
     #   - 闭市时段: 只跑持仓检查（紧急情况）
-    AI_CYCLE_INTERVAL = 12  # 每12周期≈1小时（从24提频）
+    AI_CYCLE_INTERVAL = 6  # 每6周期≈30分钟（从12提频，更多AI决策）
     ai_veto_map = {}
     if account.cycle_count % AI_CYCLE_INTERVAL == 0:
         try:
