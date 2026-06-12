@@ -113,6 +113,28 @@ def main():
     print(f"  置信度:   {result.get('confidence_score', 'N/A')}")
     print("===================\n")
 
+    # === LLM Wiki 自动入库 ===
+    try:
+        import json as _json
+        from pathlib import Path as _Path
+        _report_path = _Path(BASE) / "reports" / f"review_{datetime.date.today()}.json"
+        _report_path.parent.mkdir(parents=True, exist_ok=True)
+        _report_path.write_text(_json.dumps(result, ensure_ascii=False, indent=2))
+        print(f"[daily_review] 报告已保存: {_report_path}")
+
+        sys.path.insert(0, os.path.expanduser("~/llm-wiki/ops/scripts"))
+        from wiki_tools import wiki_ingest_atos
+        wiki_result = wiki_ingest_atos(str(_report_path))
+        if wiki_result.get("ok"):
+            if wiki_result.get("has_alerts"):
+                print(f"[wiki] ⚠️  异常单已入库: {wiki_result.get('actions')}")
+            else:
+                print(f"[wiki] 日报已入库: {wiki_result['ingested']}")
+        else:
+            print(f"[wiki] 入库失败: {wiki_result.get('error')}")
+    except Exception as e:
+        print(f"[wiki] 入库异常: {e}")
+
 
 if __name__ == "__main__":
     main()
