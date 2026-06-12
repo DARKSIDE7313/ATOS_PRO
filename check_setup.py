@@ -33,10 +33,10 @@ if eu and ep:
 else:
     print(f"[{WARN}] Email credentials not set  ->  export ATOS_EMAIL_USER=... ATOS_EMAIL_PASS=...")
 files = [
-    "~/ATOS_PRO/atos/reporting/daily_report.py",
-    "~/ATOS_PRO/atos/futu_trader.py",
+    "~/ATOS_PRO/atos/shadow/shadow_trader.py",
+    "~/ATOS_PRO/atos/live/live_trader.py",
     "~/ATOS_PRO/atos/market/regime/regime_engine.py",
-    "~/ATOS_PRO/atos/main.py",
+    "~/ATOS_PRO/web/server.py",
 ]
 print()
 for f in files:

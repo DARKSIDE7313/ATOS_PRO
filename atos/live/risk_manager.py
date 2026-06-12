@@ -113,7 +113,7 @@ def check_all_stops(positions: list, signals: dict) -> list:
         atr_val = signals.get(sym, {}).get("atr", 0)
         if atr_val > 0 and px > 0:
             vol_stop = max(0.03, min(0.10, (atr_val / px) * 2.0))  # FIX P5: 乘数2.5→2.0
-            effective_stop = min(STOP_LOSS_PCT, vol_stop)  # FIX P5: max->min
+            effective_stop = max(STOP_LOSS_PCT, vol_stop)  # FIX: max not min — high vol needs wider stops
             if pnl_pct <= -effective_stop:
                 forced.append({
                     "action": "SELL", "symbol": sym, "qty": qty,

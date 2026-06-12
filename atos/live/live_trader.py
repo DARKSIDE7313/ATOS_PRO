@@ -20,11 +20,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 from atos.live.signal_engine import get_signals, UNIVERSE, ALL_SYMBOLS
 from atos.live.portfolio import get_account_state
-from atos.live.ai_advisor import get_advice  # 旧版，保留兼容
-# v3 engine imported at point of use since it's only called for veto
+from atos.live.ai_advisor import get_advice
 from atos.live.risk_manager import filter_orders, check_all_stops as check_stop_losses, reset_daily, record_fill
 from atos.market.regime.regime_engine import RegimeEngine
-from atos.live.futu_bridge import safe_place_order as place_order  # 修复：使用完整功能的桥接模块
+from atos.live.futu_bridge import safe_place_order as place_order
 from atos.live.kelly import kelly_fraction, kelly_qty, save_trade, crouching_allocation
 from atos.core.logging import get_logger, log_trade, log_risk, log_error
 from atos.core.universe import filter_by_volume, filter_by_trend, get_active_symbols
@@ -41,32 +40,85 @@ import yfinance as yf
 
 INTERVAL_MINUTES = 30
 logger = get_logger("live_trader")
-_REGIME_ENGINE = None  # 模块级全局变量，避免每次创建新实例
+_REGIME_ENGINE = None
+_REGIME_CACHE = None   # Bug #10: 缓存 regime 结果
+_REGIME_CACHE_TS = None
 
 
 def is_market_open():
     """美股交易时间：9:30 AM – 4:00 PM EST (UTC 13:30–20:00)"""
     now = datetime.datetime.now(datetime.timezone.utc)
-    if now.weekday() >= 5:  # 周末
+    if now.weekday() >= 5:
         return False
     open_ = now.replace(hour=13, minute=30, second=0, microsecond=0)
     close_ = now.replace(hour=20, minute=0, second=0, microsecond=0)
     return open_ <= now <= close_
 
 
+def _seconds_until_next_market_open() -> float:
+    """计算到下一个交易时段开始的秒数。休市时用于智能 sleep。"""
+    now = datetime.datetime.now(datetime.timezone.utc)
+    # 下一个可能的开市时间：今天 13:30 或下个交易日 13:30
+    today_open = now.replace(hour=13, minute=30, second=0, microsecond=0)
+    if now.weekday() < 5 and now < today_open:
+        # 今天还没到开市时间，等到今天 13:30
+        return (today_open - now).total_seconds()
+    # 计算下个交易日
+    days_until_next = 1
+    next_day = now + datetime.timedelta(days=1)
+    while next_day.weekday() >= 5:
+        days_until_next += 1
+        next_day = now + datetime.timedelta(days=days_until_next)
+    next_open = next_day.replace(hour=13, minute=30, second=0, microsecond=0)
+    return (next_open - now).total_seconds()
+
+
 def get_regime():
-    """获取当前市场状态"""
-    global _REGIME_ENGINE
+    """获取当前市场状态（带缓存，Bug #10）"""
+    global _REGIME_ENGINE, _REGIME_CACHE, _REGIME_CACHE_TS
+    now = datetime.datetime.now()
+    # 缓存 5 分钟
+    if _REGIME_CACHE is not None and _REGIME_CACHE_TS is not None:
+        if (now - _REGIME_CACHE_TS).total_seconds() < 300:
+            return _REGIME_CACHE
     if _REGIME_ENGINE is None:
         _REGIME_ENGINE = RegimeEngine()
-    spy = yf.download("SPY", period="1y", interval="1d", progress=False, auto_adjust=True)
-    vix = yf.download("^VIX", period="1y", interval="1d", progress=False, auto_adjust=True)
+    try:
+        spy = yf.download("SPY", period="1y", interval="1d", progress=False, auto_adjust=True)
+        vix = yf.download("^VIX", period="1y", interval="1d", progress=False, auto_adjust=True)
+    except Exception:
+        return {"regime": "UNKNOWN", "risk_multiplier": 0.5}
     engine = _REGIME_ENGINE
+    engine.spy_prices = []
+    engine.vix_prices = []
     spy_c = spy["Close"].squeeze().tolist()
     vix_c = vix["Close"].squeeze().tolist()
     for i in range(min(len(spy_c), len(vix_c))):
         engine.update(float(spy_c[i]), float(vix_c[i]))
-    return engine.get_regime()
+    result = engine.get_regime()
+    _REGIME_CACHE = result
+    _REGIME_CACHE_TS = now
+    return result
+
+
+def _calc_sell_pnl(symbol, qty, account, signals) -> float:
+    """Bug #4/#5: 统一卖出 PnL 计算。找不到持仓时返回 0（不伪造数据）。"""
+    pos = next((p for p in account["positions"] if p["symbol"] == symbol), None)
+    if pos:
+        sell_price = signals.get(symbol, {}).get("price", pos.get("last", 0))
+        return qty * (sell_price - pos["avg_price"])
+    return 0.0
+
+
+def _log_sell_pnl(symbol, qty, account, signals, reason="SELL"):
+    """统一卖出日志记录。"""
+    try:
+        real_pnl = _calc_sell_pnl(symbol, qty, account, signals)
+        record_fill(real_pnl, account["total"])
+        from atos.live.daily_review import log_trade as save_log
+        save_log(symbol, reason, qty, signals.get(symbol, {}).get("price", 0), pnl_pct=real_pnl)
+    except Exception as e:
+        logger.debug(f"卖出日志写入失败: {e}")
 
 
 def compute_order_qty(symbol, target_pct, account_state, signals, score=0.5):
@@ -76,8 +128,6 @@ def compute_order_qty(symbol, target_pct, account_state, signals, score=0.5):
     price = signals[symbol]["price"]
     if price <= 0:
         return 0
-    # Use crouching (more aggressive) then compare with Kelly, take larger
-    import datetime
     try:
         from atos.live.risk_manager import get_state as get_risk_state
         rs = get_risk_state()
@@ -86,10 +136,11 @@ def compute_order_qty(symbol, target_pct, account_state, signals, score=0.5):
         drawdown = 0.0
     crouching_pct = crouching_allocation(score=score, drawdown=drawdown, has_news_catalyst=False)
     kelly_pct = kelly_fraction()
-    final_pct = min(crouching_pct, kelly_pct, target_pct)  # 取三者最小值（最安全）
-    # 但至少给 1%，否则永远开不了仓
-    final_pct = max(final_pct, 0.01)
-    final_pct = min(final_pct, 0.20)  # hard cap
+    final_pct = min(crouching_pct, kelly_pct, target_pct)
+    # Bug #3: 删除强制的 max(final_pct, 0.01) — 当风控说 0% 时不应强行开仓
+    if final_pct <= 0:
+        return 0
+    final_pct = min(final_pct, 0.20)
     target_val = account_state["total"] * final_pct
     current_val = next(
         (p["mkt_val"] for p in account_state["positions"] if p["symbol"] == symbol),
@@ -134,14 +185,13 @@ def run_cycle():
         log_error("live_trader", f"信号计算失败: {e}")
         return
 
-    # 信号质量分级
     active = get_active_symbols(signals)
     logger.info(
         f"信号: 优质={len(active['quality'])}只 | "
         f"观察={len(active['watch'])}只 | 回避={len(active['avoid'])}只"
     )
 
-    # 3.5 多因子计算（仅对优质+观察标的）
+    # 3.5 多因子计算
     candidate_symbols = active["quality"] + active["watch"]
     try:
         value_factors = batch_value_factors(candidate_symbols)
@@ -165,36 +215,12 @@ def run_cycle():
     }
     for order in check_stop_losses(account["positions"], stop_signals):
         log_risk("STOP_LOSS", f"{order['symbol']} qty={order['qty']}")
-        result = place_order(order["symbol"], "SELL", order["qty"])
-        log_trade(order["symbol"], "SELL", order["qty"], 0,
-                  reason="止损退出")
+        place_order(order["symbol"], "SELL", order["qty"])
+        log_trade(order["symbol"], "SELL", order["qty"], 0, reason="止损退出")
+        _log_sell_pnl(order["symbol"], order["qty"], account, signals, reason="STOP_LOSS")
 
-        try:
-            pos = next(
-                (p for p in account["positions"]
-                 if p["symbol"] == order["symbol"]), None
-            )
-            if pos:
-                sell_price = signals.get(order["symbol"], {}).get("price", pos.get("last", 0))
-                real_pnl = pos["qty"] * (sell_price - pos["avg_price"])
-            else:
-                import json
-                cfg_path = os.path.join(
-                    os.path.dirname(__file__), "../../data/strategy_config.json")
-                if os.path.exists(cfg_path):
-                    with open(cfg_path) as f:
-                        cfg = json.load(f)
-                else:
-                    cfg = {}
-                real_pnl = -abs(cfg.get("stop_loss_pct", 0.05)) * account.get("total", 100000)
-            record_fill(real_pnl, account["total"])  # 传递实际PnL而非硬编码0
-            from atos.live.daily_review import log_trade as save_log
-            save_log(order["symbol"], "STOP_LOSS", order["qty"], 0, pnl_pct=real_pnl)
-        except Exception as e:
-            logger.debug(f"止损日志写入失败: {e}")
-
-    # 4.5 组合优化 — 计算目标持仓 + 再平衡检查
-    vix = 18.0  # 默认值
+    # 4.5 组合优化
+    vix = 18.0
     try:
         vix_df = yf.download("^VIX", period="5d", interval="1d", progress=False, auto_adjust=True)
         if not vix_df.empty:
@@ -212,9 +238,8 @@ def run_cycle():
             total_equity=account["total"],
             cash_reserve_pct=cash_buffer_pct,
             current_positions=account["positions"],
-            use_risk_budget=True,  # 低风险优先
+            use_risk_budget=True,
         )
-
         rebalance_result = should_rebalance(
             current_positions=account["positions"],
             target_positions=target_result["target_positions"],
@@ -223,16 +248,13 @@ def run_cycle():
             market_regime=regime["regime"],
             vix=vix,
         )
-
         logger.info(
             f"组合优化: VIX={vix:.1f} → 现金缓冲={cash_buffer_pct:.0%} | "
             f"预期波动={target_result.get('expected_volatility', 'N/A')} | "
             f"{get_rebalance_summary(rebalance_result)[:100]}"
         )
-
-        # 执行再平衡交易
         if rebalance_result.get("should_rebalance"):
-            for trade in rebalance_result.get("trades", [])[:5]:  # 最多5笔
+            for trade in rebalance_result.get("trades", [])[:5]:
                 logger.info(f"再平衡: {trade['action']} {trade['shares']}股 {trade['symbol']}")
                 place_order(trade["symbol"], trade["action"], trade["shares"])
     except Exception as e:
@@ -263,14 +285,12 @@ def run_cycle():
         "constraints": account["constraints"],
         "universe_long": UNIVERSE["long_term"],
         "universe_short": UNIVERSE["short_term"],
-        # 🆕 因子排名
         "factor_rankings": [
             {"symbol": p["symbol"], "score": p["score"],
              "breakdown": p.get("breakdown", {})}
             for p in top_picks[:10]
         ] if top_picks else [],
         "factor_weights": factor_result["weights"] if factor_result else {},
-        # 🆕 组合优化数据
         "vix": round(vix, 1),
         "cash_buffer_pct": round(cash_buffer_pct, 3),
         "target_positions": target_result.get("target_positions", {}) if target_result else {},
@@ -280,19 +300,19 @@ def run_cycle():
         "rebalance_needed": rebalance_result.get("should_rebalance", False),
     }
 
-    # AI 否决审查 — 用 v3 引擎（因子引擎做主，AI只有否决权）
+    # AI 否决审查
     advice = {}
     try:
         from atos.ai.engine_v2 import get_advice_v3
         advice = get_advice_v3(snapshot)
     except Exception as e:
         logger.debug(f"AI veto调用失败: {e}")
-    
+
     veto_map = advice.get("veto_map", {})
-    vetoed_symbols = {s for s, v in veto_map.items() 
+    vetoed_symbols = {s for s, v in veto_map.items()
                       if isinstance(v, dict) and v.get("veto", False)}
-    
-    # 因子引擎决策（同 shadow_trader 模式）— 从 top_picks 生成交易指令
+
+    # 因子引擎决策
     proposed = []
     for p in top_picks[:8]:
         sym = p["symbol"]
@@ -301,7 +321,6 @@ def run_cycle():
             continue
         if p.get("score", 0) < 0.55:
             continue
-        # 检查是否已有持仓
         existing = next((pos for pos in account["positions"] if pos["symbol"] == sym), None)
         if existing:
             continue
@@ -310,7 +329,7 @@ def run_cycle():
             "target_pct": min(p.get("score", 0.5) * 0.12, 0.15),
             "reason": f"因子开仓 score={p.get('score',0):.2f}",
         })
-    
+
     safe = filter_orders(proposed, account, regime)
     logger.info(f"候选={len(top_picks)} | AI否决={len(vetoed_symbols)} | 风控通过={len(safe)}条")
 
@@ -333,34 +352,8 @@ def run_cycle():
             log_trade(sym, action, abs(qty), signals.get(sym, {}).get("price", 0),
                       reason=order.get("reason", ""))
             if action == "SELL":
-                try:
-                    pos = next(
-                        (p for p in account["positions"]
-                         if p["symbol"] == sym), None
-                    )
-                    if pos:
-                        sell_price = signals.get(sym, {}).get("price", pos.get("last", 0))
-                        real_pnl = abs(qty) * (sell_price - pos["avg_price"])
-                    else:
-                        import json
-                        cfg_path = os.path.join(
-                            os.path.dirname(__file__), "../../data/strategy_config.json")
-                        if os.path.exists(cfg_path):
-                            with open(cfg_path) as f:
-                                cfg = json.load(f)
-                        else:
-                            cfg = {}
-                        # SELL 默认使用止损比例（负值），而非止盈比例
-                        real_pnl = -abs(cfg.get("stop_loss_pct", 0.05)) * account.get("total", 100000)
-                    record_fill(real_pnl, account["total"])  # 传递实际PnL而非硬编码0
-                    from atos.live.daily_review import log_trade as save_log
-                    save_log(sym, "SELL", abs(qty),
-                             signals.get(sym, {}).get("price", 0),
-                             pnl_pct=real_pnl)
-                except Exception as e:
-                    logger.debug(f"卖出日志写入失败: {e}")
+                _log_sell_pnl(sym, abs(qty), account, signals, reason="SELL")
             else:
-                # BUY 操作记录为0 PnL（尚未实现盈亏）
                 record_fill(0.0, account["total"])
         else:
             log_error("live_trader", f"下单失败: {action} {qty}股 {sym}")
@@ -386,10 +379,16 @@ def main():
 
         if is_market_open():
             run_cycle()
+            time.sleep(INTERVAL_MINUTES * 60)
         else:
-            logger.debug("市场休市，等待中...")
-
-        time.sleep(INTERVAL_MINUTES * 60)
+            # Bug #8: 非交易时段智能 sleep，不等 30 分钟空跑
+            wait_seconds = _seconds_until_next_market_open()
+            # 至少等 5 分钟（避免频繁轮询），最多等到开市
+            wait_seconds = max(300, min(wait_seconds, 3600 * 16))
+            next_open_str = (datetime.datetime.now(datetime.timezone.utc) +
+                             datetime.timedelta(seconds=wait_seconds)).strftime("%H:%M UTC")
+            logger.debug(f"市场休市，{wait_seconds/60:.0f}分钟后 ({next_open_str}) 再检查")
+            time.sleep(wait_seconds)
 
 
 if __name__ == "__main__":

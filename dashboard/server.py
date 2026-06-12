@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""ATOS PRO Dashboard Server v5 — http://localhost:9000"""
+"""ATOS PRO Dashboard Server v5 — http://localhost:9000
+Bug #14: 这是旧版仪表盘（http.server），新版在 web/server.py (FastAPI, port 8000)。
+两个仪表盘功能重叠但互不冲突，web/server.py 是主要入口。"""
 import http.server,json,os,sys,datetime,re,sqlite3,subprocess,threading,time
 from urllib.parse import urlparse,parse_qs
 
@@ -37,8 +39,7 @@ def _live_price(sym):
 
 def _fetch_price(sym):
     global _price_cache,_price_ts
-    py=os.path.join(BASE,'venv','bin','python3')
-    if not os.path.exists(py): py=sys.executable
+    py = sys.executable  # Bug #13: 直接用当前 Python，不依赖不存在的 venv
     try:
         code="import sys,yfinance; t=yfinance.Ticker(sys.argv[1]); i=t.info or {}; p=i.get('currentPrice') or i.get('regularMarketPrice') or 0; print(p) if p else print(-1)"
         r=subprocess.run([py,'-c',code,sym],capture_output=True,timeout=10,text=True)

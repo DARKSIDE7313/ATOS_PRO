@@ -33,7 +33,7 @@ class BollingerStrategy:
 
     def generate_signals(self, ticker: str, closes, volumes=None,
                          bb_period: int = 20, bb_std: float = 2.0,
-                         rsi_low: float = 35, rsi_high: float = 65,
+                         rsi_low: float = 35,
                          stop_pct: float = 0.05,
                          take_pct: float = 0.08) -> list:
         """

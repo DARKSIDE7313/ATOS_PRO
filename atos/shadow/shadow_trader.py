@@ -220,6 +220,9 @@ class ShadowAccount:
         elif t < 500000: return "MODERATE"
         return "CONSERVATIVE"
 
+    # Bug #7 注释: mode 名称反映风险偏好而非仓位数量。
+    # VERY_AGGRESSIVE(3仓)=资金极少时只能集中火力, AGGRESSIVE(15仓)=有资金后可以分散,
+    # MODERATE(8仓)=适中, CONSERVATIVE(10仓)=大资金但适度分散保持流动性。
     @property
     def max_positions(self) -> int:
         return {"VERY_AGGRESSIVE": 3, "AGGRESSIVE": 15, "MODERATE": 8, "CONSERVATIVE": 10}[self.mode]
@@ -790,7 +793,7 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
         sym = pick["symbol"]
         if deployed >= max_deploy:
             break
-        if len(account.positions) >= effective_max_pos:
+        if len(account.positions) >= effective_max_pos and sym not in account.positions:
             break
 
         # 冷却期检查
@@ -822,19 +825,37 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
         if price <= 0:
             continue
 
-        # RSI过滤（收紧: 75→68, 低胜率阶段不再追强。等盈利恢复再放宽）
+        # RSI过滤
         rsi = signals.get(sym, {}).get("rsi", 50)
         if rsi > 68:
             logger.debug(f"⏭ {sym} RSI={rsi:.0f}>68 超买")
             continue
 
-        # MA200偏离过滤（收紧: 25%→18%, 减少高位追入）
+        # MA200偏离过滤
         ma200 = signals.get(sym, {}).get("ma200", 0)
         if ma200 > 0 and price > ma200 * 1.18:
             logger.debug(f"⏭ {sym} 价格偏离MA200>18%")
             continue
 
-        # 🆕 v5: Crouching 方法计算仓位
+        # Bug #2: 修复死代码 — 已有持仓允许加仓（仅盈利时）
+        is_add = sym in account.positions
+        if is_add:
+            pos = account.positions[sym]
+            avg_px = pos.get("avg_price", 0)
+            if avg_px <= 0:
+                continue
+            pnl_pct = (price - avg_px) / avg_px
+            if pnl_pct < 0:
+                logger.debug(f"⏭ {sym} 浮亏{pnl_pct:.1%} — 禁止加仓")
+                continue
+            # 加仓不超过单仓上限的50%
+            current_val = pos["qty"] * price
+            max_single_val = account.total_equity * account.max_single_pct
+            if current_val >= max_single_val * 0.5:
+                logger.debug(f"⏭ {sym} 已达加仓上限")
+                continue
+
+        # Crouching 方法计算仓位
         enhanced_score = pick["score"]
         serenity_boost = pick["serenity_boost"]
         has_catalyst = (serenity_boost >= 0.10)  # STRONG_CHOKEPOINT = has catalyst
@@ -870,21 +891,8 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
             target_pct *= 0.85
         target_val = account.total_equity * target_pct
 
-        # 考虑已有持仓（加仓情况）
+        # 考虑已有持仓 — Bug #2: 加仓路径已在上方过滤（仅盈利时可到达此处）
         current_val = account.positions[sym]["qty"] * price if sym in account.positions else 0
-        # BUGFIX P4: 浮亏状态禁止加仓 — 已有仓位且亏损时跳过
-        if current_val > 0:
-            pos_info = account.positions.get(sym, {})
-            avg_px = pos_info.get("avg_price", 0)
-            if avg_px > 0:
-                existing_pnl = (price - avg_px) / avg_px
-                if existing_pnl < 0:
-                    logger.debug(f"⏭ {sym} 浮亏{existing_pnl:.2%} 禁止加仓")
-                    current_val = account.positions[sym]["qty"] * price
-                    # 只设 delta=0 跳过加仓，但首次买入仍可能通过
-                    delta_val = 0
-                    continue
-        # 正常计算delta
         delta_val = target_val - current_val
         if delta_val <= 0:
             continue
