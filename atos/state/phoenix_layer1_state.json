@@ -1,0 +1,15 @@
+{
+  "dca_log": [
+    {
+      "action": "buy",
+      "symbol": "VOO",
+      "amount": 15000.0,
+      "shares": 22.12,
+      "price": 678.0,
+      "pe": 27.7,
+      "multiple": 0.5,
+      "date": "2026-06-06"
+    }
+  ],
+  "last_rebalance": "2026-06-06"
+}
