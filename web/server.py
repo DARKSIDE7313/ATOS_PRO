@@ -154,6 +154,7 @@ def _sync_backtest(ticker: str, capital: int) -> dict:
                     "price": round(curr_price, 2), "pnl": round(pnl, 2),
                     "time": str(ts)
                 })
+            # always clear position state on sell attempt
             in_position = False
 
     # Main loop: iterate through each bar
@@ -215,18 +216,18 @@ def _sync_backtest(ticker: str, capital: int) -> dict:
             _execute_signal("SELL", 0.8, curr_price, ts)
             continue
 
-        # Five-condition entry
+        # Five-condition entry（优化版）
         if not in_position and risk_mult > 0:
-            golden_cross = prev_ema20 <= prev_ema50 and curr_ema20 > curr_ema50
+            trend_up = curr_ema20 > curr_ema50
             above_ema200 = curr_price > curr_ema200
-            rsi_ok = 45 <= rsi <= 68
-            volume_ok = vol_ratio >= 1.5
-            volatility_ok = atr_pct < 0.03
+            rsi_ok = 40 <= rsi <= 70
+            volume_ok = vol_ratio >= 1.2
+            volatility_ok = atr_pct < 0.05
 
-            if golden_cross and above_ema200 and rsi_ok and volume_ok and volatility_ok:
+            if trend_up and above_ema200 and rsi_ok and volume_ok and volatility_ok:
                 entry_price = curr_price
-                stop_loss = curr_price - 1.5 * atr
-                take_profit = curr_price + 3.0 * atr
+                stop_loss = curr_price - 2.5 * atr
+                take_profit = curr_price + 4.0 * atr
                 in_position = True
                 _execute_signal("BUY", 0.9 * risk_mult, curr_price, ts)
 

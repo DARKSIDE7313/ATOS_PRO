@@ -89,18 +89,18 @@ class InstitutionalStrategy:
             self.in_position = False
             return
 
-        # 五重入场条件
+        # 五重入场条件（优化版）
         if not self.in_position and risk_mult > 0:
-            golden_cross = prev_ema20 <= prev_ema50 and curr_ema20 > curr_ema50
+            trend_up = curr_ema20 > curr_ema50
             above_ema200 = curr_price > curr_ema200
-            rsi_ok = 45 <= rsi <= 68
-            volume_ok = vol_ratio >= 1.5
-            volatility_ok = atr_pct < 0.03
+            rsi_ok = 40 <= rsi <= 70
+            volume_ok = vol_ratio >= 1.2
+            volatility_ok = atr_pct < 0.05
 
-            if golden_cross and above_ema200 and rsi_ok and volume_ok and volatility_ok:
+            if trend_up and above_ema200 and rsi_ok and volume_ok and volatility_ok:
                 self.entry_price = curr_price
-                self.stop_loss = curr_price - 1.5 * atr
-                self.take_profit = curr_price + 3.0 * atr
+                self.stop_loss = curr_price - 2.5 * atr
+                self.take_profit = curr_price + 4.0 * atr
                 self.in_position = True
                 await self.event_bus.publish(SignalEvent(
                     ticker=market_event.ticker, side="BUY",
