@@ -73,6 +73,8 @@ class DualMomentumStrategy:
                     in_position = False
             else:
                 # Entry: short momentum > long AND positive + volume confirmation
+                current_vol = 1.0
+                avg_vol = 1.0
                 if volumes is not None and len(prices) >= 20:
                     vol_series = pd.Series(volumes[:len(prices)])
                     avg_vol = vol_series.rolling(20).mean().iloc[-1]

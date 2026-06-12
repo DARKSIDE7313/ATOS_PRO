@@ -88,7 +88,13 @@ class BollingerStrategy:
                     in_position = False
             else:
                 # Entry: below lower band + RSI oversold + trend filter (avoid catching falling knives)
-                trend_ok = close > sma200 if len(prices) >= 200 else close > sma50
+                # Use MA direction (not price position): buy pullbacks in uptrends only
+                if len(prices) >= 200:
+                    trend_ok = sma50 > sma200  # medium-term trend UP
+                elif len(prices) >= 50:
+                    trend_ok = sma > sma50     # short-term > medium-term (proxy)
+                else:
+                    trend_ok = True            # not enough data, allow entry
                 if close <= lower and rsi14 <= rsi_low and trend_ok:
                     signals.append({
                         'ticker': ticker, 'action': 'BUY',

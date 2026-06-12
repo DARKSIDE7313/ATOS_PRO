@@ -65,7 +65,6 @@ class RSI2Strategy:
                     })
                     in_position = False
                 # Exit 2: price crosses above SMA5 (trend reversal signal)
-                # Bug 10: removed rsi2>50 requirement — RSI2 almost always >50 after rebound
                 elif close > sma5 and rsi2 > 60:
                     signals.append({
                         'ticker': ticker, 'action': 'SELL',
@@ -73,7 +72,15 @@ class RSI2Strategy:
                         'pnl_pct': (close - entry_price) / entry_price
                     })
                     in_position = False
-                # Exit 3: trailing stop from peak (Bug 4)
+                # Exit 2b: extreme overbought failsafe — RSI2>90, exit regardless of profit
+                elif rsi2 > 90:
+                    signals.append({
+                        'ticker': ticker, 'action': 'SELL',
+                        'price': close, 'reason': f'RSI2={rsi2:.1f}>90 extreme OB',
+                        'pnl_pct': (close - entry_price) / entry_price
+                    })
+                    in_position = False
+                # Exit 3: trailing stop from peak
                 elif close <= peak_price * (1 - stop_pct):
                     signals.append({
                         'ticker': ticker, 'action': 'SELL',
