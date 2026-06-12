@@ -28,6 +28,11 @@ async def index():
     return (WEB_DIR / "templates" / "index.html").read_text()
 
 
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
+
 @app.post("/api/run")
 async def run_strategy(request: Request):
     body = await request.json()
