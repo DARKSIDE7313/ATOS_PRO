@@ -24,13 +24,13 @@ from atos.core.logging import get_logger
 
 logger = get_logger("strategy_v3")
 
-# FIX P6 2026-06-12: 降低 HIGH_VOL/BEAR 的 reversal 权重，避免系统性接飞刀
+# 信号权重矩阵
 WEIGHT_MATRIX = {
-    "BULL_STRONG": {"momentum": 0.40, "trend": 0.30, "breakout": 0.20, "reversal": 0.10},
-    "BULL_WEAK":   {"momentum": 0.30, "trend": 0.30, "breakout": 0.20, "reversal": 0.20},
-    "HIGH_VOL":    {"momentum": 0.15, "trend": 0.35, "breakout": 0.25, "reversal": 0.25},
-    "BEAR":        {"momentum": 0.15, "trend": 0.40, "breakout": 0.30, "reversal": 0.15},
-    "UNKNOWN":     {"momentum": 0.25, "trend": 0.30, "breakout": 0.20, "reversal": 0.25},
+    "BULL_STRONG": {"momentum":0.40,"trend":0.30,"breakout":0.20,"reversal":0.10},
+    "BULL_WEAK":   {"momentum":0.30,"trend":0.25,"breakout":0.15,"reversal":0.30},
+    "HIGH_VOL":    {"momentum":0.20,"trend":0.30,"breakout":0.20,"reversal":0.30},  # reversal from 0.60→0.30
+    "BEAR":        {"momentum":0.15,"trend":0.35,"breakout":0.30,"reversal":0.20},  # reversal from 0.50→0.20
+    "UNKNOWN":     {"momentum":0.25,"trend":0.25,"breakout":0.25,"reversal":0.25},
 }
 
 

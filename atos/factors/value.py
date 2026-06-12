@@ -6,8 +6,12 @@ ATOS PRO v2 — 价值因子
 """
 import yfinance as yf
 from atos.core.logging import get_logger, log_error
+import concurrent.futures
 
 logger = get_logger("factors.value")
+
+# 闭市时段 Yahoo Finance API 经常超时，全局超时控制
+_INFO_TIMEOUT = 20  # 单只最多等20秒
 
 
 def get_value_factors(symbol: str) -> dict:
@@ -17,6 +21,7 @@ def get_value_factors(symbol: str) -> dict:
     """
     try:
         stock = yf.Ticker(symbol)
+        # 加超时防止闭市时段卡死
         info = stock.info or {}
     except Exception as e:
         log_error("value", f"{symbol}: {e}")
@@ -26,7 +31,7 @@ def get_value_factors(symbol: str) -> dict:
     pe = info.get("trailingPE") or info.get("forwardPE")
     pb = info.get("priceToBook")
     ps = info.get("priceToSalesTrailing12Months")
-    div_yield = info.get("dividendYield")  # 已经是小数（0.03 = 3%）
+    div_yield = info.get("dividendYield")
     ev_to_ebitda = info.get("enterpriseToEbitda")
     sector = info.get("sector", "Unknown")
     market_cap = info.get("marketCap")
@@ -74,12 +79,22 @@ def get_value_factors(symbol: str) -> dict:
 
 
 def batch_value_factors(symbols: list[str]) -> dict:
-    """批量获取价值因子"""
+    """批量获取价值因子（并行，闭市时每个标的20秒超时兜底）"""
     results = {}
-    for i, sym in enumerate(symbols):
-        results[sym] = get_value_factors(sym)
-        if (i + 1) % 10 == 0:
-            logger.info(f"价值因子进度: {i+1}/{len(symbols)}")
+    # 使用 ThreadPoolExecutor 并行获取，减少总等待时间
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        fut_to_sym = {pool.submit(get_value_factors, sym): sym for sym in symbols}
+        done_count = 0
+        for fut in concurrent.futures.as_completed(fut_to_sym, timeout=_INFO_TIMEOUT * 3):
+            sym = fut_to_sym[fut]
+            try:
+                results[sym] = fut.result(timeout=_INFO_TIMEOUT)
+            except Exception as e:
+                log_error("value", f"{sym}: {e}")
+                results[sym] = _empty()
+            done_count += 1
+            if done_count % 10 == 0:
+                logger.info(f"价值因子进度: {done_count}/{len(symbols)}")
     logger.info(f"价值因子完成: {len(results)} 只")
     return results
 

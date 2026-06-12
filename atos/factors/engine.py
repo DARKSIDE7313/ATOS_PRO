@@ -24,6 +24,7 @@ DEFAULT_WEIGHTS = {
 
 # IC 历史记录：{regime: {"last_ic": float, "weight_adjustments": {...}}}
 _ic_history: dict[str, dict] = {}
+_ic_lock = __import__('threading').Lock()
 
 # 每个因子的 IC 记录：{regime: {factor: ic_value}}
 _per_factor_ic: dict[str, dict[str, float]] = {}
@@ -35,11 +36,11 @@ _per_factor_ic: dict[str, dict[str, float]] = {}
 #   - HIGH_VOL: 质量和价值为主，均值回归降至0.12
 #   - 所有环境下：技术面保持主力地位
 REGIME_WEIGHTS = {
-    "BULL_STRONG": {"momentum": 0.35, "technical": 0.25, "value": 0.05, "quality": 0.05, "multiframe": 0.15, "mean_rev": 0.15},
-    "BULL_WEAK":   {"momentum": 0.25, "technical": 0.30, "value": 0.05, "quality": 0.05, "multiframe": 0.15, "mean_rev": 0.20},
-    "HIGH_VOL":    {"momentum": 0.20, "technical": 0.25, "value": 0.08, "quality": 0.07, "multiframe": 0.15, "mean_rev": 0.25},
-    "BEAR":        {"momentum": 0.30, "technical": 0.22, "value": 0.05, "quality": 0.08, "multiframe": 0.18, "mean_rev": 0.17},
-    "SIDEWAYS":    {"momentum": 0.22, "technical": 0.28, "value": 0.07, "quality": 0.08, "multiframe": 0.15, "mean_rev": 0.20},
+    "BULL_STRONG": {"momentum": 0.30, "technical": 0.25, "value": 0.05, "quality": 0.05, "multiframe": 0.20, "mean_rev": 0.15},
+    "BULL_WEAK":   {"momentum": 0.22, "technical": 0.30, "value": 0.05, "quality": 0.05, "multiframe": 0.18, "mean_rev": 0.20},
+    "HIGH_VOL":    {"momentum": 0.20, "technical": 0.25, "value": 0.10, "quality": 0.10, "multiframe": 0.18, "mean_rev": 0.17},  # 降低 mean_rev 防高波动抄底
+    "BEAR":        {"momentum": 0.18, "technical": 0.22, "value": 0.12, "quality": 0.18, "multiframe": 0.20, "mean_rev": 0.10},  # BEAR: 降低 mean_rev 0.15→0.10，提升 quality 防踩雷
+    "SIDEWAYS":    {"momentum": 0.20, "technical": 0.28, "value": 0.08, "quality": 0.08, "multiframe": 0.16, "mean_rev": 0.20},
     "UNKNOWN":     {"momentum": 0.25, "technical": 0.30, "value": 0.07, "quality": 0.08, "multiframe": 0.15, "mean_rev": 0.15},
 }
 
@@ -148,14 +149,14 @@ def adjust_weights_from_ic(regime: str) -> dict:
 
     返回调整后的权重 dict {factor: weight}。
     """
-    history = _ic_history.get(regime)
-    if not history:
-        # IC 数据尚未积累 — 使用默认权重（ULTRA AI 会动态调整）
-        return dict(REGIME_WEIGHTS.get(regime, DEFAULT_WEIGHTS))
-
-    last_ic = history.get("last_ic", 0.0)
+    with _ic_lock:
+        history = _ic_history.get(regime)
+        if not history:
+            return dict(REGIME_WEIGHTS.get(regime, DEFAULT_WEIGHTS))
+        last_ic = history.get("last_ic", 0.0)
+        per_factor = dict(_per_factor_ic.get(regime, {}))
+    
     base_weights = dict(REGIME_WEIGHTS.get(regime, DEFAULT_WEIGHTS))
-    per_factor = _per_factor_ic.get(regime, {})
 
     if last_ic > 0.05:
         # 正相关 → 提升 IC 最高的因子（如果 per-factor IC 数据可用）
@@ -221,17 +222,24 @@ def combine(signals: dict, value_factors: dict, momentum_factors: dict,
     if multiframe_factors is None:
         multiframe_factors = {}
 
-    # 如果启用 v3 信号，覆盖 multiframe_factors
+    # 如果启用 v3 信号，从已有的 signal_engine 数据中计算多时间框架信号
+    # BUGFIX 2026-06-11: 不再单独调 yf.download()（太慢），所有数据从 signals 提取
     if use_v3_signals:
         try:
-            from atos.live.strategy_v3 import get_v3_signals
-            symbols = list(signals.keys())
-            v3_factors = get_v3_signals(symbols, regime)
-            if v3_factors:
-                multiframe_factors = v3_factors
-                logger.info(f"v3多时间框架信号已集成: {len(v3_factors)} 只标的")
+            from atos.live.strategy_v3 import composite_signal
+            v3_factors = {}
+            for sym in list(signals.keys()):
+                result = composite_signal(sym, regime, signals[sym])
+                v3_factors[sym] = {
+                    "composite": result["score"],
+                    "decision": result["decision"],
+                    "multi_timeframe": result.get("multi_timeframe", {}),
+                    "reasons": result.get("reasons", []),
+                }
+            multiframe_factors = v3_factors
+            logger.info(f"v3多时间框架信号计算完成: {len(v3_factors)} 只标的")
         except Exception as e:
-            logger.warning(f"v3信号集成失败: {e}，使用默认 multiframe_factors")
+            logger.warning(f"v3信号计算失败: {e}，使用默认 multiframe_factors")
 
     for sym in ALL_SYMBOLS:
         if sym not in signals:
@@ -251,15 +259,25 @@ def combine(signals: dict, value_factors: dict, momentum_factors: dict,
         smc_normalized = 0.5 + smc_score_raw  # -0.6~0.6 → -0.1~1.1, clamp to 0~1
         smc_normalized = max(0.0, min(1.0, smc_normalized))
 
-        total = (
-            v_score * weights["value"] +
-            m_score * weights["momentum"] +
-            q_score * weights["quality"] +
-            t_score * weights["technical"] +
-            f_score * weights["multiframe"] +
-            r_score * weights.get("mean_rev", 0.0) +  # 🆕 均值回归权重
-            smc_normalized * 0.08  # 🆕 SMC因子权重8%
-        )
+        # 核心因子加权（不包含SMC——SMC作为独立修正）
+        core_weights = {k: weights.get(k, 0) for k in ["value", "momentum", "quality", "technical", "multiframe", "mean_rev"]}
+        core_sum = sum(core_weights.values())
+        if core_sum > 0:
+            # 归一化核心权重到总和为1，然后加权
+            total = (
+                v_score * core_weights["value"] / core_sum +
+                m_score * core_weights["momentum"] / core_sum +
+                q_score * core_weights["quality"] / core_sum +
+                t_score * core_weights["technical"] / core_sum +
+                f_score * core_weights["multiframe"] / core_sum +
+                r_score * core_weights["mean_rev"] / core_sum
+            )
+        else:
+            total = 0.5  # Fallback
+        
+        # SMC 作为独立修正因子（5%权重）
+        total = total * 0.95 + smc_normalized * 0.05
+        total = max(0.0, min(1.0, total))
 
         scores[sym] = round(total, 4)
         breakdown[sym] = {
@@ -280,11 +298,12 @@ def combine(signals: dict, value_factors: dict, momentum_factors: dict,
         f"Top3: {rankings[:3]} | 权重={weights}"
     )
 
-    # 存储权重（供后续 IC 反馈循环使用）
-    _ic_history[regime] = {
-        "last_ic": _ic_history.get(regime, {}).get("last_ic", 0.0),
-        "weight_adjustments": dict(weights),
-    }
+    # 存储权重（供后续 IC 反馈循环使用）— 加锁
+    with _ic_lock:
+        _ic_history[regime] = {
+            "last_ic": _ic_history.get(regime, {}).get("last_ic", 0.0),
+            "weight_adjustments": dict(weights),
+        }
 
     return {
         "rankings": rankings,
@@ -332,8 +351,9 @@ def ic_analysis(prev_scores: dict, current_returns: dict, regime: str = "UNKNOWN
 
     result = {"ic": round(ic, 4), "n": len(common), "verdict": verdict}
 
-    # 回写 IC 到历史，下次 combine() 会根据此 IC 调整权重
-    _ic_history.setdefault(regime, {})["last_ic"] = result["ic"]
+    # 回写 IC 到历史（加锁）
+    with _ic_lock:
+        _ic_history.setdefault(regime, {})["last_ic"] = result["ic"]
 
     # 计算每个因子的 IC（如果 breakdown 数据可用）
     if prev_breakdown and len(common) >= 10:
@@ -352,7 +372,8 @@ def ic_analysis(prev_scores: dict, current_returns: dict, regime: str = "UNKNOWN
                 pi = _spearman(list(factor_vals), factor_returns)
                 per_factor_ics[factor] = round(pi, 4)
         if per_factor_ics:
-            _per_factor_ic[regime] = per_factor_ics
+            with _ic_lock:
+                _per_factor_ic[regime] = per_factor_ics
             best_f = max(per_factor_ics, key=per_factor_ics.get)
             worst_f = min(per_factor_ics, key=per_factor_ics.get)
             logger.info(f"每个因子 IC: {per_factor_ics} | 最佳={best_f}={per_factor_ics[best_f]:.4f}, 最差={worst_f}={per_factor_ics[worst_f]:.4f}")

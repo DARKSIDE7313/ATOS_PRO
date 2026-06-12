@@ -1,35 +1,85 @@
 """
-ATOS PRO v4 — AI 决策引擎（重写版）
-====================================
-不再是用因子评分 + 阈值做机械买卖。
-而是模拟资深投资者的完整决策流程：
-
-  1. CIO 市场研判 — 大盘方向、仓位建议、风险警示
-  2. 持仓问诊 — 每只持仓的独立诊断（持有/加仓/减仓/清仓）
-  3. 开仓分析 — 候选标的的深度分析（机会/风险/仓位建议）
-  4. 否决审查 — 组合级安全检查
-
-核心原则：
-  - AI 有开仓建议权，但最终由风控层裁量
-  - AI 对自己的判断负责（记录、跟踪、反思）
-  - 每笔决策都要有"为什么"和"什么情况下我可能是错的"
-"""
+# ATOS PRO v4 — AI 决策引擎（重写版）
+# 所有 JSON 解析使用 _extract_json() 统一处理 DeepSeek 非结构化输出
+# BUGFIX 2026-06-12: 
+#   - 所有 json.loads() 改为 _extract_json() (处理 ```json 包裹 + markdown)
+#   - 修复双层 json.loads(resp.json()) 导致全部崩走fallback
+#   - API_KEY 读取增加换行/strip防御
+#   - 每个API失败时有完整回溯日志"""
 
 import json
 import os
 import datetime
 import requests
+import re
 from atos.core.logging import get_logger
+# Noise guard: skip recording tiny pnl changes
+NOISE_THRESHOLD = 0.001
+def _is_noise(pnl_change):
+    return abs(pnl_change) < NOISE_THRESHOLD
+
 
 logger = get_logger("ai.engine_v4")
 
 API_URL = "https://api.deepseek.com/chat/completions"
-MODEL = "deepseek-chat"  # DeepSeek API 模型名（不是 provider 别名）
+MODEL = "deepseek-chat"  # DeepSeek API 模型名
+
+def _extract_json(text: str) -> dict:
+    """从 LLM 响应中提取并解析 JSON。
+    
+    DeepSeek 在无 response_format 约束时可能返回：
+    - 纯 JSON: {...}
+    - markdown 包裹: ```json\n...\n```
+    - markdown 包裹: ```\n...\n```
+    - 文本+JSON混合: "... {...} ..."
+    
+    依次尝试：直接解析 → markdown提取 → 正则提取第一个{...}
+    全部失败则抛出 ValueError。
+    """
+    if not text or not isinstance(text, str):
+        raise ValueError("空响应")
+    
+    text = text.strip()
+    
+    # 1. 直接解析
+    try:
+        return json.loads(text)
+    except (json.JSONDecodeError, TypeError):
+        pass
+    
+    # 2. 提取 ```json ... ``` 或 ``` ... ```
+    m = re.search(r'```(?:json)?\s*\n?(.*?)```', text, re.DOTALL | re.IGNORECASE)
+    if m:
+        try:
+            return json.loads(m.group(1).strip())
+        except (json.JSONDecodeError, TypeError):
+            pass
+    
+    # 3. 提取第一个 {...} 或 [{...}]
+    m = re.search(r'(\{.*\})', text, re.DOTALL)
+    if m:
+        try:
+            return json.loads(m.group(1).strip())
+        except (json.JSONDecodeError, TypeError):
+            pass
+    
+    m = re.search(r'(\[.*\])', text, re.DOTALL)
+    if m:
+        try:
+            return json.loads(m.group(1).strip())
+        except (json.JSONDecodeError, TypeError):
+            pass
+    
+    raise ValueError(f"无法从响应中提取JSON: {text[:200]}")
+
+
 # 从多个可能的位置读取 API Key
 def _get_api_key() -> str:
     key = os.environ.get("DEEPSEEK_API_KEY", "")
     if key:
-        return key
+        key = key.strip().strip("'\"")
+        if key:
+            return key
     # 从 Hermes .env 读取
     for env_path in [
         os.path.expanduser("~/.hermes/.env"),
@@ -41,7 +91,9 @@ def _get_api_key() -> str:
                     for line in f:
                         line = line.strip()
                         if line.startswith("DEEPSEEK_API_KEY="):
-                            return line.split("=", 1)[1].strip().strip("\"'")
+                            val = line.split("=", 1)[1].strip().strip("\"'")
+                            if val:
+                                return val
             except Exception:
                 pass
     return ""
@@ -128,7 +180,8 @@ def cio_analysis(market_snapshot: dict) -> dict:
         headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
         resp = requests.post(API_URL, json=payload, headers=headers, timeout=60)
         resp.raise_for_status()
-        result = json.loads(resp.json()["choices"][0]["message"]["content"])
+        content = resp.json()["choices"][0]["message"]["content"]
+        result = _extract_json(content)
         logger.info(f"CIO: 仓位={result.get('position_size',50)}% 风险={result.get('risk_level','MEDIUM')}")
         return result
     except Exception as e:
@@ -209,7 +262,7 @@ def review_position(position_data: dict) -> dict:
         headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
         resp = requests.post(API_URL, json=payload, headers=headers, timeout=30)
         resp.raise_for_status()
-        result = json.loads(resp.json()["choices"][0]["message"]["content"])
+        result = _extract_json(resp.json()["choices"][0]["message"]["content"])
         logger.info(f"持仓诊断 {position_data.get('symbol','?')}: {result.get('verdict','?')} conf={result.get('confidence',0):.2f}")
         return result
     except Exception as e:
@@ -285,7 +338,7 @@ def analyze_candidate(candidate_data: dict) -> dict:
         headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
         resp = requests.post(API_URL, json=payload, headers=headers, timeout=30)
         resp.raise_for_status()
-        result = json.loads(resp.json()["choices"][0]["message"]["content"])
+        result = _extract_json(resp.json()["choices"][0]["message"]["content"])
         logger.info(f"开仓分析 {candidate_data.get('symbol','?')}: {result.get('decision','?')} conf={result.get('confidence',0):.2f}")
         return result
     except Exception as e:
@@ -426,7 +479,7 @@ def veto_candidate(candidate: dict) -> dict:
         headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
         resp = requests.post(API_URL, json=payload, headers=headers, timeout=30)
         resp.raise_for_status()
-        result = json.loads(resp.json()["choices"][0]["message"]["content"])
+        result = _extract_json(resp.json()["choices"][0]["message"]["content"])
         logger.info(f"否决审查 {candidate.get('symbol','?')}: {'❌否决' if result.get('veto') else '✅批准'} | {result.get('reason','')[:40]}")
         return result
     except Exception as e:
@@ -695,7 +748,8 @@ def get_advice_v4_ultra(snapshot: dict) -> dict:
         headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
         resp = requests.post(API_URL, json=payload, headers=headers, timeout=120)
         resp.raise_for_status()
-        raw = json.loads(resp.json()["choices"][0]["message"]["content"])
+        content = resp.json()["choices"][0]["message"]["content"]
+        raw = _extract_json(content)
         
         # 映射到兼容格式
         result = {

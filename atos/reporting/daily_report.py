@@ -175,11 +175,23 @@ def main():
     print("\n=== ATOS PRO 每日报告 ===")
     print(f"时间: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}") 
     print("-" * 40)
-    account, positions           = fetch_account_data()
-    regime, spy_price, vix_price = fetch_market_regime()
-    html                         = build_html_report(account, positions, regime, spy_price, vix_price)
+    try:
+        account, positions           = fetch_account_data()
+    except Exception as e:
+        print(f"[WARN] 账户数据获取失败: {e}")
+        account, positions = {}, []
+    try:
+        regime, spy_price, vix_price = fetch_market_regime()
+    except Exception as e:
+        print(f"[WARN] 市场状态获取失败: {e}")
+        regime, spy_price, vix_price = {}, 0, 0
+    html = build_html_report(account, positions, regime, spy_price, vix_price)
     save_report(html)
-    send_email(html)
+    # 邮件发送失败不阻断报告生成
+    try:
+        send_email(html)
+    except Exception as e:
+        print(f"[WARN] 邮件发送失败: {e}")
     print("-" * 40)
     print("[完成] 每日报告生成成功")
 

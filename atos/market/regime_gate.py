@@ -160,6 +160,9 @@ def get_curve_slope_rank() -> Optional[float]:
     """
     cs = _get_cached("curve_slope")
     if cs is None:
+        # 用 5年 (^FVX) 和 10年 (^TNX) 近似 yield curve 斜率
+        # 注意: yfinance 没有 ^2YR，最接近国债短期端点是 ^FVX(5年)
+        # 但百分位排名法（252日窗口）对斜率绝对值误差不敏感
         dgs2 = yf.download("^FVX", period="2y", interval="1d", progress=False, auto_adjust=True)
         dgs10 = yf.download("^TNX", period="2y", interval="1d", progress=False, auto_adjust=True)
 

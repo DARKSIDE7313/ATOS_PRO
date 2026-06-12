@@ -1,0 +1,8 @@
+[build]
+  command = "echo 'Static site, no build needed'"
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/api"
+  to = "/.netlify/functions/api-proxy"
+  status = 200

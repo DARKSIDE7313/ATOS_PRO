@@ -198,8 +198,18 @@ class H(http.server.BaseHTTPRequestHandler):
             with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'index.html')) as f:
                 self.wfile.write(f.read().encode())
     def _j(self,d):
-        self.send_response(200); self.send_header('Content-Type','application/json'); self.send_header('Cache-Control','no-cache'); self.end_headers()
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin','*')
+        self.send_header('Access-Control-Allow-Methods','GET, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers','Content-Type')
+        self.send_header('Content-Type','application/json'); self.send_header('Cache-Control','no-cache'); self.end_headers()
         self.wfile.write(json.dumps(d,ensure_ascii=False,default=str).encode())
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin','*')
+        self.send_header('Access-Control-Allow-Methods','GET, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers','Content-Type')
+        self.end_headers()
 
 if __name__=='__main__':
     import socketserver

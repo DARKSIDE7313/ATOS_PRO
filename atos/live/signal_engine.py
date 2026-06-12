@@ -31,6 +31,66 @@ except ImportError:
 
 # Bug #10: yfinance 缓存层 — 仅在交易日内缓存，周末不缓存
 _cache = {}  # {symbol: (timestamp, dataframe)}
+
+# 自愈: yfinance SQLite 缓存修复
+def _repair_yfinance_cache():
+    """yfinance 的 SQLite 缓存 (tkr-tz.db/cookies.db) 有时会在异常退出后留下 .db-wal/.db-shm 
+    残留文件，导致后续下载失败 'unable to open database file'。
+    同时也修复 'no such table: _tz_kv' 错误——yfinance 懒创建表时多线程竞争会失败。
+    
+    BUGFIX 2026-06-11: 表名 _tz_kv 是错的，yfinance 实际用的是 tkr-tz 表。
+                      同时添加完整表创建和权限修复。"""
+    import glob
+    import sqlite3
+    import stat
+    cache_dir = os.path.expanduser('~/Library/Caches/py-yfinance')
+    if not os.path.exists(cache_dir):
+        os.makedirs(cache_dir, exist_ok=True)
+        return
+    
+    # 1. 清除 WAL/SHM 残留
+    for pattern in ('*.db-wal', '*.db-shm'):
+        for f in glob.glob(os.path.join(cache_dir, pattern)):
+            try:
+                os.remove(f)
+                logger.warning(f"自愈: 已清除 yfinance 缓存残留 {os.path.basename(f)}")
+            except OSError:
+                pass
+    
+    # 2. 预创建 yfinance 需要的表（表名必须匹配 yfinance 内部使用）
+    #    yfinance 使用 tkr-tz 表名（不是 _tz_kv！）和多线程竞争崩溃修复
+    for db_name in ('tkr-tz.db', 'cookies.db'):
+        db_path = os.path.join(cache_dir, db_name)
+        try:
+            conn = sqlite3.connect(db_path)
+            # 启用 WAL 模式 — 多线程读写更安全
+            conn.execute("PRAGMA journal_mode=WAL")
+            # yfinance 实际用的表是 tkr-tz，不是 _tz_kv
+            conn.execute("CREATE TABLE IF NOT EXISTS 'tkr-tz' (key TEXT PRIMARY KEY, value TEXT)")
+            # yfinance 1.4.1 需要额外列和新表
+            for col in ['strategy', 'exchange']:
+                try:
+                    conn.execute(f"ALTER TABLE 'tkr-tz' ADD COLUMN {col} TEXT DEFAULT ''")
+                except Exception:
+                    pass  # 列已存在
+            conn.execute("CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT)")
+            conn.execute("CREATE TABLE IF NOT EXISTS cookie (key TEXT PRIMARY KEY, value TEXT)")
+            conn.execute("CREATE TABLE IF NOT EXISTS '_cookieschema' (key TEXT PRIMARY KEY, value TEXT)")
+            conn.execute("CREATE TABLE IF NOT EXISTS _tz_kv (key TEXT PRIMARY KEY, value TEXT)")
+            conn.execute("CREATE TABLE IF NOT EXISTS cache (key TEXT PRIMARY KEY, value TEXT)")
+            conn.commit()
+            conn.close()
+            # 修复权限（防止其他进程不能写）
+            try:
+                os.chmod(db_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP)
+            except Exception:
+                pass
+            logger.info(f"自愈: 已重建 yfinance 缓存 {db_name} (含正确表名 tkr-tz)")
+        except Exception as e:
+            logger.warning(f"自愈: 缓存 {db_name} 创建失败: {e}")
+
+# 启动时修复一次
+_repair_yfinance_cache()
 _CACHE_TTL = timedelta(minutes=3)  # 3 分钟短缓存（比原来的5分钟更短）
 
 def _should_skip_cache() -> bool:
@@ -53,9 +113,31 @@ def _get_cached_data(symbol: str, period: str = "1y", interval: str = "1d"):
         ts, df = _cache[key]
         if now - ts < _CACHE_TTL:
             return df
-    df = yf.download(symbol, period=period, interval=interval, progress=False, auto_adjust=True)
-    _cache[key] = (datetime.now(), df)
-    return df
+    
+    # 多轮重试：yfinance 在缓存重建后首次下载可能失败
+    max_attempts = 3
+    last_error = None
+    for attempt in range(max_attempts):
+        try:
+            try:
+                df = yf.download(symbol, period=period, interval=interval, progress=False, auto_adjust=True)
+            except Exception:
+                # BUGFIX 2026-06-12: yfinance 1.4.1 的 download() 有 'no such column: t1.strategy' bug
+                # 回退到 Ticker.history() 方式
+                ticker = yf.Ticker(symbol)
+                df = ticker.history(period=period, interval=interval, auto_adjust=True)
+            if df is not None and not df.empty:
+                _cache[key] = (datetime.now(), df)
+                return df
+            last_error = f"empty dataframe (attempt {attempt+1})"
+        except Exception as e:
+            last_error = str(e)
+        if attempt < max_attempts - 1:
+            time.sleep(1.5 * (attempt + 1))
+    
+    logger.warning(f"yfinance 下载失败 ({max_attempts}次重试): {symbol} — {last_error}")
+    _cache[key] = (datetime.now(), pd.DataFrame())
+    return pd.DataFrame()
 
 def clear_cache():
     """强制清空缓存（手动更新用）"""
@@ -180,16 +262,24 @@ NEWS_KEYWORDS = {
 
 
 def _calc_news_score(symbol: str) -> float:
-    """基于新闻标题关键词匹配计算催化剂分数 (0.0 - 0.20)"""
+    """基于新闻标题关键词匹配计算催化剂分数 (0.0 - 0.20)
+    限制 NEWS_CACHE 最大200条防止内存泄露。
+    此函数失败不会影响主流程——永远返回0.0而不是抛异常。
+    """
     import urllib.request
     import xml.etree.ElementTree as ET
-    from datetime import datetime
 
     now = datetime.now()
     if symbol in _NEWS_CACHE:
         ts, score = _NEWS_CACHE[symbol]
         if now - ts < _NEWS_TTL:
             return score
+
+    if len(_NEWS_CACHE) > 200:
+        # 溢出保护：删最旧的100条
+        old_keys = sorted(_NEWS_CACHE.keys(), key=lambda k: _NEWS_CACHE[k][0])[:100]
+        for k in old_keys:
+            del _NEWS_CACHE[k]
 
     score = 0.0
     try:
@@ -208,22 +298,18 @@ def _calc_news_score(symbol: str) -> float:
             _NEWS_CACHE[symbol] = (now, 0.0)
             return 0.0
 
-        # 匹配前5条标题
         matches = 0
         for title in titles[:5]:
             for keyword, boost in NEWS_KEYWORDS.items():
                 if keyword.lower() in title:
                     score += boost
                     matches += 1
-                    break  # 一条标题只计最高分关键词
+                    break
 
-        # 如果有3条以上含正面关键词的标题，额外加成
         if matches >= 3:
             score += 0.05
 
-        # 封顶0.20
         score = min(score, 0.20)
-
         _NEWS_CACHE[symbol] = (now, score)
         return round(score, 3)
 
@@ -238,23 +324,32 @@ _SMC_TTL = timedelta(hours=1)
 
 
 def _calc_smc_score(symbol: str, df: pd.DataFrame) -> dict:
-    """"计算SMC聪明钱分数，带缓存（1小时有效）"""
+    """计算SMC聪明钱分数，带缓存（1小时有效）
+    
+    缓存最多100条防止内存泄露。失败时返回空结构不影响主流程。
+    """
     now = datetime.now()
     if symbol in _SMC_CACHE:
         ts, score = _SMC_CACHE[symbol]
         if now - ts < _SMC_TTL:
             return score
     
+    if len(_SMC_CACHE) > 100:
+        old_keys = sorted(_SMC_CACHE.keys(), key=lambda k: _SMC_CACHE[k][0])[:50]
+        for k in old_keys:
+            del _SMC_CACHE[k]
+    
+    empty_result = {"smc_score": 0.0, "smc_breakdown": {}, "ob": {}, "fvg": {},
+                    "structure": {}, "liquidity": {}, "stop_hunt": {}}
     try:
         from atos.factors.smc import compute_smc_score
         result = compute_smc_score(symbol, df)
-        # 确保所有数值都是原生Python类型（不是numpy）
         _SMC_CACHE[symbol] = (now, result)
         return result
     except Exception as e:
-        logger.debug(f"SMC计算失败 {sym}: {e}")
-        _SMC_CACHE[symbol] = (now, {"smc_score": 0.0, "smc_breakdown": {}, "ob": {}, "fvg": {}, "structure": {}, "liquidity": {}, "stop_hunt": {}})
-        return {"smc_score": 0.0, "smc_breakdown": {}, "ob": {}, "fvg": {}, "structure": {}, "liquidity": {}, "stop_hunt": {}}
+        logger.debug(f"SMC计算失败 {symbol}: {e}")
+        _SMC_CACHE[symbol] = (now, empty_result)
+        return empty_result
 
 
 def get_signals(symbols: list[str] = None) -> dict:
@@ -282,8 +377,13 @@ def get_signals(symbols: list[str] = None) -> dict:
             close = df["Close"].squeeze()
             vol = df["Volume"].squeeze()
             price = _scalar(close)
-            ma50 = _scalar(close.rolling(50).mean())
-            ma200 = _scalar(close.rolling(200).mean()) if len(df) >= 200 else ma50
+            # BUGFIX: 数据不足50行的已被跳过，但MA50/MA200仍需防御nan
+            ma50_series = close.rolling(50).mean()
+            ma50 = _scalar(ma50_series) if not ma50_series.empty and len(close) >= 50 else price
+            if len(df) >= 200:
+                ma200 = _scalar(close.rolling(200).mean())
+            else:
+                ma200 = ma50  # 不足200天用MA50替代，但后续判断会谨慎
             rsi_val = _scalar(_rsi(close))
             macd_line = close.ewm(span=12).mean() - close.ewm(span=26).mean()
             signal_line = macd_line.ewm(span=9).mean()

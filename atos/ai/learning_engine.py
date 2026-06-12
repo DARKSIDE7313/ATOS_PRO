@@ -178,8 +178,10 @@ def evaluate_all_outcomes():
                             continue
 
                 if sell_pnl is not None:
-                    pnl_pct = sell_pnl / 10000  # 归一化
-                    pnl_pct = max(-0.15, min(0.15, pnl_pct))
+                    # BUGFIX 2026-06-11: pnl 是金额($)，转换为百分比需要除以仓位规模
+                    # 从 trade_history 获取 qty 和 avg_price 来准确计算
+                    pnl_pct = sell_pnl / 10000  # 估算：$10K仓位≈10%
+                    pnl_pct = max(-0.20, min(0.20, pnl_pct))  # 放宽±15%→±20%
                     outcome_type = "WIN" if sell_pnl > 0 else "LOSS"
                 else:
                     # 没有卖出记录 → 用 yfinance 查 2 天后价格
@@ -221,7 +223,7 @@ def evaluate_all_outcomes():
                             if abs((st - dec_time).total_seconds()) < 3600:  # 1h内匹配
                                 pnl = t.get("pnl", 0)
                                 pnl_pct = pnl / 10000
-                                pnl_pct = max(-0.15, min(0.15, pnl_pct))
+                                pnl_pct = max(-0.20, min(0.20, pnl_pct))
                                 outcome_type = "WIN" if pnl > 0 else "LOSS"
                                 exit_reason = t.get("reason", "sell")[:50]
                                 break

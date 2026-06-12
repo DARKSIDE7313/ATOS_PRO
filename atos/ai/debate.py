@@ -21,7 +21,7 @@ from atos.core.logging import get_logger
 logger = get_logger("ai.debate")
 
 API_URL = "https://api.deepseek.com/chat/completions"
-MODEL = "deepseek-v4-pro"
+MODEL = "deepseek-chat"  # 统一使用 deepseek-chat (直连DeepSeek API/OpenRouter 一致)
 API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 
 # ============================================================

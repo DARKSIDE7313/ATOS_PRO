@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ATOS PRO Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#0b0d10; --surface:#12161c; --surface2:#171c23; --surface3:#1d2430;
+  --border:rgba(255,255,255,.08); --text:#e8edf5; --muted:#8b95a7; --faint:#566074;
+  --green:#22c55e; --red:#ef4444; --blue:#3b82f6; --gold:#f59e0b; --teal:#14b8a6;
+  --green-bg:rgba(34,197,94,.12); --red-bg:rgba(239,68,68,.12); --blue-bg:rgba(59,130,246,.12);
+  --gold-bg:rgba(245,158,11,.12); --teal-bg:rgba(20,184,166,.12);
+  --radius:14px; --radius-sm:8px;
+  --font-body:'Inter',sans-serif; --font-mono:'IBM Plex Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-body);background:var(--bg);color:var(--text);line-height:1.5}
+header{
+  height:58px; display:flex; align-items:center; justify-content:space-between;
+  padding:0 22px; border-bottom:1px solid var(--border); background:rgba(11,13,16,.9);
+  backdrop-filter:blur(10px); position:sticky; top:0; z-index:20;
+}
+.logo{display:flex;align-items:center;gap:10px;font-family:var(--font-mono);font-weight:600;font-size:15px}
+.logo svg{color:var(--teal)}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.small{font-size:12px;color:var(--muted);font-family:var(--font-mono)}
+.btn{
+  border:1px solid rgba(20,184,166,.28); background:var(--teal-bg); color:var(--teal);
+  padding:7px 13px; border-radius:10px; cursor:pointer; font-size:12px; font-weight:600;
+}
+main{padding:22px;max-width:1400px;margin:0 auto}
+.status{
+  display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--radius);margin-bottom:18px;font-size:12px;color:var(--muted)
+}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green)}
+.section-title{
+  font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted);
+  margin:20px 0 10px; font-weight:700;
+}
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+.card{
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  padding:16px; position:relative; overflow:hidden;
+}
+.card::before{content:"";position:absolute;left:0;top:0;right:0;height:2px;background:var(--teal);opacity:.7}
+.label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+.value{font-size:28px;line-height:1;font-weight:700;font-family:var(--font-mono);margin-bottom:8px}
+.sub{font-size:12px;color:var(--muted)}
+.pos{color:var(--green)} .neg{color:var(--red)}
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;font-family:var(--font-mono)}
+.b-green{background:var(--green-bg);color:var(--green)} .b-red{background:var(--red-bg);color:var(--red)}
+.b-blue{background:var(--blue-bg);color:var(--blue)} .b-gold{background:var(--gold-bg);color:var(--gold)}
+.b-teal{background:var(--teal-bg);color:var(--teal)}
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.chart-card,.panel{
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px;
+}
+.chart-title{font-size:12px;color:var(--muted);margin-bottom:12px;font-weight:600}
+.review-list,.adj-list{display:flex;flex-direction:column;gap:10px}
+.review{
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden;
+}
+.review-head{
+  display:flex;justify-content:space-between;gap:16px;padding:14px 16px;background:var(--surface2);cursor:pointer
+}
+.review-date{font-family:var(--font-mono);font-size:12px;font-weight:600}
+.review-summary{font-size:12px;color:var(--muted);margin-top:4px}
+.review-body{padding:0 16px;max-height:0;overflow:hidden;transition:max-height .3s ease,padding .3s ease}
+.review-body.open{max-height:600px;padding:14px 16px}
+.review-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.list-title{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px}
+ul.clean{list-style:none;display:flex;flex-direction:column;gap:6px}
+ul.clean li{font-size:12px;color:var(--text)}
+.param-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px}
+.param{
+  background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:14px;
+}
+.param-name{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px}
+.param-value{font-family:var(--font-mono);font-size:20px;font-weight:700}
+.adj{
+  display:grid;grid-template-columns:120px 1fr;gap:12px;background:var(--surface);
+  border:1px solid var(--border);border-radius:12px;padding:12px 14px
+}
+.adj-date{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+.adj-main{font-size:13px;font-weight:600}
+.adj-sub{font-size:12px;color:var(--muted);margin-top:4px}
+.empty{
+  background:var(--surface); border:1px dashed var(--border); border-radius:var(--radius);
+  padding:32px; text-align:center; color:var(--muted); font-size:13px;
+}
+@media (max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)} .param-grid{grid-template-columns:repeat(3,1fr)}}
+@media (max-width:760px){.charts,.review-grid{grid-template-columns:1fr} .kpis,.param-grid{grid-template-columns:1fr 1fr}}
+@media (max-width:520px){.kpis,.param-grid{grid-template-columns:1fr} .adj{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline>
+      <polyline points="16 7 22 7 22 13"></polyline>
+    </svg>
+    ATOS PRO
+  </div>
+  <div class="topbar-right">
+    <div class="small" id="updatedAt">更新中...</div>
+    <button class="btn" onclick="loadAll()">刷新</button>
+  </div>
+</header>
+
+<main>
+  <div class="status"><span class="dot"></span><span id="statusText">正在读取交易与复盘数据...</span></div>
+
+  <div class="section-title">实时概览</div>
+  <div class="kpis" id="kpis"></div>
+
+  <div class="section-title">趋势图表</div>
+  <div class="charts">
+    <div class="chart-card">
+      <div class="chart-title">胜率趋势</div>
+      <canvas id="winChart" height="180"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">每笔 PnL 分布</div>
+      <canvas id="pnlChart" height="180"></canvas>
+    </div>
+  </div>
+
+  <div class="section-title">每日复盘</div>
+  <div id="reviewsWrap"></div>
+
+  <div class="section-title">策略参数</div>
+  <div class="param-grid" id="params"></div>
+
+  <div class="section-title">参数调整日志</div>
+  <div id="adjsWrap"></div>
+</main>
+
+<script>
+const base = '..';
+let winChart, pnlChart;
+
+async function getJSON(path){
+  const r = await fetch(path + '?t=' + Date.now());
+  if(!r.ok) throw new Error(path);
+  return r.json();
+}
+async function getText(path){
+  const r = await fetch(path + '?t=' + Date.now());
+  if(!r.ok) throw new Error(path);
+  return r.text();
+}
+function parseJSONL(text){
+  return text.trim().split('\\n').filter(Boolean).map(x=>{try{return JSON.parse(x)}catch{return null}}).filter(Boolean);
+}
+function pct(v,d=1){ return (v*100).toFixed(d) + '%'; }
+
+async function loadReviews(){
+  const arr = [];
+  for(let i=0;i<7;i++){
+    const d = new Date(); d.setDate(d.getDate()-i);
+    const ds = d.toISOString().slice(0,10);
+    try{
+      const j = await getJSON(`${base}/reports/review_${ds}.json`);
+      arr.push({date:ds,j});
+    }catch(e){}
+  }
+  return arr;
+}
+
+function renderKpis(stats, config, trades){
+  const totalTrades = stats?.total_trades ?? trades.length;
+  const winRate = stats?.win_rate ?? null;
+  const winLossR = stats?.win_loss_r ?? null;
+  const today = new Date().toISOString().slice(0,10);
+  const todayTrades = trades.filter(t => (t.date||'').slice(0,10) === today);
+  const todayPnl = todayTrades.reduce((s,t)=>s + Number(t.pnl_pct||0),0);
+  const todayWins = todayTrades.filter(t => Number(t.pnl_pct||0) > 0).length;
+  const wr = stats?.win_rate ?? config?.kelly_win_rate ?? 0.70;
+  const rr = stats?.win_loss_r ?? config?.kelly_win_loss_r ?? 3.0;
+  const fullK = Math.max(0, wr - (1-wr)/rr);
+  const halfK = Math.min(fullK * 0.5, 0.30);
+  const sl = config?.stop_loss_pct ?? 0.05;
+  const tp = config?.take_profit_pct ?? 0.15;
+  const cards = [
+    {label:'胜率', value: winRate==null ? '—' : pct(winRate), cls: winRate>=0.55?'pos':'', sub:`共 ${totalTrades} 笔成交`, badge:`<span class="badge ${winRate>=0.6?'b-green':'b-gold'}">${winRate>=0.6?'良好':'偏低'}</span>`},
+    {label:'今日 PnL', value: todayTrades.length ? (todayPnl>=0?'+':'') + pct(todayPnl,2) : '—', cls: todayPnl>=0?'pos':'neg', sub:`今日 ${todayTrades.length} 笔 / ${todayWins} 胜`, badge:''},
+    {label:'半凯利仓位', value: pct(halfK), cls:'', sub:`全凯利 ${pct(fullK)} × 0.5`, badge:'<span class="badge b-teal">HALF-KELLY</span>'},
+    {label:'盈亏比', value: winLossR==null ? '—' : winLossR.toFixed(2)+'x', cls: winLossR>=2?'pos':'', sub:'目标 ≥ 2.0x', badge:''},
+    {label:'止损 / 止盈', value: '-' + pct(sl), cls:'neg', sub:`止盈 +${pct(tp)}`, badge:'<span class="badge b-red">STOP LOSS</span>'},
+    {label:'参数版本', value: config?.last_updated || '—', cls:'', sub:`调整记录 ${(config?.adjustment_history||[]).length} 条`, badge:''}
+  ];
+  document.getElementById('kpis').innerHTML = cards.map(c => `
+    <div class="card">
+      <div class="label">${c.label}</div>
+      <div class="value ${c.cls}">${c.value}</div>
+      <div class="sub">${c.badge} ${c.sub}</div>
+    </div>
+  `).join('');
+}
+
+function renderCharts(trades){
+  const byDate = {};
+  trades.forEach(t=>{
+    const d=(t.date||'').slice(0,10); if(!d) return;
+    byDate[d] ??= {wins:0,total:0};
+    byDate[d].total++;
+    if(Number(t.pnl_pct||0) > 0) byDate[d].wins++;
+  });
+  const dates = Object.keys(byDate).sort();
+  const winSeries = dates.map(d => +(byDate[d].wins/byDate[d].total*100).toFixed(1));
+  if(winChart) winChart.destroy();
+  winChart = new Chart(document.getElementById('winChart'), {
+    type:'line',
+    {labels:dates.map(d=>d.slice(5)),datasets:[{winSeries,borderColor:'#14b8a6',backgroundColor:'rgba(20,184,166,.12)',fill:true,tension:.35,borderWidth:2}]},
+    options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8b95a7'}},y:{min:0,max:100,ticks:{color:'#8b95a7',callback:v=>v+'%'}}}}
+  });
+  const lastTrades = trades.slice(-20);
+  const pnl = lastTrades.map(t => +(Number(t.pnl_pct||0)*100).toFixed(2));
+  if(pnlChart) pnlChart.destroy();
+  pnlChart = new Chart(document.getElementById('pnlChart'), {
+    type:'bar',
+    {labels:lastTrades.map((_,i)=>'#'+(i+1)),datasets:[{pnl,backgroundColor:pnl.map(v=>v>=0?'rgba(34,197,94,.7)':'rgba(239,68,68,.7)')}]},
+    options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8b95a7'}},y:{ticks:{color:'#8b95a7',callback:v=>v+'%'}}}}
+  });
+}
+
+function renderReviews(reviews){
+  const wrap = document.getElementById('reviewsWrap');
+  if(!reviews.length){ wrap.innerHTML = '<div class="empty">暂无复盘记录</div>'; return; }
+  wrap.className = 'review-list';
+  wrap.innerHTML = reviews.map((r,i)=>`
+    <div class="review">
+      <div class="review-head" onclick="toggleReview(${i})">
+        <div>
+          <div class="review-date">${r.date}</div>
+          <div class="review-summary">${r.data.performance_summary || '—'}</div>
+        </div>
+        <div class="badge ${r.data.confidence_score>=0.7?'b-green':r.data.confidence_score>=0.5?'b-gold':'b-red'}">置信 ${(Number(r.data.confidence_score||0)*100).toFixed(0)}%</div>
+      </div>
+      <div class="review-body" id="review-body-${i}">
+        <div class="review-grid">
+          <div>
+            <div class="list-title">做对的事</div>
+            <ul class="clean">${(r.data.what_worked||[]).map(x=>`<li>${x}</li>`).join('') || '<li>—</li>'}</ul>
+          </div>
+          <div>
+            <div class="list-title">做错的事</div>
+            <ul class="clean">${(r.data.what_failed||[]).map(x=>`<li>${x}</li>`).join('') || '<li>—</li>'}</ul>
+          </div>
+        </div>
+        <div style="margin-top:14px">
+          <div class="list-title">明日展望</div>
+          <div style="font-size:12px;color:var(--muted)">${r.data.market_outlook || '—'}</div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+function toggleReview(i){
+  document.getElementById('review-body-'+i).classList.toggle('open');
+}
+
+function renderParams(config){
+  const params = [
+    ['止损','stop_loss_pct',v=>'-'+pct(v)],
+    ['止盈','take_profit_pct',v=>'+'+pct(v)],
+    ['最大仓位','max_single_pct',v=>pct(v,0)],
+    ['RSI超买','rsi_overbought',v=>String(v)],
+    ['RSI超卖','rsi_oversold',v=>String(v)],
+    ['Kelly WR','kelly_win_rate',v=>pct(v,0)],
+    ['Kelly R','kelly_win_loss_r',v=>String(v)+'x'],
+  ];
+  document.getElementById('params').innerHTML = params.map(([n,k,f])=>`
+    <div class="param">
+      <div class="param-name">${n}</div>
+      <div class="param-value">${config && config[k] != null ? f(config[k]) : '—'}</div>
+    </div>
+  `).join('');
+}
+
+function renderAdjs(config){
+  const wrap = document.getElementById('adjsWrap');
+  const hist = (config?.adjustment_history || []).slice().reverse();
+  if(!hist.length){ wrap.innerHTML = '<div class="empty">暂无调整记录</div>'; return; }
+  wrap.className = 'adj-list';
+  wrap.innerHTML = hist.map(a=>`
+    <div class="adj">
+      <div class="adj-date">${a.date || '—'}</div>
+      <div>
+        <div class="adj-main">${a.parameter}: ${a.old} → ${a.new}</div>
+        <div class="adj-sub">${a.reason || ''}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function loadAll(){
+  try{
+    const [stats, config, tradeText, reviews] = await Promise.all([
+      getJSON(`${base}/data/trade_stats.json`).catch(()=>null),
+      getJSON(`${base}/data/strategy_config.json`).catch(()=>null),
+      getText(`${base}/data/trade_log.jsonl`).catch(()=> ''),
+      loadReviews()
+    ]);
+    const trades = parseJSONL(tradeText || '');
+    renderKpis(stats, config, trades);
+    renderCharts(trades);
+    renderReviews(reviews);
+    renderParams(config);
+    renderAdjs(config);
+    document.getElementById('statusText').textContent = `读取成功：交易 ${trades.length} 笔，复盘 ${reviews.length} 份`;
+    document.getElementById('updatedAt').textContent = '更新: ' + new Date().toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'});
+  }catch(e){
+    console.error(e);
+    document.getElementById('statusText').textContent = '读取失败，请确认通过 http://localhost 打开，而不是 file://';
+  }
+}
+loadAll();
+setInterval(loadAll, 5*60*1000);
+</script>
+</body>
+</html>

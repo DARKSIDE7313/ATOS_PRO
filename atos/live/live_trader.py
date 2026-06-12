@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from atos.live.signal_engine import get_signals, UNIVERSE, ALL_SYMBOLS
 from atos.live.portfolio import get_account_state
 from atos.live.ai_advisor import get_advice  # 旧版，保留兼容
-from atos.ai.engine_v2 import get_advice_v2      # 🆕 v2 引擎
+# v3 engine imported at point of use since it's only called for veto
 from atos.live.risk_manager import filter_orders, check_all_stops as check_stop_losses, reset_daily, record_fill
 from atos.market.regime.regime_engine import RegimeEngine
 from atos.live.futu_bridge import safe_place_order as place_order  # 修复：使用完整功能的桥接模块
@@ -86,7 +86,9 @@ def compute_order_qty(symbol, target_pct, account_state, signals, score=0.5):
         drawdown = 0.0
     crouching_pct = crouching_allocation(score=score, drawdown=drawdown, has_news_catalyst=False)
     kelly_pct = kelly_fraction()
-    final_pct = max(crouching_pct, min(kelly_pct, target_pct))
+    final_pct = min(crouching_pct, kelly_pct, target_pct)  # 取三者最小值（最安全）
+    # 但至少给 1%，否则永远开不了仓
+    final_pct = max(final_pct, 0.01)
     final_pct = min(final_pct, 0.20)  # hard cap
     target_val = account_state["total"] * final_pct
     current_val = next(
@@ -278,14 +280,39 @@ def run_cycle():
         "rebalance_needed": rebalance_result.get("should_rebalance", False),
     }
 
-    advice = get_advice_v2(snapshot)  # 🆕 使用 v2 多理论辩论引擎
-    proposed = [
-        a for a in
-        advice.get("short_term_actions", []) + advice.get("long_term_actions", [])
-        if a["action"] != "HOLD"
-    ]
+    # AI 否决审查 — 用 v3 引擎（因子引擎做主，AI只有否决权）
+    advice = {}
+    try:
+        from atos.ai.engine_v2 import get_advice_v3
+        advice = get_advice_v3(snapshot)
+    except Exception as e:
+        logger.debug(f"AI veto调用失败: {e}")
+    
+    veto_map = advice.get("veto_map", {})
+    vetoed_symbols = {s for s, v in veto_map.items() 
+                      if isinstance(v, dict) and v.get("veto", False)}
+    
+    # 因子引擎决策（同 shadow_trader 模式）— 从 top_picks 生成交易指令
+    proposed = []
+    for p in top_picks[:8]:
+        sym = p["symbol"]
+        if sym in vetoed_symbols:
+            logger.info(f"🧠 AI否决跳过 {sym}")
+            continue
+        if p.get("score", 0) < 0.55:
+            continue
+        # 检查是否已有持仓
+        existing = next((pos for pos in account["positions"] if pos["symbol"] == sym), None)
+        if existing:
+            continue
+        proposed.append({
+            "symbol": sym, "action": "BUY",
+            "target_pct": min(p.get("score", 0.5) * 0.12, 0.15),
+            "reason": f"因子开仓 score={p.get('score',0):.2f}",
+        })
+    
     safe = filter_orders(proposed, account, regime)
-    logger.info(f"AI建议={len(proposed)}条 | 风控通过={len(safe)}条")
+    logger.info(f"候选={len(top_picks)} | AI否决={len(vetoed_symbols)} | 风控通过={len(safe)}条")
 
     # 6. 执行下单
     for order in safe:

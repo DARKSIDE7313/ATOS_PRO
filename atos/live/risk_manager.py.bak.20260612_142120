@@ -19,8 +19,8 @@ MAX_DAILY_LOSS_PCT = 0.02      # 日亏损超过2% → 熔断当天交易
 MAX_DRAWDOWN_PCT = 0.15        # 最大回撤15%（从12%放宽）→ 暂停所有新开仓
 MAX_CONSECUTIVE_LOSSES = 5     # 连续5次亏损 → 降频
 COOLDOWN_CYCLES = 48           # v4: 冷却周期数从288(24h)降到48(4h) — 止损后还能回补
-STOP_LOSS_PCT = 0.08           # FIX P5           # v4: 从6%放宽到12% — 给持仓更多波动空间，减少假止损
-TAKE_PROFIT_PCT = 0.12         # FIX P5         # 止盈 15%卖一半（从10%放宽）
+STOP_LOSS_PCT = 0.12           # v4: 从6%放宽到12% — 给持仓更多波动空间，减少假止损
+TAKE_PROFIT_PCT = 0.15         # 止盈 15%卖一半（从10%放宽）
 MAX_ORDERS_PER_CYCLE = 8       # 每周期最多8笔
 
 # 持久化路径
@@ -112,8 +112,8 @@ def check_all_stops(positions: list, signals: dict) -> list:
         #    高波动标的用 ATR 止损（更宽），低波动用硬止损兜底。
         atr_val = signals.get(sym, {}).get("atr", 0)
         if atr_val > 0 and px > 0:
-            vol_stop = max(0.03, min(0.10, (atr_val / px) * 2.0))  # FIX P5: 乘数2.5→2.0
-            effective_stop = min(STOP_LOSS_PCT, vol_stop)  # FIX P5: max->min
+            vol_stop = max(0.03, min(0.10, (atr_val / px) * 2.5))
+            effective_stop = max(STOP_LOSS_PCT, vol_stop)  # 取较宽者
             if pnl_pct <= -effective_stop:
                 forced.append({
                     "action": "SELL", "symbol": sym, "qty": qty,

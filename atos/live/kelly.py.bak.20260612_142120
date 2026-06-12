@@ -1,5 +1,3 @@
-from atos.core.logging import get_logger
-logger = get_logger("kelly")
 """
 Kelly Criterion position sizing module.
 Uses half-Kelly for safety. Win rate and win/loss ratio
@@ -84,11 +82,11 @@ def crouching_allocation(score: float, drawdown: float,
     """
     # Base allocation by confidence tier
     if score >= 0.80:
-        base_pct = 0.07      # FIX P4
+        base_pct = 0.12
     elif score >= 0.70:
-        base_pct = 0.05      # FIX P4
-    elif score >= 0.55:
-        base_pct = 0.03      # FIX P4
+        base_pct = 0.08
+    elif score >= 0.50:
+        base_pct = 0.05
     else:
         return 0.0  # Below threshold, no allocation
 
@@ -100,12 +98,12 @@ def crouching_allocation(score: float, drawdown: float,
 
     # News catalyst boost
     if has_news_catalyst:
-        after_dd *= 1.15    # FIX P4: 1.5->1.15
+        after_dd *= 1.5
 
-    # FIX P4: Hard cap 30%->10%
-    final = min(after_dd, 0.10)
+    # Hard cap at 30% (aggressive but not reckless)
+    final = min(after_dd, 0.30)
 
-    logger.debug(f"[crouching] score={score:.2f} base={base_pct:.2%} "
+    print(f"[crouching] score={score:.2f} base={base_pct:.2%} "
           f"DD={drawdown:.2%} penalty={dd_penalty:.2f} "
           f"catalyst={has_news_catalyst} final={final:.2%}")
     return final

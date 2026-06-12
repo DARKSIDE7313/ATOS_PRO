@@ -50,6 +50,7 @@ dashboard_stderr.log
 dashboard_stdout.log
 dashboard.log
 
-# Project metadata
-.project/
+# Local Netlify folder
+.netlify
 phoenix_state.json
+.project/
