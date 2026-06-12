@@ -1,9 +1,15 @@
 """
 ATOS PRO v2 — 因子合成引擎
-===========================
+==========================
 综合价值、动量、质量、技术、多时间框架因子，
 根据市场环境动态调整权重，输出最终排名。
 支持 IC 分析检验因子有效性。
+
+v5 收益修复:
+  - 缺失数据默认分 0.5→0.0 (避免假阳性排名)
+  - 基准分 0.5→0.0 (增大信号分化)
+  - BEAR 模式权重更激进防守
+  - 趋势+反转去冗余 (趋势用MA，反转用RSI+BB)
 """
 import math
 from typing import Optional
@@ -12,176 +18,142 @@ from atos.core.universe import ALL_SYMBOLS
 
 logger = get_logger("factors.engine")
 
-# 默认权重（会根据市场状态动态调整）
+# 默认权重
 DEFAULT_WEIGHTS = {
-    "value":      0.05,   # 价值（短线不看估值 — 降权）
-    "momentum":   0.25,   # 动量（提升 — 趋势跟踪）
-    "quality":    0.05,   # 质量（短线不看重基本面 — 降权）
-    "technical":  0.30,   # 技术面（主力 — RSI/MACD/趋势/Bollinger）
-    "multiframe": 0.15,   # 多时间框架（提升 — 多时间确认）
-    "mean_rev":   0.20,   # 均值回归（提升 — CAUTIOUS/BULL_WEAK 中回归策略有效）
+    "value":      0.05,
+    "momentum":   0.25,
+    "quality":    0.05,
+    "technical":  0.30,
+    "multiframe": 0.15,
+    "mean_rev":   0.20,
 }
 
-# IC 历史记录：{regime: {"last_ic": float, "weight_adjustments": {...}}}
+# IC 历史记录
 _ic_history: dict[str, dict] = {}
 _ic_lock = __import__('threading').Lock()
-
-# 每个因子的 IC 记录：{regime: {factor: ic_value}}
 _per_factor_ic: dict[str, dict[str, float]] = {}
 
-# 不同市场环境下的权重调整
-# v4 重大修改：
-#   - BEAR: 动量权重大幅提升(0.08→0.30)，均值回归降至0.05（下跌趋势中抄底=找死）
-#   - BULL_STRONG: 动量为主，均值回归辅助(0.17→0.12)
-#   - HIGH_VOL: 质量和价值为主，均值回归降至0.12
-#   - 所有环境下：技术面保持主力地位
+# v5: BEAR模式下动量大幅降低、质量大幅提升（真正切换防守）
+# HIGH_VOL下降低动量+均值回归，提升趋势+突破（避免高波动抄底）
 REGIME_WEIGHTS = {
-    "BULL_STRONG": {"momentum": 0.30, "technical": 0.25, "value": 0.05, "quality": 0.05, "multiframe": 0.20, "mean_rev": 0.15},
-    "BULL_WEAK":   {"momentum": 0.22, "technical": 0.30, "value": 0.05, "quality": 0.05, "multiframe": 0.18, "mean_rev": 0.20},
-    "HIGH_VOL":    {"momentum": 0.20, "technical": 0.25, "value": 0.10, "quality": 0.10, "multiframe": 0.18, "mean_rev": 0.17},  # 降低 mean_rev 防高波动抄底
-    "BEAR":        {"momentum": 0.18, "technical": 0.22, "value": 0.12, "quality": 0.18, "multiframe": 0.20, "mean_rev": 0.10},  # BEAR: 降低 mean_rev 0.15→0.10，提升 quality 防踩雷
-    "SIDEWAYS":    {"momentum": 0.20, "technical": 0.28, "value": 0.08, "quality": 0.08, "multiframe": 0.16, "mean_rev": 0.20},
-    "UNKNOWN":     {"momentum": 0.25, "technical": 0.30, "value": 0.07, "quality": 0.08, "multiframe": 0.15, "mean_rev": 0.15},
+    "BULL_STRONG": {"momentum": 0.32, "technical": 0.25, "value": 0.05, "quality": 0.05, "multiframe": 0.18, "mean_rev": 0.15},
+    "BULL_WEAK":   {"momentum": 0.22, "technical": 0.28, "value": 0.05, "quality": 0.08, "multiframe": 0.18, "mean_rev": 0.19},
+    "HIGH_VOL":    {"momentum": 0.12, "technical": 0.22, "value": 0.12, "quality": 0.15, "multiframe": 0.20, "mean_rev": 0.19},
+    "BEAR":        {"momentum": 0.06, "technical": 0.18, "value": 0.15, "quality": 0.30, "multiframe": 0.18, "mean_rev": 0.13},
+    "SIDEWAYS":    {"momentum": 0.18, "technical": 0.26, "value": 0.10, "quality": 0.10, "multiframe": 0.16, "mean_rev": 0.20},
+    "UNKNOWN":     {"momentum": 0.22, "technical": 0.28, "value": 0.10, "quality": 0.10, "multiframe": 0.15, "mean_rev": 0.15},
 }
 
 
 def _tech_score(signal: dict) -> float:
-    """将技术信号转为 0-1 得分"""
+    """将技术信号转为 0-1 得分。v5: 从 0.0 起步，纯增量评分。"""
     if not signal:
-        return 0.5
-    score = 0.5
+        return 0.0
+    score = 0.0
     trend = signal.get("trend", "NEUTRAL")
     rsi = signal.get("rsi", 50)
     vol_r = signal.get("volume_ratio", 1.0)
     bb = signal.get("bollinger", {})
 
-    # 趋势加分
-    trend_map = {"UP": 0.2, "WEAK_UP": 0.1, "NEUTRAL": 0.0, "WEAK_DOWN": -0.1, "DOWN": -0.2}
+    # 趋势加分 — v5: 不与 mean_rev 重叠（mean_rev 只负责 RSI+BB）
+    trend_map = {"UP": 0.25, "WEAK_UP": 0.15, "NEUTRAL": 0.0, "WEAK_DOWN": -0.15, "DOWN": -0.25}
     score += trend_map.get(trend, 0)
 
-    # RSI: 40-70 健康，过买过卖扣分
+    # RSI: 40-70 健康
     if 40 <= rsi <= 70:
-        score += 0.1
+        score += 0.10
     elif rsi < 30:
-        score -= 0.15
+        score -= 0.10
     elif rsi > 80:
         score -= 0.15
 
     # 放量加分
     if 1.2 <= vol_r <= 3.0:
-        score += 0.1
+        score += 0.10
     elif vol_r < 0.5:
-        score -= 0.1
+        score -= 0.10
 
-    # 布林带位置
+    # 布林带中位健康
     pct_b = bb.get("pct_b", 0.5)
     if 0.2 <= pct_b <= 0.8:
         score += 0.05
     elif pct_b < 0.1 or pct_b > 0.9:
-        score -= 0.1
+        score -= 0.10
 
-    return max(0.05, min(0.95, score))
+    return max(0.0, min(1.0, score))
 
 
 def _mean_rev_score(signal: dict) -> float:
-    """均值回归评分——从 Bollinger Bands + RSI 判断价格是否偏离均值。
-
-    核心逻辑（受 je-suis-tm/quant-trading 的 W-Bottom 策略启发）：
-      - 价格接近下轨 + RSI 低 → 高均值回归买入信号
-      - 价格接近上轨 + RSI 高 → 高均值回归卖出信号
-      - 价格在均值附近 → 中性
-
-    返回 0-1 分，越高表示越值得买入（均值回归视角）。
-    """
+    """均值回归评分 — v5: 只用 RSI + BB，不再重复评判趋势（趋势由 _tech_score 负责）。"""
     if not signal:
-        return 0.5
+        return 0.0
 
     rsi = signal.get("rsi", 50)
     bb = signal.get("bollinger", {})
     pct_b = bb.get("pct_b", 0.5)
-    trend = signal.get("trend", "NEUTRAL")
+    score = 0.0
 
-    # %B = (price - lower) / (upper - lower)
-    # %B < 0.2 = 接近下轨（可能超卖），%B > 0.8 = 接近上轨（可能超买）
-    score = 0.5
-
-    # RSI 均值回归信号
-    if rsi < 30:
-        score += 0.25  # 极度超卖 → 强回归买入信号
+    # RSI 均值回归信号（v5: 去掉与趋势的交叉项）
+    if rsi < 25:
+        score += 0.35
+    elif rsi < 30:
+        score += 0.25
     elif rsi < 35:
         score += 0.15
     elif rsi < 40:
         score += 0.08
     elif rsi > 75:
-        score -= 0.20  # 极度超买 → 均值回归卖出信号
+        score -= 0.25
     elif rsi > 70:
-        score -= 0.12
+        score -= 0.15
     elif rsi > 65:
-        score -= 0.05
+        score -= 0.08
 
     # Bollinger %B 位置
-    if pct_b < 0.15:
-        score += 0.20  # 明显低于下轨 → 回归买入
+    if pct_b < 0.10:
+        score += 0.25
+    elif pct_b < 0.20:
+        score += 0.15
     elif pct_b < 0.30:
-        score += 0.10
-    elif pct_b > 0.85:
-        score -= 0.20  # 明显高于上轨 → 回归卖出
+        score += 0.08
+    elif pct_b > 0.90:
+        score -= 0.25
+    elif pct_b > 0.80:
+        score -= 0.15
     elif pct_b > 0.70:
-        score -= 0.10
+        score -= 0.08
 
-    # 趋势负向时均值回归信号更强
-    if trend == "DOWN" and rsi < 35:
-        score += 0.10  # 跌势中超卖 → 更强回归信号
-    elif trend == "UP" and rsi > 70:
-        score -= 0.10  # 涨势中超买 → 更强回归卖出
-
-    return max(0.05, min(0.95, score))
+    return max(0.0, min(1.0, score))
 
 
 def adjust_weights_from_ic(regime: str) -> dict:
-    """
-    根据历史 IC 调整因子权重。
-
-    规则：
-      - last_ic > 0.05  (正预测能力) → 提升 IC 最高的因子
-      - last_ic < -0.05 (负预测能力) → 缩减 IC 最低的因子
-      - 其余情况 → 使用默认权重
-
-    返回调整后的权重 dict {factor: weight}。
-    """
+    """根据历史 IC 调整因子权重。"""
     with _ic_lock:
         history = _ic_history.get(regime)
         if not history:
             return dict(REGIME_WEIGHTS.get(regime, DEFAULT_WEIGHTS))
         last_ic = history.get("last_ic", 0.0)
         per_factor = dict(_per_factor_ic.get(regime, {}))
-    
+
     base_weights = dict(REGIME_WEIGHTS.get(regime, DEFAULT_WEIGHTS))
 
     if last_ic > 0.05:
-        # 正相关 → 提升 IC 最高的因子（如果 per-factor IC 数据可用）
         if per_factor:
             best_factor = max(per_factor, key=per_factor.get)
-            logger.info(f"IC={last_ic:.4f} > 0.05: 提升因子 {best_factor} (pi={per_factor[best_factor]:.4f})")
         else:
             best_factor = max(base_weights, key=base_weights.get)
-        boost = base_weights[best_factor] * 0.10  # 提升 10%
+        boost = base_weights[best_factor] * 0.10
         base_weights[best_factor] = round(base_weights[best_factor] + boost, 4)
-        logger.info(f"IC={last_ic:.4f} > 0.05: 提升 {best_factor} 权重至 {base_weights[best_factor]:.3f}")
+        logger.info(f"IC={last_ic:.4f} > 0.05: 提升 {best_factor} → {base_weights[best_factor]:.3f}")
     elif last_ic < -0.05:
-        # 负相关 → 缩减 IC 最低的因子（如果 per-factor IC 数据可用）
         if per_factor:
             worst_factor = min(per_factor, key=per_factor.get)
-            logger.info(f"IC={last_ic:.4f} < -0.05: 缩减因子 {worst_factor} (pi={per_factor[worst_factor]:.4f})")
         else:
             worst_factor = max(base_weights, key=base_weights.get)
         reduction = base_weights[worst_factor] * 0.20
         base_weights[worst_factor] = round(base_weights[worst_factor] - reduction, 4)
-        logger.info(f"IC={last_ic:.4f} < -0.05: 缩减 {worst_factor} 权重至 {base_weights[worst_factor]:.3f}")
-    else:
-        logger.info(f"IC={last_ic:.4f} 在 [-0.05, 0.05] 内，使用默认权重（AI将在CIO阶段动态调权）")
+        logger.info(f"IC={last_ic:.4f} < -0.05: 缩减 {worst_factor} → {base_weights[worst_factor]:.3f}")
 
-    # 归一化确保权重总和为 1.0
     total = sum(base_weights.values())
     if total > 0:
         base_weights = {k: round(v / total, 4) for k, v in base_weights.items()}
@@ -196,25 +168,10 @@ def combine(signals: dict, value_factors: dict, momentum_factors: dict,
     """
     综合所有因子，输出每只标的的综合评分。
 
-    参数:
-        signals: 技术信号 {symbol: {price, rsi, trend, ...}}
-        value_factors: 价值因子 {symbol: {composite, ...}}
-        momentum_factors: 动量因子 {symbol: {composite, ...}}
-        quality_factors: 质量因子 {symbol: {composite, ...}}
-        regime: 市场状态
-        multiframe_factors: 多时间框架因子 {symbol: {composite, ...}}
-                           （来自 strategy_v3.get_v3_signals）
-
-    返回:
-        {
-            "rankings": [(symbol, score), ...],   # 排名
-            "scores": {symbol: 0.75, ...},         # 原始分数
-            "breakdown": {symbol: {value:0.8, ...}}, # 分解
-            "weights": {value: 0.2, ...},           # 实际权重
-            "ic": 0.15,                             # 当前IC
-        }
+    v5 修复:
+      - 缺失因子默认 0.0 (而非 0.5)，避免无数据标的假性高分
+      - multiframe 因子由 composite_signal 按实际字段计算
     """
-    # 通过 IC 反馈循环调整权重
     weights = adjust_weights_from_ic(regime)
     scores = {}
     breakdown = {}
@@ -222,8 +179,7 @@ def combine(signals: dict, value_factors: dict, momentum_factors: dict,
     if multiframe_factors is None:
         multiframe_factors = {}
 
-    # 如果启用 v3 信号，从已有的 signal_engine 数据中计算多时间框架信号
-    # BUGFIX 2026-06-11: 不再单独调 yf.download()（太慢），所有数据从 signals 提取
+    # 如果启用 v3 信号，从 signal_engine 数据中实时计算（修复字段名）
     if use_v3_signals:
         try:
             from atos.live.strategy_v3 import composite_signal
@@ -233,37 +189,32 @@ def combine(signals: dict, value_factors: dict, momentum_factors: dict,
                 v3_factors[sym] = {
                     "composite": result["score"],
                     "decision": result["decision"],
-                    "multi_timeframe": result.get("multi_timeframe", {}),
                     "reasons": result.get("reasons", []),
                 }
             multiframe_factors = v3_factors
             logger.info(f"v3多时间框架信号计算完成: {len(v3_factors)} 只标的")
         except Exception as e:
-            logger.warning(f"v3信号计算失败: {e}，使用默认 multiframe_factors")
+            logger.warning(f"v3信号计算失败: {e}")
 
     for sym in ALL_SYMBOLS:
         if sym not in signals:
             continue
 
-        v_score = value_factors.get(sym, {}).get("composite", 0.5)
-        m_score = momentum_factors.get(sym, {}).get("composite", 0.5)
-        q_score = quality_factors.get(sym, {}).get("composite", 0.5)
+        # v5: 缺失数据默认 0.0 (而非 0.5) — 避免无数据标的假性高分
+        v_score = value_factors.get(sym, {}).get("composite", 0.0)
+        m_score = momentum_factors.get(sym, {}).get("composite", 0.0)
+        q_score = quality_factors.get(sym, {}).get("composite", 0.0)
         t_score = _tech_score(signals[sym])
-        f_score = multiframe_factors.get(sym, {}).get("composite", 0.5)
-        r_score = _mean_rev_score(signals[sym])  # 🆕 均值回归
-        smc_score_raw = signals[sym].get("smc_score", {}).get("smc_score", 0.0)  # 🆕 SMC聪明钱
+        f_score = multiframe_factors.get(sym, {}).get("composite", 0.0)
+        r_score = _mean_rev_score(signals[sym])
+        smc_score_raw = signals[sym].get("smc_score", {}).get("smc_score", 0.0)
 
-        # SMC得分范围-0.6~0.6，映射到0~1区间（中线0.5）
-        # smc_score_raw > 0 → 看涨信号 → 加分
-        # smc_score_raw < 0 → 看跌信号 → 减分
-        smc_normalized = 0.5 + smc_score_raw  # -0.6~0.6 → -0.1~1.1, clamp to 0~1
+        smc_normalized = 0.5 + smc_score_raw
         smc_normalized = max(0.0, min(1.0, smc_normalized))
 
-        # 核心因子加权（不包含SMC——SMC作为独立修正）
         core_weights = {k: weights.get(k, 0) for k in ["value", "momentum", "quality", "technical", "multiframe", "mean_rev"]}
         core_sum = sum(core_weights.values())
         if core_sum > 0:
-            # 归一化核心权重到总和为1，然后加权
             total = (
                 v_score * core_weights["value"] / core_sum +
                 m_score * core_weights["momentum"] / core_sum +
@@ -273,9 +224,8 @@ def combine(signals: dict, value_factors: dict, momentum_factors: dict,
                 r_score * core_weights["mean_rev"] / core_sum
             )
         else:
-            total = 0.5  # Fallback
-        
-        # SMC 作为独立修正因子（5%权重）
+            total = 0.0
+
         total = total * 0.95 + smc_normalized * 0.05
         total = max(0.0, min(1.0, total))
 
@@ -286,11 +236,10 @@ def combine(signals: dict, value_factors: dict, momentum_factors: dict,
             "quality": round(q_score, 3),
             "technical": round(t_score, 3),
             "multiframe": round(f_score, 3),
-            "mean_rev": round(r_score, 3),  # 🆕
+            "mean_rev": round(r_score, 3),
             "total": round(total, 3),
         }
 
-    # 按分数排名
     rankings = sorted(scores.items(), key=lambda x: x[1], reverse=True)
 
     logger.info(
@@ -298,7 +247,6 @@ def combine(signals: dict, value_factors: dict, momentum_factors: dict,
         f"Top3: {rankings[:3]} | 权重={weights}"
     )
 
-    # 存储权重（供后续 IC 反馈循环使用）— 加锁
     with _ic_lock:
         _ic_history[regime] = {
             "last_ic": _ic_history.get(regime, {}).get("last_ic", 0.0),
@@ -315,17 +263,10 @@ def combine(signals: dict, value_factors: dict, momentum_factors: dict,
 
 def ic_analysis(prev_scores: dict, current_returns: dict, regime: str = "UNKNOWN",
                 prev_breakdown: Optional[dict] = None) -> dict:
-    """
-    信息系数分析。
-    IC = 上一期因子得分 与 当期实际收益 的秩相关系数。
-    |IC| > 0.05 说明因子有效；|IC| > 0.1 说明因子很强。
-
-    分析结果自动回写到 _ic_history，供下次 combine() 使用。
-    """
+    """信息系数分析。"""
     common = set(prev_scores.keys()) & set(current_returns.keys())
     if len(common) < 10:
         result = {"ic": 0.0, "n": len(common), "verdict": "数据不足"}
-        # 即使数据不足，也更新 IC 历史（IC=0 不会触发调整）
         _ic_history.setdefault(regime, {})["last_ic"] = 0.0
         return result
 
@@ -335,7 +276,6 @@ def ic_analysis(prev_scores: dict, current_returns: dict, regime: str = "UNKNOWN
         scores_list.append(prev_scores[sym])
         returns_list.append(current_returns[sym])
 
-    # Spearman 秩相关
     ic = _spearman(scores_list, returns_list)
 
     if abs(ic) > 0.1:
@@ -351,11 +291,9 @@ def ic_analysis(prev_scores: dict, current_returns: dict, regime: str = "UNKNOWN
 
     result = {"ic": round(ic, 4), "n": len(common), "verdict": verdict}
 
-    # 回写 IC 到历史（加锁）
     with _ic_lock:
         _ic_history.setdefault(regime, {})["last_ic"] = result["ic"]
 
-    # 计算每个因子的 IC（如果 breakdown 数据可用）
     if prev_breakdown and len(common) >= 10:
         factor_names = ["value", "momentum", "quality", "technical", "multiframe"]
         per_factor_ics = {}
@@ -376,14 +314,14 @@ def ic_analysis(prev_scores: dict, current_returns: dict, regime: str = "UNKNOWN
                 _per_factor_ic[regime] = per_factor_ics
             best_f = max(per_factor_ics, key=per_factor_ics.get)
             worst_f = min(per_factor_ics, key=per_factor_ics.get)
-            logger.info(f"每个因子 IC: {per_factor_ics} | 最佳={best_f}={per_factor_ics[best_f]:.4f}, 最差={worst_f}={per_factor_ics[worst_f]:.4f}")
+            logger.info(f"每个因子 IC: {per_factor_ics} | 最佳={best_f}={per_factor_ics[best_f]:.4f}")
 
     return result
 
 
 def get_top_picks(combine_result: dict, n: int = 10,
-                  min_score: float = 0.55) -> list[dict]:
-    """从综合结果中提取 Top N 推荐标的"""
+                  min_score: float = 0.50) -> list[dict]:
+    """从综合结果中提取 Top N 推荐标的。v5: 阈值从 0.55→0.50 (匹配新的 0.0 基准分)。"""
     rankings = combine_result["rankings"]
     breakdown = combine_result["breakdown"]
     picks = []
@@ -405,7 +343,6 @@ def _spearman(x: list, y: list) -> float:
     n = len(x)
     if n < 3:
         return 0.0
-    # 排名
     def rank(vals):
         sorted_vals = sorted(enumerate(vals), key=lambda kv: kv[1])
         ranks = [0] * len(vals)

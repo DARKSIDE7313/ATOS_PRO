@@ -62,7 +62,7 @@ def get_quality_factors(symbol: str) -> dict:
     if operating_margins and operating_margins > 0:
         scores["opmargin_score"] = _normalize(operating_margins, 0.05, 0.40, 0.15)
 
-    composite = sum(scores.values()) / len(scores) if scores else 0.5
+    composite = sum(scores.values()) / len(scores) if scores else 0.0  # v5: 无数据→0.0
 
     return {
         **raw,
@@ -118,4 +118,4 @@ def _normalize_inverse(val, low, high, cap=0.05):
 
 
 def _empty():
-    return {"symbol": "?", "composite": 0.5, "scores": {}}
+    return {"symbol": "?", "composite": 0.0, "scores": {}}

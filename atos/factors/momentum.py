@@ -77,7 +77,7 @@ def get_momentum_factors(symbol: str) -> dict:
         else:
             raw["consistency"] = None
 
-        composite = sum(scores.values()) / len(scores) if scores else 0.5
+        composite = sum(scores.values()) / len(scores) if scores else 0.0  # v5: 无数据→0.0
 
         return {
             **raw,
@@ -102,4 +102,4 @@ def batch_momentum_factors(symbols: list[str]) -> dict:
 
 
 def _empty() -> dict:
-    return {"symbol": "?", "composite": 0.5, "scores": {}}
+    return {"symbol": "?", "composite": 0.0, "scores": {}}

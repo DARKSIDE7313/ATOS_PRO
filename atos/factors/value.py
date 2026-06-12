@@ -65,11 +65,11 @@ def get_value_factors(symbol: str) -> dict:
     if ev_to_ebitda and ev_to_ebitda > 0:
         scores["ev_score"] = _normalize_inverse(ev_to_ebitda, 0, 50, 0.2)
 
-    # 综合得分
+    # v5: 无数据给 0.0（而非 0.5）— 避免无数据标的假性高分
     if scores:
         composite = sum(scores.values()) / len(scores)
     else:
-        composite = 0.5  # 无数据给中性分
+        composite = 0.0
 
     return {
         **raw,
@@ -113,4 +113,4 @@ def _normalize_inverse(val: float, low: float, high: float, cap: float = 0.05) -
 
 
 def _empty() -> dict:
-    return {"symbol": "?", "sector": "Unknown", "composite": 0.5, "scores": {}}
+    return {"symbol": "?", "sector": "Unknown", "composite": 0.0, "scores": {}}
