@@ -46,19 +46,23 @@ class BollingerStrategy:
         signals = []
         in_position = False
         entry_price = 0
+        peak_price = 0
 
         for i, close in enumerate(closes):
             prices.append(float(close))
 
-            if len(prices) < bb_period + 1:
+            if len(prices) < max(bb_period, 20) + 1:
                 continue
 
             s = pd.Series(prices)
             sma, upper, lower = self._bbands(s, bb_period, bb_std)
             rsi14 = self._rsi(s, 14)
+            sma50 = s.rolling(50).mean().iloc[-1] if len(prices) >= 50 else sma
+            sma200 = s.rolling(200).mean().iloc[-1] if len(prices) >= 200 else sma50
 
             if in_position:
-                # Exit: price returns to middle band + RSI confirms (Bug 8: RSI>60 not 50, avoid early exit)
+                peak_price = max(peak_price, close)
+                # Exit: price returns to middle band + RSI confirms
                 if close >= sma and rsi14 > 60:
                     signals.append({
                         'ticker': ticker, 'action': 'SELL',
@@ -66,11 +70,11 @@ class BollingerStrategy:
                         'pnl_pct': (close - entry_price) / entry_price
                     })
                     in_position = False
-                # Stop loss
-                elif close <= entry_price * (1 - stop_pct):
+                # Trailing stop from peak (#3)
+                elif close <= peak_price * (1 - stop_pct):
                     signals.append({
                         'ticker': ticker, 'action': 'SELL',
-                        'price': close, 'reason': f'STOP -{stop_pct:.0%}',
+                        'price': close, 'reason': f'TrailStop -{stop_pct:.0%}',
                         'pnl_pct': (close - entry_price) / entry_price
                     })
                     in_position = False
@@ -83,8 +87,9 @@ class BollingerStrategy:
                     })
                     in_position = False
             else:
-                # Entry: price below lower band + RSI oversold
-                if close <= lower and rsi14 <= rsi_low:
+                # Entry: below lower band + RSI oversold + trend filter (avoid catching falling knives)
+                trend_ok = close > sma200 if len(prices) >= 200 else close > sma50
+                if close <= lower and rsi14 <= rsi_low and trend_ok:
                     signals.append({
                         'ticker': ticker, 'action': 'BUY',
                         'price': close,
@@ -92,6 +97,7 @@ class BollingerStrategy:
                         'pnl_pct': 0
                     })
                     entry_price = close
+                    peak_price = close
                     in_position = True
 
         return signals

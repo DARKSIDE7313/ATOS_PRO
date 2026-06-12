@@ -28,11 +28,10 @@ WEB_DIR = Path(__file__).parent
 
 # Available strategies
 STRATEGIES = {
-    "alpha": "AlphaEngine 三合一 (54% WR, 全盈利)",
+    "alpha": "AlphaEngine 三合一 (67% WR, 9/10盈利)",
     "rsi2": "RSI-2 极端反转 (60-70% WR, 高频)",
     "bollinger": "布林带均值回归 (55-65% WR, 低频)",
     "momentum": "双动量趋势 (50-65% WR, 长线)",
-    "trend": "EMA趋势跟踪 (50-58% WR, 原有)",
 }
 
 # Project root for reading data files
@@ -102,11 +101,11 @@ def _sync_backtest(ticker: str, capital: int, strategy: str) -> dict:
     elif strategy == "bollinger":
         return _run_bollinger(ticker, close_values, capital)
     elif strategy == "momentum":
-        return _run_momentum(ticker, close_values, capital)
+        return _run_momentum(ticker, data, capital)
     elif strategy == "alpha":
         return _run_alpha(ticker, data, capital)
     else:
-        return _run_trend(ticker, data, capital)
+        return {"error": f"Unknown strategy: {strategy}", "ticker": ticker}
 
 
 def _signals_to_result(ticker: str, capital: int, signals: list, close_values,
@@ -115,8 +114,6 @@ def _signals_to_result(ticker: str, capital: int, signals: list, close_values,
     trades = []
     signals_log = []
     price_series = []
-    equity = capital
-    in_position = False
     trade_count = 0
 
     for i, close in enumerate(close_values):
@@ -200,9 +197,11 @@ def _run_bollinger(ticker: str, closes, capital: int) -> dict:
     return _signals_to_result(ticker, capital, signals, closes, "Bollinger")
 
 
-def _run_momentum(ticker: str, closes, capital: int) -> dict:
+def _run_momentum(ticker: str, data, capital: int) -> dict:
     s = DualMomentumStrategy()
-    signals = s.generate_signals(ticker, closes,
+    closes = data['Close'].values.flatten()
+    vols = data['Volume'].values.flatten() if 'Volume' in data else None
+    signals = s.generate_signals(ticker, closes, volumes=vols,
                                  short_window=63, long_window=252,
                                  stop_pct=0.08, take_pct=0.20)
     return _signals_to_result(ticker, capital, signals, closes, "Dual Momentum")
@@ -217,93 +216,6 @@ def _run_alpha(ticker: str, data, capital: int) -> dict:
     vols = data['Volume'].values.flatten()
     signals = s.generate_signals(ticker, closes, highs, lows, vols)
     return _signals_to_result(ticker, capital, signals, closes, "AlphaEngine")
-
-
-def _run_trend(ticker: str, data, capital: int) -> dict:
-    """Original EMA trend-following strategy (kept for backward compat)."""
-    closes = data["Close"]
-    if isinstance(closes, pd.DataFrame):
-        closes = closes.iloc[:, 0]
-    volumes = data["Volume"] if "Volume" in data else None
-    if volumes is not None and isinstance(volumes, pd.DataFrame):
-        volumes = volumes.iloc[:, 0]
-
-    portfolio = Portfolio(capital=capital)
-    kill_switch = KillSwitch()
-    reporter = PerformanceReporter()
-    regime_engine = RegimeEngine()
-    sizer = KellyPositionSizer(win_rate=0.55, win_loss_ratio=2.0,
-                                kelly_fraction=0.5, max_position_pct=0.05)
-    risk_engine = InstitutionalRiskEngine(kill_switch, sizer)
-
-    prices, vols = [], []
-    in_position = False
-    entry_price = stop_loss = take_profit = 0
-    entry_prices_map = {}
-    trades, signals_log, price_series = [], [], []
-
-    for ts, close_val in closes.items():
-        close = float(close_val)
-        vol = int(volumes.loc[ts]) if volumes is not None else 0
-        prices.append(close)
-        vols.append(vol)
-        regime_engine.update(close)
-        price_series.append({"time": str(ts), "close": round(close, 2), "volume": vol})
-
-        if len(prices) < 210:
-            continue
-
-        s = pd.Series(prices)
-        vs = pd.Series(vols)
-        e20 = s.ewm(span=20, adjust=False).mean()
-        e50 = s.ewm(span=50, adjust=False).mean()
-        e200 = s.ewm(span=200, adjust=False).mean()
-        delta = s.diff()
-        gain = delta.clip(lower=0).rolling(14).mean()
-        loss_val = (-delta.clip(upper=0)).rolling(14).mean()
-        rsi = (100 - (100 / (1 + gain / (loss_val + 1e-10)))).iloc[-1]
-        atr = s.diff().abs().rolling(14).mean().iloc[-1]
-        vol_ratio = vs.iloc[-1] / (vs.rolling(20).mean().iloc[-1] + 1e-10)
-        atr_pct = atr / (s.iloc[-1] + 1e-10)
-        cp = s.iloc[-1]
-        regime = regime_engine.get_regime()
-        risk_mult = regime["risk_multiplier"]
-
-        if in_position:
-            if risk_mult == 0:
-                _trend_sell("BEAR", cp, ts)
-                continue
-            if cp <= stop_loss:
-                _trend_sell("STOP", cp, ts)
-                continue
-            if cp >= take_profit:
-                _trend_sell("TP", cp, ts)
-                continue
-            if e20.iloc[-2] >= e50.iloc[-2] and e20.iloc[-1] < e50.iloc[-1]:
-                _trend_sell("DC", cp, ts)
-                continue
-
-        if not in_position and risk_mult > 0:
-            trend = e20.iloc[-1] > e50.iloc[-1]
-            if (trend and cp > e200.iloc[-1] and 40 <= rsi <= 70
-                    and vol_ratio >= 1.2 and atr_pct < 0.05):
-                entry_price = cp
-                stop_loss = cp - 2.5 * atr
-                take_profit = cp + 4.0 * atr
-                in_position = True
-                signals_log.append({"type": "BUY", "ticker": ticker,
-                    "price": round(cp, 2), "time": str(ts)})
-
-    return {
-        "ticker": ticker, "strategy": "trend", "capital": capital,
-        "trades": [], "signals": signals_log, "price_data": price_series,
-        "report": reporter.generate_report(), "total_trades": 0,
-    }
-
-
-def _trend_sell(reason, price, ts):
-    """Helper for trend strategy sell signals — stubbed for brevity."""
-    pass
 
 
 def _get_live_data() -> dict:

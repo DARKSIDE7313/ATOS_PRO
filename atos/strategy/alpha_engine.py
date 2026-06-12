@@ -27,6 +27,7 @@ class AlphaEngine:
         self.volumes = []
         self.highs = []
         self.lows = []
+        self._entry_bar = 0
 
     # ---------- Indicators ----------
 

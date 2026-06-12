@@ -56,8 +56,8 @@ class RSI2Strategy:
 
             if in_position:
                 peak_price = max(peak_price, close)
-                # Exit 1: RSI recovery (classic Connors exit)
-                if rsi2 > exit_rsi:
+                # Exit 1: RSI recovery (classic Connors exit) — require min +2% profit
+                if rsi2 > exit_rsi and close > entry_price * 1.02:
                     signals.append({
                         'ticker': ticker, 'action': 'SELL',
                         'price': close, 'reason': f'RSI2={rsi2:.1f}>exit',

@@ -72,13 +72,14 @@ class DualMomentumStrategy:
                     })
                     in_position = False
             else:
-                # Entry: short momentum > long AND positive + trend confirmation
-                volumes_list = []
-                for j in range(len(prices) - 20, len(prices)):
-                    volumes_list.append(float(volumes[j]) if volumes is not None else 1)
-                avg_vol = sum(volumes_list) / len(volumes_list) if volumes_list else 1
-                current_vol = float(volumes[-1]) if volumes is not None else 1
-                vol_ok = current_vol > avg_vol * 0.7  # no volume collapse
+                # Entry: short momentum > long AND positive + volume confirmation
+                if volumes is not None and len(prices) >= 20:
+                    vol_series = pd.Series(volumes[:len(prices)])
+                    avg_vol = vol_series.rolling(20).mean().iloc[-1]
+                    current_vol = vol_series.iloc[-1]
+                    vol_ok = current_vol > avg_vol * 0.7
+                else:
+                    vol_ok = True
 
                 if short_ret > long_ret and short_ret > 0 and vol_ok:
                     signals.append({
