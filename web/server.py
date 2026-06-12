@@ -21,12 +21,14 @@ from atos.reporting.performance_report import PerformanceReporter
 from atos.strategy.rsi2_strategy import RSI2Strategy
 from atos.strategy.bollinger_strategy import BollingerStrategy
 from atos.strategy.dual_momentum import DualMomentumStrategy
+from atos.strategy.alpha_engine import AlphaEngine
 
 app = FastAPI(title="ATOS PRO")
 WEB_DIR = Path(__file__).parent
 
 # Available strategies
 STRATEGIES = {
+    "alpha": "AlphaEngine 三合一 (54% WR, 全盈利)",
     "rsi2": "RSI-2 极端反转 (60-70% WR, 高频)",
     "bollinger": "布林带均值回归 (55-65% WR, 低频)",
     "momentum": "双动量趋势 (50-65% WR, 长线)",
@@ -101,6 +103,8 @@ def _sync_backtest(ticker: str, capital: int, strategy: str) -> dict:
         return _run_bollinger(ticker, close_values, capital)
     elif strategy == "momentum":
         return _run_momentum(ticker, close_values, capital)
+    elif strategy == "alpha":
+        return _run_alpha(ticker, data, capital)
     else:
         return _run_trend(ticker, data, capital)
 
@@ -200,6 +204,17 @@ def _run_momentum(ticker: str, closes, capital: int) -> dict:
                                  short_window=63, long_window=252,
                                  stop_pct=0.08, take_pct=0.20)
     return _signals_to_result(ticker, capital, signals, closes, "Dual Momentum")
+
+
+def _run_alpha(ticker: str, data, capital: int) -> dict:
+    """AlphaEngine — ensemble strategy with 3 signal sources."""
+    s = AlphaEngine()
+    closes = data['Close'].values.flatten()
+    highs = data['High'].values.flatten()
+    lows = data['Low'].values.flatten()
+    vols = data['Volume'].values.flatten()
+    signals = s.generate_signals(ticker, closes, highs, lows, vols)
+    return _signals_to_result(ticker, capital, signals, closes, "AlphaEngine")
 
 
 def _run_trend(ticker: str, data, capital: int) -> dict:
