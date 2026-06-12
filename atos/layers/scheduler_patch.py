@@ -34,7 +34,7 @@ async def _morning_scan_job(signal_queue_put, kelly_fn):
     adapted = _adapter.adapt(signals, kelly_fn)
     for item in adapted:
         try:
-            await signal_queue_put(item)
+            signal_queue_put(item)  # sync put (queue.Queue)
         except Exception as e:
             logger.error(
                 "[Scheduler] Queue push failed %s: %s", item["ticker"], e

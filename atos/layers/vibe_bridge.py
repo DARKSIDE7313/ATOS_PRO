@@ -78,34 +78,89 @@ def _make_client(timeout: float) -> httpx.AsyncClient:
     )
 
 
+def _make_signal(item: dict, now_iso: str) -> AtosSignal | None:
+    """Create an AtosSignal from a structured dict item."""
+    ticker = (item.get("ticker") or item.get("symbol") or "").strip().upper()
+    if not ticker:
+        return None
+    direction = item.get("direction", "flat").lower()
+    if direction not in ("long", "short", "flat"):
+        direction = "flat"
+    try:
+        confidence = float(item.get("confidence", 0.5))
+        confidence = max(0.0, min(1.0, confidence))
+    except (TypeError, ValueError):
+        confidence = 0.5
+    return AtosSignal(
+        ticker=ticker,
+        direction=direction,
+        confidence=confidence,
+        position_size=0.0,
+        source="vibe_quant_desk",
+        reason=str(item.get("reason", "")),
+        generated_at=now_iso,
+        expires_at=str(item.get("expires_at", "")),
+    )
+
+
 def _parse_signals(raw: dict) -> list[AtosSignal]:
+    """Parse signals from swarm response. Handles both 'signals' array and 'final_report' text."""
     signals = []
     now_iso = datetime.now().isoformat()
-    for item in raw.get("signals", []):
-        ticker = (item.get("ticker") or item.get("symbol") or "").strip().upper()
-        if not ticker:
-            continue
-        direction = item.get("direction", "flat").lower()
-        if direction not in ("long", "short", "flat"):
+
+    # Format 1: structured signals array
+    raw_signals = raw.get("signals", [])
+    if raw_signals:
+        for item in raw_signals:
+            sig = _make_signal(item, now_iso)
+            if sig and sig.is_valid():
+                signals.append(sig)
+        return signals
+
+    # Format 2: final_report text — try to extract structured info
+    report = raw.get("final_report", "")
+    if isinstance(report, dict):
+        report = json.dumps(report)
+    if report and isinstance(report, str):
+        # Look for ticker patterns like 0700.HK, 9988.HK, AAPL, etc.
+        import re
+        ticker_pattern = re.compile(r'\b(\d{4}\.HK|[\w]{1,5})\b')
+        direction_pattern = re.compile(r'(long|short|flat|buy|sell|hold)', re.IGNORECASE)
+        conf_pattern = re.compile(r'confidence[:\s]+(\d+\.?\d*)', re.IGNORECASE)
+
+        for line in report.split('\n'):
+            ticker_match = ticker_pattern.search(line)
+            if not ticker_match:
+                continue
+            ticker = ticker_match.group(1).upper()
+            dir_match = direction_pattern.search(line)
             direction = "flat"
-        try:
-            confidence = float(item.get("confidence", 0.5))
-            confidence = max(0.0, min(1.0, confidence))
-        except (TypeError, ValueError):
-            confidence = 0.5
-        sig = AtosSignal(
-            ticker=ticker,
-            direction=direction,
-            confidence=confidence,
-            position_size=0.0,
-            source="vibe_quant_desk",
-            reason=str(item.get("reason", "")),
-            generated_at=now_iso,
-            expires_at=str(item.get("expires_at", "")),
-        )
-        if sig.is_valid():
-            signals.append(sig)
-    return signals
+            if dir_match:
+                d = dir_match.group(1).lower()
+                direction = {"buy": "long", "sell": "short"}.get(d, d)
+            conf = 0.5
+            conf_match = conf_pattern.search(line)
+            if conf_match:
+                try:
+                    conf = float(conf_match.group(1))
+                    conf = max(0.0, min(1.0, conf))
+                except ValueError:
+                    pass
+            sig = AtosSignal(
+                ticker=ticker, direction=direction,
+                confidence=conf, position_size=0.0,
+                source="vibe_quant_desk",
+                reason=line.strip()[:200],
+                generated_at=now_iso,
+                expires_at="",
+            )
+            if sig.is_valid():
+                signals.append(sig)
+        if signals:
+            return signals
+
+    logger.info("[VibeBridge] No structured signals found in response.")
+    return []
 
 
 def _save_signals_cache(signals: list[AtosSignal]) -> None:
@@ -188,9 +243,10 @@ class VibeBridge:
         if cache_key in self._session_cache:
             return self._session_cache[cache_key]
         result = await self._post_with_retry("/sessions", {"title": title})
-        if result and "id" in result:
-            self._session_cache[cache_key] = result["id"]
-            return result["id"]
+        if result and (result.get("session_id") or result.get("id")):
+            sid = result.get("session_id") or result.get("id")
+            self._session_cache[cache_key] = sid
+            return sid
         return None
 
     async def _poll_run(
@@ -241,7 +297,7 @@ class VibeBridge:
         run_data = await self._post_with_retry(
             "/swarm/runs",
             {
-                "preset": "quant_strategy_desk",
+                "preset_name": "quant_strategy_desk",
                 "session_id": session_id,
                 "variables": {
                     "universe": " ".join(universe),
@@ -252,10 +308,11 @@ class VibeBridge:
             timeout=VIBE_TIMEOUT_SHORT,
         )
 
-        if not run_data or "run_id" not in run_data:
+        if not run_data or not (run_data.get("id") or run_data.get("run_id")):
             return load_cached_signals()
 
-        result = await self._poll_run(run_data["run_id"])
+        run_id = run_data.get("id") or run_data.get("run_id")
+        result = await self._poll_run(run_id)
         if not result or result.get("status") in ("failed", "timeout"):
             return load_cached_signals()
 

@@ -22,6 +22,7 @@ import sys
 import json
 import time
 import datetime
+import queue
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
@@ -55,6 +56,7 @@ from atos.factors.advanced_signals import get_all_advanced_signals, intermarket_
 from atos.market.regime_gate import evaluate_regime_gate, adjust_exposure_for_regime_gate  # 🆕 v4 宏观门控
 from atos.live.kelly import kelly_fraction, kelly_qty, crouching_allocation  # 🆕 Crouching 仓位方法
 from atos.longterm.serenity import get_chokepoint_candidates  # 🆕 Serenity 瓶颈扫描集成
+from atos.scheduler import start_scheduler, stop_scheduler, signal_queue  # 🆕 Vibe-Trading 调度器
 import yfinance as yf
 
 logger = get_logger("shadow_trader")
@@ -1176,6 +1178,13 @@ def main():
         logger.warning(f"实时数据源不可用: {e}")
         account._use_realtime = False
 
+    # 🆕 启动 Vibe-Trading 调度器（后台线程）
+    try:
+        start_scheduler()
+        logger.info("✅ Vibe-Trading 调度器已启动")
+    except Exception as e:
+        logger.warning(f"⚠️ Vibe-Trading 调度器启动失败（非阻塞）: {e}")
+
     logger.info("Press Ctrl+C to stop")
 
     cycle = 0
@@ -1186,9 +1195,23 @@ def main():
 
     while True:
         try:
+            # 🆕 消费 Vibe 信號（非阻塞）
+            try:
+                while True:
+                    vibe_signal = signal_queue.get_nowait()
+                    logger.info(
+                        f"[Vibe] 信號: {vibe_signal['ticker']} "
+                        f"{vibe_signal['direction']} "
+                        f"conf={vibe_signal['confidence']:.2f} "
+                        f"size={vibe_signal['position_size']:.4f}"
+                    )
+            except queue.Empty:
+                pass
+
             # 🔴 External kill-switch: if /tmp/atos_EMERGENCY_STOP exists, halt immediately
             if os.path.exists("/tmp/atos_EMERGENCY_STOP"):
                 logger.critical("🔴 EMERGENCY STOP detected — halting all trading")
+                stop_scheduler()  # 🆕 停止调度器
                 # Save final state before exiting
                 state = {
                     "initial_cash": account.initial_cash,
@@ -1228,6 +1251,7 @@ def main():
             time.sleep(5 * 60)  # 5分钟周期
         except KeyboardInterrupt:
             logger.info("手动停止")
+            stop_scheduler()  # 🆕 停止调度器
             os.remove(lock_file) if os.path.exists(lock_file) else None
             break
         except Exception as e:

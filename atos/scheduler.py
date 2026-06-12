@@ -1,17 +1,27 @@
 """
 ATOS Scheduler — APScheduler-powered job orchestration.
-Hosts Vibe-Trading jobs (morning scan, shadow review, alpha bench)
-and any future scheduled tasks for the ATOS PRO system.
+Runs in a background daemon thread so it works alongside
+the synchronous shadow_trader main loop.
 
 Usage:
     from atos.scheduler import start_scheduler, signal_queue
-    await start_scheduler()
-    # signal_queue.get() to consume Vibe signals in your main loop
+
+    start_scheduler()
+
+    # In your main loop, drain Vibe signals:
+    import queue
+    try:
+        signal = signal_queue.get_nowait()
+        # process signal...
+    except queue.Empty:
+        pass
 """
 
 import asyncio
 import logging
 import os
+import queue
+import threading
 from datetime import datetime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -20,13 +30,15 @@ from atos.live.kelly import kelly_fraction
 
 logger = logging.getLogger("atos.scheduler")
 
-# --- Shared state ---
-scheduler: AsyncIOScheduler | None = None
-signal_queue: asyncio.Queue = asyncio.Queue(maxsize=100)
+# --- Shared state (thread-safe) ---
+signal_queue = queue.Queue(maxsize=100)
+_scheduler: AsyncIOScheduler | None = None
+_loop: asyncio.AbstractEventLoop | None = None
+_thread: threading.Thread | None = None
+_shutdown_event = threading.Event()
 
 
 # --- Kelly wrapper for Vibe adapter ---
-# kelly_fraction(ticker, confidence) → position size fraction (0.0-0.15)
 def vibe_kelly(ticker: str, confidence: float) -> float:
     """Kelly sizing for Vibe signals. Confidence modulates final size."""
     base = kelly_fraction()
@@ -35,7 +47,7 @@ def vibe_kelly(ticker: str, confidence: float) -> float:
 
 # --- Trades CSV path (for shadow_review) ---
 def get_today_trades_csv() -> str:
-    """Return the path to today's trade CSV export (Futu format)."""
+    """Path to today's trade CSV export (Futu format)."""
     today = datetime.now().strftime("%Y%m%d")
     data_dir = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data"
@@ -45,11 +57,7 @@ def get_today_trades_csv() -> str:
 
 # --- Alpha config updater ---
 def update_alpha_config(alive_factors: list[dict]) -> None:
-    """
-    Callback for weekly alpha bench results.
-    Saves the surviving (alive) factors to a JSON config
-    that the factor engine can reference.
-    """
+    """Save surviving alpha factors from weekly bench results."""
     import json
 
     data_dir = os.path.join(
@@ -69,33 +77,64 @@ def update_alpha_config(alive_factors: list[dict]) -> None:
     )
 
 
-async def start_scheduler() -> AsyncIOScheduler:
-    """Start the APScheduler with all Vibe jobs registered."""
-    global scheduler
+def _run_scheduler_loop() -> None:
+    """Run the APScheduler event loop in this background thread."""
+    global _scheduler, _loop
 
-    if scheduler is not None:
-        logger.warning("[Scheduler] Already running, skipping.")
-        return scheduler
+    _loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(_loop)
 
-    scheduler = AsyncIOScheduler()
-    scheduler.start()
+    _scheduler = AsyncIOScheduler(event_loop=_loop)
+    _scheduler.start()
 
     register_vibe_jobs(
-        scheduler=scheduler,
-        signal_queue_put=signal_queue.put,
+        scheduler=_scheduler,
+        signal_queue_put=signal_queue.put,  # thread-safe queue.Queue.put
         kelly_fn=vibe_kelly,
         trades_csv_path_fn=get_today_trades_csv,
         update_alpha_config_fn=update_alpha_config,
     )
 
-    logger.info("[Scheduler] Started with Vibe jobs registered.")
-    return scheduler
+    logger.info("[Scheduler] Background thread started with Vibe jobs registered.")
+
+    # Run until shutdown is signaled
+    try:
+        while not _shutdown_event.is_set():
+            _loop.run_until_complete(asyncio.sleep(1))
+    except Exception as e:
+        logger.error("[Scheduler] Background thread error: %s", e)
+    finally:
+        if _scheduler:
+            _scheduler.shutdown(wait=False)
+        tasks = asyncio.all_tasks(_loop)
+        for t in tasks:
+            t.cancel()
+        _loop.run_until_complete(asyncio.gather(*tasks, return_exceptions=True))
+        _loop.close()
+        logger.info("[Scheduler] Background thread stopped.")
 
 
-async def stop_scheduler() -> None:
-    """Gracefully shut down the scheduler."""
-    global scheduler
-    if scheduler:
-        scheduler.shutdown(wait=False)
-        scheduler = None
-        logger.info("[Scheduler] Stopped.")
+def start_scheduler() -> None:
+    """Start the APScheduler in a background daemon thread."""
+    global _thread
+
+    if _thread is not None and _thread.is_alive():
+        logger.warning("[Scheduler] Already running.")
+        return
+
+    _shutdown_event.clear()
+    _thread = threading.Thread(target=_run_scheduler_loop, daemon=True, name="atos-scheduler")
+    _thread.start()
+    logger.info("[Scheduler] Launched background thread.")
+
+
+def stop_scheduler() -> None:
+    """Signal shutdown and wait for the background thread to finish."""
+    global _thread
+
+    if _thread is None:
+        return
+
+    _shutdown_event.set()
+    _thread.join(timeout=5)
+    _thread = None
