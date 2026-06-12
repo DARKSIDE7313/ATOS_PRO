@@ -1,11 +1,25 @@
 # Python
 __pycache__/
+*.pyc
+*.pyo
 *.py[cod]
+.venv/
+venv/
 *.egg-info/
 dist/
 
-# Virtual env
-venv/
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+Thumbs.db
 
 # Secrets & env
 .env
@@ -29,31 +43,13 @@ data/.shadow_trader.lock
 state/
 
 # Reports (generated)
-reports/transparency/
-reports/phoenix_report_*.json
-reports/daily_analysis_*.json
-reports/daily_email_*.html
-reports/cron.log
-reports/live_trader.log
-reports/report_*.html
-reports/serenity_*
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Project metadata
-.project/
-phoenix_state.json
+reports/
 
 # Dashboard runtime
 dashboard_stderr.log
 dashboard_stdout.log
 dashboard.log
+
+# Project metadata
+.project/
+phoenix_state.json

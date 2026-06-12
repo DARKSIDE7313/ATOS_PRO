@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATOS PRO — 机构级策略仪表盘</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', monospace;
+    background: #0d1117; color: #c9d1d9; min-height: 100vh;
+  }
+  .header {
+    background: #161b22; border-bottom: 1px solid #30363d;
+    padding: 16px 24px; display: flex; align-items: center; gap: 12px;
+  }
+  .header h1 { font-size: 20px; color: #58a6ff; }
+  .header .badge { font-size: 11px; background: #238636; color: #fff; padding: 2px 8px; border-radius: 10px; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+  .controls {
+    display: flex; gap: 12px; align-items: center; margin-bottom: 24px;
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px;
+  }
+  .controls label { font-size: 14px; color: #8b949e; }
+  .controls input {
+    background: #0d1117; border: 1px solid #30363d; color: #c9d1d9;
+    padding: 8px 12px; border-radius: 6px; font-size: 16px; width: 120px;
+    font-family: monospace;
+  }
+  .controls input:focus { outline: none; border-color: #58a6ff; }
+  .btn {
+    background: #238636; color: #fff; border: none; padding: 8px 24px;
+    border-radius: 6px; font-size: 14px; cursor: pointer; font-weight: 600;
+    transition: background 0.2s;
+  }
+  .btn:hover { background: #2ea043; }
+  .btn:disabled { background: #30363d; cursor: not-allowed; }
+  .metrics {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px; margin-bottom: 24px;
+  }
+  .metric-card {
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    padding: 16px;
+  }
+  .metric-card .label { font-size: 12px; color: #8b949e; text-transform: uppercase; }
+  .metric-card .value { font-size: 24px; font-weight: 700; margin-top: 4px; }
+  .metric-card .value.green { color: #3fb950; }
+  .metric-card .value.red { color: #f85149; }
+  .metric-card .value.blue { color: #58a6ff; }
+  .chart-container {
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    padding: 16px; margin-bottom: 24px;
+  }
+  .chart-container h3 { font-size: 14px; color: #8b949e; margin-bottom: 12px; }
+  canvas { width: 100%; border-radius: 4px; }
+  .trades-table {
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    overflow: hidden; margin-bottom: 24px;
+  }
+  .trades-table h3 { font-size: 14px; color: #8b949e; padding: 16px; border-bottom: 1px solid #30363d; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 10px 16px; color: #8b949e; border-bottom: 1px solid #30363d; font-weight: 500; }
+  td { padding: 10px 16px; border-bottom: 1px solid #21262d; }
+  .pnl-pos { color: #3fb950; } .pnl-neg { color: #f85149; }
+  .side-buy { color: #3fb950; font-weight: 600; } .side-sell { color: #f85149; font-weight: 600; }
+  .loading { text-align: center; padding: 40px; color: #8b949e; display: none; }
+  .loading.show { display: block; }
+  .spinner {
+    display: inline-block; width: 24px; height: 24px; border: 3px solid #30363d;
+    border-top-color: #58a6ff; border-radius: 50%; animation: spin 0.8s linear infinite;
+    margin-right: 8px; vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error { background: #490202; color: #f85149; padding: 12px 16px; border-radius: 6px; margin-bottom: 16px; display: none; }
+  .no-data { text-align: center; padding: 60px; color: #484f58; font-size: 18px; }
+  .report-box {
+    background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+    padding: 16px; font-family: monospace; font-size: 13px; white-space: pre;
+    color: #8b949e; overflow-x: auto;
+  }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>ATOS PRO</h1>
+  <span class="badge">机构级</span>
+</div>
+
+<div class="container">
+  <div class="controls">
+    <label>股票代码:</label>
+    <input type="text" id="ticker" value="NVDA" placeholder="NVDA">
+    <button class="btn" id="runBtn" onclick="runStrategy()">▶ 运行策略</button>
+    <span style="font-size:12px;color:#484f58;margin-left:8px;">使用 2 年历史数据回测</span>
+  </div>
+
+  <div class="error" id="errorBox"></div>
+
+  <div class="loading" id="loading">
+    <span class="spinner"></span>正在获取数据并运行策略...
+  </div>
+
+  <div id="results" style="display:none;">
+    <div class="metrics" id="metrics"></div>
+    <div class="chart-container">
+      <h3>价格走势 & 交易信号</h3>
+      <canvas id="chart"></canvas>
+    </div>
+    <div class="trades-table">
+      <h3>交易记录</h3>
+      <table>
+        <thead><tr><th>时间</th><th>方向</th><th>数量</th><th>价格</th><th>盈亏</th></tr></thead>
+        <tbody id="tradesBody"></tbody>
+      </table>
+    </div>
+    <div class="chart-container">
+      <h3>绩效报告</h3>
+      <div class="report-box" id="reportBox"></div>
+    </div>
+  </div>
+
+  <div class="no-data" id="noData">输入股票代码，点击运行查看策略结果</div>
+</div>
+
+<script>
+async function runStrategy() {
+  const ticker = document.getElementById('ticker').value.trim().toUpperCase();
+  if (!ticker) return;
+
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+  document.getElementById('loading').classList.add('show');
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('noData').style.display = 'none';
+  document.getElementById('errorBox').style.display = 'none';
+
+  try {
+    const resp = await fetch('/api/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticker, capital: 100000 })
+    });
+
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+
+    const data = await resp.json();
+
+    if (data.price_data.length === 0) {
+      document.getElementById('errorBox').textContent = `无法获取 ${ticker} 的数据，请检查代码是否正确`;
+      document.getElementById('errorBox').style.display = 'block';
+      return;
+    }
+
+    renderResults(data);
+    document.getElementById('results').style.display = 'block';
+  } catch (err) {
+    document.getElementById('errorBox').textContent = `错误: ${err.message}`;
+    document.getElementById('errorBox').style.display = 'block';
+  } finally {
+    document.getElementById('loading').classList.remove('show');
+    btn.disabled = false;
+  }
+}
+
+function renderResults(data) {
+  // Metrics
+  const trades = data.trades || [];
+  const wins = trades.filter(t => t.pnl > 0);
+  const losses = trades.filter(t => t.pnl <= 0);
+  const totalPnl = trades.reduce((s, t) => s + t.pnl, 0);
+  const winRate = trades.length > 0 ? (wins.length / trades.length * 100).toFixed(0) : 0;
+
+  document.getElementById('metrics').innerHTML = `
+    <div class="metric-card">
+      <div class="label">股票</div>
+      <div class="value blue">${data.ticker}</div>
+    </div>
+    <div class="metric-card">
+      <div class="label">总交易</div>
+      <div class="value blue">${trades.length}</div>
+    </div>
+    <div class="metric-card">
+      <div class="label">胜率</div>
+      <div class="value ${winRate >= 50 ? 'green' : 'red'}">${winRate}%</div>
+    </div>
+    <div class="metric-card">
+      <div class="label">盈利次数</div>
+      <div class="value green">${wins.length}</div>
+    </div>
+    <div class="metric-card">
+      <div class="label">亏损次数</div>
+      <div class="value red">${losses.length}</div>
+    </div>
+    <div class="metric-card">
+      <div class="label">总盈亏</div>
+      <div class="value ${totalPnl >= 0 ? 'green' : 'red'}">$${totalPnl.toFixed(0)}</div>
+    </div>
+  `;
+
+  // Chart
+  drawChart(data);
+
+  // Trades table
+  document.getElementById('tradesBody').innerHTML = trades.map(t => {
+    const pnlClass = t.pnl > 0 ? 'pnl-pos' : 'pnl-neg';
+    const sideClass = t.side === 'BUY' ? 'side-buy' : 'side-sell';
+    const time = t.time ? t.time.split('T')[0] + ' ' + (t.time.split('T')[1]||'').slice(0,8) : '-';
+    return `<tr>
+      <td>${time}</td>
+      <td class="${sideClass}">${t.side === 'BUY' ? '买入' : '卖出'}</td>
+      <td>${t.qty}</td>
+      <td>$${t.price.toFixed(2)}</td>
+      <td class="${pnlClass}">${t.pnl >= 0 ? '+' : ''}$${t.pnl.toFixed(2)}</td>
+    </tr>`;
+  }).join('');
+
+  // Report
+  document.getElementById('reportBox').textContent = data.report || '无报告';
+}
+
+function drawChart(data) {
+  const canvas = document.getElementById('chart');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const container = canvas.parentElement;
+  const width = container.clientWidth - 32;
+  const height = 400;
+
+  canvas.width = width * dpr;
+  canvas.height = height * dpr;
+  canvas.style.width = width + 'px';
+  canvas.style.height = height + 'px';
+  ctx.scale(dpr, dpr);
+
+  const prices = data.price_data;
+  const signals = data.signals || [];
+
+  if (prices.length < 2) return;
+
+  const closes = prices.map(p => p.close);
+  const minP = Math.min(...closes) * 0.98;
+  const maxP = Math.max(...closes) * 1.02;
+  const range = maxP - minP || 1;
+  const pad = { top: 20, right: 20, bottom: 30, left: 60 };
+  const w = width - pad.left - pad.right;
+  const h = height - pad.top - pad.bottom;
+
+  function x(i) { return pad.left + (i / (prices.length - 1)) * w; }
+  function y(v) { return pad.top + h - ((v - minP) / range) * h; }
+
+  // Background grid
+  ctx.strokeStyle = '#21262d';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const gy = pad.top + (h * i / 4);
+    ctx.beginPath(); ctx.moveTo(pad.left, gy); ctx.lineTo(width - pad.right, gy); ctx.stroke();
+    ctx.fillStyle = '#8b949e'; ctx.font = '11px monospace';
+    const val = maxP - (range * i / 4);
+    ctx.fillText('$' + val.toFixed(0), 4, gy + 4);
+  }
+
+  // Price line
+  ctx.strokeStyle = '#58a6ff';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x(0), y(prices[0].close));
+  for (let i = 1; i < prices.length; i++) {
+    ctx.lineTo(x(i), y(prices[i].close));
+  }
+  ctx.stroke();
+
+  // Buy/Sell markers
+  for (const sig of signals) {
+    if (sig.type !== 'BUY' && sig.type !== 'SELL') continue;
+    const sigTime = sig.time;
+    let idx = prices.findIndex(p => p.time >= sigTime);
+    if (idx < 0) idx = prices.length - 1;
+    const px = x(idx);
+    const py = y(sig.price || prices[idx].close);
+    const isBuy = sig.type === 'BUY';
+    ctx.fillStyle = isBuy ? '#3fb950' : '#f85149';
+    ctx.beginPath();
+    if (isBuy) {
+      ctx.moveTo(px, py - 8);
+      ctx.lineTo(px + 6, py + 4);
+      ctx.lineTo(px - 6, py + 4);
+    } else {
+      ctx.moveTo(px, py + 8);
+      ctx.lineTo(px + 6, py - 4);
+      ctx.lineTo(px - 6, py - 4);
+    }
+    ctx.closePath(); ctx.fill();
+  }
+
+  // Time axis labels
+  ctx.fillStyle = '#8b949e'; ctx.font = '10px monospace';
+  const steps = Math.max(1, Math.floor(prices.length / 6));
+  for (let i = 0; i < prices.length; i += steps) {
+    const t = prices[i].time ? prices[i].time.split('T')[0] : '';
+    ctx.fillText(t, x(i) - 20, height - 6);
+  }
+}
+</script>
+</body>
+</html>
