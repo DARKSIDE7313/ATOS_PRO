@@ -57,7 +57,27 @@ from atos.market.regime_gate import evaluate_regime_gate, adjust_exposure_for_re
 from atos.live.kelly import kelly_fraction, kelly_qty, crouching_allocation  # 🆕 Crouching 仓位方法
 from atos.longterm.serenity import get_chokepoint_candidates  # 🆕 Serenity 瓶颈扫描集成
 from atos.scheduler import start_scheduler, stop_scheduler, signal_queue  # 🆕 Vibe-Trading 调度器
-from atos.vibe_bridge import run_swarm_research, is_vibe_alive   # Vibe-Trading 火力全开桥接
+
+# ── Vibe Bridge 安全导入（atos/vibe_bridge.py 已删除，用 layers 替代）──
+def is_vibe_alive() -> bool:
+    try:
+        from atos.layers.vibe_bridge import VibeBridge
+        import asyncio
+        return asyncio.get_event_loop().run_until_complete(VibeBridge().healthcheck())
+    except Exception:
+        return False
+
+def run_swarm_research(symbols: list, goal: str = "") -> dict | None:
+    try:
+        from atos.layers.vibe_bridge import VibeBridge
+        import asyncio
+        bridge = VibeBridge()
+        return asyncio.get_event_loop().run_until_complete(
+            bridge.morning_scan(symbols, focus=goal, horizon="1-5 days"))
+    except Exception as e:
+        from atos.core.logging import get_logger
+        get_logger("shadow_trader").warning(f"Vibe swarm 跳过: {e}")
+        return None
 
 # ============================================================
 # 全局交易成本参数（必须跑赢大盘 + 手续费的核心）
