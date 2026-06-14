@@ -89,7 +89,7 @@ def _run_scheduler_loop() -> None:
 
     register_vibe_jobs(
         scheduler=_scheduler,
-        signal_queue_put=signal_queue.put,  # thread-safe queue.Queue.put
+        signal_queue_put=lambda item: signal_queue.put(item, timeout=5) if not signal_queue.full() else logger.warning("[Scheduler] Queue full, dropping Vibe signal"),  # non-blocking
         kelly_fn=vibe_kelly,
         trades_csv_path_fn=get_today_trades_csv,
         update_alpha_config_fn=update_alpha_config,

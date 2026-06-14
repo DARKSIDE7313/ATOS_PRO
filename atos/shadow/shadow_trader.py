@@ -213,7 +213,7 @@ class ShadowAccount:
             qty = p.get("qty", 0)
             # 防御 nan / None / 负数
             if lp is None: lp = 0
-            if isinstance(lp, float) and str(lp) == "nan":
+            if isinstance(lp, float) and math.isnan(lp):
                 lp = p.get("avg_price", 0)
             if lp is None: lp = 0
             if isinstance(lp, float) and str(lp) == "nan":
@@ -887,7 +887,7 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
     try:
         from atos.live.risk_manager import get_state as get_risk_state
         rs = get_risk_state()
-        current_dd = rs.get("drawdown", 0.0)
+        current_dd = rs.get("current_drawdown", 0.0)
         if current_dd is None:
             current_dd = 0.0
     except Exception:
@@ -1038,7 +1038,7 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
         # BUGFIX P4 2026-06-12: 从 max() 改保守融合
         # 不再取两者中较大值（推高建仓尺寸），改用加权平均 + clamp。
         # crouching_pct 更激进，vol_pct 更保守，取 0.4×crouching + 0.6×vol
-        vol_pct = vol_result["pct"] if vol_result else 0
+        vol_pct = vol_result.get("weight", 0) if vol_result else 0
         if crouching_pct > 0 and vol_pct > 0:
             target_pct = 0.4 * crouching_pct + 0.6 * vol_pct
         else:
@@ -1354,8 +1354,7 @@ def main():
                 }
                 os.makedirs(os.path.dirname(state_file), exist_ok=True)
                 try:
-                    with open(state_file, "w") as f:
-                        json.dump(state, f, indent=2)
+                    atomic_write(state_file, json.dumps(state, indent=2))
                 except Exception:
                     pass
                 sys.exit(0)

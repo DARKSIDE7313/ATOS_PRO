@@ -171,8 +171,9 @@ class RegimeEngine:
         # 需要至少 5 个历史状态才能平滑
         if len(self.regime_history) >= 5:
             recent = self.regime_history[-5:]
-            # 取中位数作为平滑后的状态
-            smoothed = median(recent)
+            # Use mode (most common) instead of median — string median is alphabetical
+            from collections import Counter
+            smoothed = Counter(recent).most_common(1)[0][0]
         else:
             smoothed = raw["regime"]
 

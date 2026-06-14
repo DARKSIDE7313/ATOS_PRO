@@ -45,14 +45,14 @@ def get_advice(snapshot: dict) -> dict:
             {"role": "user",   "content": json.dumps(snapshot, ensure_ascii=False)},
         ],
         "temperature": 0.3,
-        "response_format": {"type": "json_object"},
     }
     headers = {"Authorization": f"Bearer {DEEPSEEK_API_KEY}", "Content-Type": "application/json"}
     try:
         resp = requests.post(API_URL, json=payload, headers=headers, timeout=30)
         resp.raise_for_status()
         content = resp.json()["choices"][0]["message"]["content"]
-        advice  = json.loads(content)
+        from atos.ai.engine_v4 import _extract_json
+        advice  = _extract_json(content)
         print(f"[ai_advisor] DeepSeek OK. Risk: {advice.get('risk_notes', '--')}")
         return advice
     except Exception as e:

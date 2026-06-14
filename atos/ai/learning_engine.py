@@ -70,7 +70,7 @@ def _get_price_after_days(symbol: str, target_date: datetime, days: int = 2) -> 
         if df.empty:
             return 0
         if isinstance(df.columns, pd.MultiIndex):
-            pass
+            df.columns = [c[0] for c in df.columns]
         close = df["Close"].squeeze() if "Close" in df.columns else (df.iloc[:, 0] if df.shape[1] >= 1 else None)
         if close is None or len(close) == 0:
             return 0

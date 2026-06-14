@@ -156,7 +156,7 @@ def adjust_weights_from_ic(regime: str) -> dict:
         if per_factor:
             worst_factor = min(per_factor, key=per_factor.get)
         else:
-            worst_factor = min(base_weights, key=base_weights.get) if base_weights else "momentum"
+            worst_factor = max(base_weights, key=base_weights.get) if base_weights else "momentum"  # 惩罚最大的(guess worst)
         reduction = base_weights.get(worst_factor, 0.05) * 0.20
         base_weights[worst_factor] = round(base_weights.get(worst_factor, 0.05) - reduction, 4)
         logger.info(f"IC={last_ic:.4f} < -0.05: 缩减 {worst_factor} (IC最低) → {base_weights[worst_factor]:.3f}")

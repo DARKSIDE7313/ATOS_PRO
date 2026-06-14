@@ -131,7 +131,7 @@ def compute_order_qty(symbol, target_pct, account_state, signals, score=0.5):
     try:
         from atos.live.risk_manager import get_state as get_risk_state
         rs = get_risk_state()
-        drawdown = rs.get("drawdown", 0.0) or 0.0
+        drawdown = rs.get("current_drawdown", 0.0) or 0.0
     except Exception:
         drawdown = 0.0
     crouching_pct = crouching_allocation(score=score, drawdown=drawdown, has_news_catalyst=False)

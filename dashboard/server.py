@@ -260,4 +260,4 @@ if __name__=='__main__':
     # Load prices in background — don't block startup
     import threading
     threading.Thread(target=refresh_all_prices, daemon=True).start()
-    S(('0.0.0.0',9000),H).serve_forever()
+    S(('127.0.0.1', 9000), H).serve_forever()

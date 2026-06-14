@@ -49,7 +49,7 @@ class SignalAdapter:
         for sig in ranked:
             try:
                 size = kelly_fn(sig.ticker, sig.confidence)
-                adjusted = round(min(size * sig.confidence, 1.0), 4)
+                adjusted = round(min(size, 1.0), 4)
                 result.append(self.to_layer3_item(sig, adjusted))
             except Exception as e:
                 logger.error(
