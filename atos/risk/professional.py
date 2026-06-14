@@ -32,6 +32,8 @@ def triple_barrier(entry_price: float, current_price: float,
     返回: {"exit": True/False, "reason": "...", "barrier": "profit|stop|time"}
     """
     # 计算自适应障碍（基于当前波动率）
+    if entry_price <= 0:
+        return {"exit": False, "reason": "triple_barrier: entry_price无效", "barrier": None, "pnl_pct": 0}
     profit_barrier = entry_price * (1 + volatility * 2.0)   # 2倍波动率止盈
     stop_barrier = entry_price * (1 - volatility * 1.5)     # 1.5倍波动率止损
 
@@ -152,7 +154,8 @@ class TrailingStop:
             self._breach_count = 0
 
         triggered = self._breach_count >= self.confirm_cycles
-        profit_pct = (current_price - self.entry_price) / self.entry_price
+        profit_pct = ((current_price - self.entry_price) / self.entry_price
+                      if self.entry_price > 0 else 0.0)
 
         return {
             "triggered": triggered,

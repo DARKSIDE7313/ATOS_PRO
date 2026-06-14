@@ -33,9 +33,9 @@ _CACHE_TTL = timedelta(minutes=30)
 # 常数（从 RGVH 论文的阈值范围取保守值）
 # RGVH: IV_THR ~ [0.55, 0.85], VXN_THR ~ [0.70, 0.85], SLOPE_THR ~ [0.05, 0.30]
 # 我们取中间偏保守的值
-IV_THR = 0.70           # IV百分位 > 0.70 → 跳过开仓
-VXN_THR = 0.75          # VXN-VIX利差百分位 > 0.75 → 跳过开仓
-SLOPE_THR = 0.20        # 2s10s斜率百分位 < 0.20 → 跳过
+IV_THR = 0.88           # v6 进攻性：只在极端恐慌时才大幅降仓
+VXN_THR = 0.88
+SLOPE_THR = 0.08
 
 # 门控等级
 GATE_NORMAL = 0         # 全部安全 → 100%仓位

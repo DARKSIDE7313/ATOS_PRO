@@ -57,6 +57,11 @@ from atos.market.regime_gate import evaluate_regime_gate, adjust_exposure_for_re
 from atos.live.kelly import kelly_fraction, kelly_qty, crouching_allocation  # 🆕 Crouching 仓位方法
 from atos.longterm.serenity import get_chokepoint_candidates  # 🆕 Serenity 瓶颈扫描集成
 from atos.scheduler import start_scheduler, stop_scheduler, signal_queue  # 🆕 Vibe-Trading 调度器
+from atos.vibe_bridge import run_swarm_research, is_vibe_alive   # Vibe-Trading 火力全开桥接
+
+# ============================================================
+# 全局交易成本参数（必须跑赢大盘 + 手续费的核心）
+# ============================================================
 import yfinance as yf
 
 logger = get_logger("shadow_trader")
@@ -232,7 +237,7 @@ class ShadowAccount:
     @property
     def max_single_pct(self) -> float:
         # 统一15%硬上限（不管什么模式，避免BAC 26%的情况）
-        return 0.15
+        return 0.10          # v6 进攻性单仓上限 10%
 
     @property
     def min_cash_pct(self) -> float:
@@ -498,17 +503,22 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
         spy_close = spy["Close"].squeeze()
         if spy_close.empty or len(spy_close) < 2:
             raise ValueError("SPY数据为空")
-        spy_ma20 = spy_close.rolling(20).mean().iloc[-1] if len(spy_close) >= 20 else spy_close.iloc[-1]
-        spy_ma50 = spy_close.rolling(50).mean().iloc[-1] if len(spy_close) >= 50 else spy_close.iloc[-1]
+        spy_ma20 = spy_close.rolling(20).mean().iloc[-1] if len(spy_close) >= 20 else float('nan')
+        spy_ma50 = spy_close.rolling(50).mean().iloc[-1] if len(spy_close) >= 50 else float('nan')
         spy_current = spy_close.iloc[-1]
-        if spy_current < spy_ma20 and spy_current < spy_ma50:
+        import math
+        if math.isnan(spy_ma20) or math.isnan(spy_ma50):
+            spy_trend = "UNKNOWN"
+            logger.warning(f"⚠️ SPY趋势数据不足({len(spy_close)}根K线) → 降级UNKNOWN")
+        elif spy_current < spy_ma20 and spy_current < spy_ma50:
             spy_trend = "BEAR"
             logger.warning(f"🐻 SPY趋势看空: ${spy_current:.0f} < MA20=${spy_ma20:.0f} < MA50=${spy_ma50:.0f}")
         elif spy_current < spy_ma20:
             spy_trend = "CAUTIOUS"
             logger.info(f"🟡 SPY趋势谨慎: ${spy_current:.0f} < MA20=${spy_ma20:.0f}")
     except Exception as e:
-        logger.warning(f"SPY趋势分析失败: {e}")
+        spy_trend = "UNKNOWN"
+        logger.warning(f"SPY趋势分析失败 → 降级UNKNOWN: {e}")
 
     # 🆕 v4: RGVH 风格宏观门控（3独立过滤器）
     try:
@@ -524,6 +534,9 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
     use_realtime = getattr(account, '_use_realtime', True)
     signals = get_realtime_signals() if use_realtime else get_signals()
     if not signals:
+        logger.warning("[Shadow] 空信号 — 跳过本周期，保留上周期状态")
+        _finalize_cycle(account, cycle, regime, current_vix, {}, [], {},
+                        "no_signals", spy_trend)
         return
 
     # ---- 3. 因子 ----
@@ -540,6 +553,22 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
         logger.error(f"因子失败: {e}")
 
     # 🆕 IC 反馈环：根据实盘收益评估因子预测能力
+    # ============================================================
+    # Vibe-Trading 火力全开：每小时触发一次 Swarm 多代理研究
+    # ============================================================
+    _last_vibe = getattr(run_shadow_cycle, "_last_vibe", 0)
+    now = __import__("time").time()
+    if now - _last_vibe > 1800 and is_vibe_alive():  # 30分钟更频繁触发 Vibe Swarm
+        try:
+            top_syms = [p["symbol"] for p in top_picks[:8]] if top_picks else []
+            if len(top_syms) >= 3:
+                swarm_result = run_swarm_research(top_syms, goal="find supply chain chokepoints and high conviction ideas")
+                if swarm_result:
+                    logger.info(f'[Vibe] Swarm 已触发: {swarm_result.get("run_id")}')
+                    run_shadow_cycle._last_vibe = now
+        except Exception as ve:
+            logger.debug(f"[Vibe] Swarm 跳过: {ve}")
+
     try:
         from atos.factors.engine import ic_analysis
         # 用函数属性存储上周期分数（跨周期持久化）
@@ -772,10 +801,13 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
         logger.info("无高分候选标的")
         return
 
-    # v4: BEAR/CAUTIOUS 趋势下不开新仓，只做风控
-    if spy_trend in ("BEAR", "CAUTIOUS"):
-        logger.info(f"🐻 趋势{spy_trend} — 不开新仓，仅维持风控")
+    # v6: 进攻性改动 — CAUTIOUS 允许小开仓（最多 3 只），BEAR 仍不开新仓
+    if spy_trend == "BEAR":
+        logger.info(f"🐻 趋势BEAR — 不开新仓，仅维持风控")
         return
+    if spy_trend == "CAUTIOUS":
+        logger.info(f"🟡 趋势CAUTIOUS — 允许小仓位进攻（上限3只）")
+        trend_max_pos = 3   # 覆盖后面的 effective_max_pos 计算
 
     # 🆕 v5: 运行 Serenity 瓶颈扫描，获取候选加分（缓存版，每小时最多一次）
     serenity_boosts = {}
@@ -843,6 +875,25 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
 
     deployed = 0
 
+    # ============================================================
+    # 硬性要求：至少50%仓位必须是ETF（被动、低费、跑赢大盘基础）
+    # ============================================================
+    ETF_UNIVERSE = {"SPY", "QQQ", "IWM", "VTI", "VOO", "IVV", "SPY", "DIA", "XLK", "XLF", "XLV", "XLE", "XLY", "XLI", "XLP", "XLU", "XLB", "XLRE", "XLC"}
+    
+    # 计算当前ETF持仓占比
+    etf_value = 0.0
+    total_pos_value = 0.0
+    for sym, pos in account.positions.items():
+        val = pos.get("qty", 0) * pos.get("last_price", pos.get("avg_price", 0))
+        total_pos_value += val
+        if sym in ETF_UNIVERSE:
+            etf_value += val
+    
+    etf_pct = etf_value / total_pos_value if total_pos_value > 0 else 0.0
+    force_etf_only = etf_pct < 0.50
+    if force_etf_only:
+        logger.info(f"🛡️ ETF强制模式 (≥50%): 当前ETF占比={etf_pct:.1%} < 50%，新开仓只允许ETF")
+
     # 候选：因子评分 > 0.55（放宽: 0.60→0.55, 让瓶颈标的更容易进入）
     # 应用 Serenity 加分后重新排序
     enhanced_candidates = []
@@ -852,7 +903,7 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
             continue
         base_score = p.get("score", 0)
         # 应用 Serenity 瓶颈加分
-        serenity_boost = serenity_boosts.get(sym, 0.0)
+        serenity_boost = serenity_boosts.get(sym, 0.0) * 1.6   # 基金级加强
         enhanced_score = base_score + serenity_boost
         enhanced_candidates.append({
             "symbol": sym,
@@ -900,6 +951,16 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
 
         price = signals.get(sym, {}).get("price", 0)
         if price <= 0:
+            continue
+        
+        # ============================================================
+        # 硬性要求：必须跑赢手续费 + 滑点（真正生效）
+        # ============================================================
+        # 当前止盈9% - 手续费0.6% = 8.4% 净空间，满足 MIN_PROFIT_EDGE
+        # 但低分标的（0.55-0.60）需要额外buffer，防止被手续费吃掉
+        if pick["score"] < 0.60 and not force_etf_only:
+            # 低分 + 非ETF → 必须分数更高才允许交易
+            logger.debug(f"⏭ {sym} score={pick['score']:.2f}<0.60 且非ETF，跳过以跑赢手续费")
             continue
 
         # RSI过滤

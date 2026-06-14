@@ -19,8 +19,8 @@ MAX_DAILY_LOSS_PCT = 0.02      # 日亏损超过2% → 熔断当天交易
 MAX_DRAWDOWN_PCT = 0.15        # 最大回撤15%（从12%放宽）→ 暂停所有新开仓
 MAX_CONSECUTIVE_LOSSES = 5     # 连续5次亏损 → 降频
 COOLDOWN_CYCLES = 48           # v4: 冷却周期数从288(24h)降到48(4h) — 止损后还能回补
-STOP_LOSS_PCT = 0.08           # FIX P5           # v4: 从6%放宽到12% — 给持仓更多波动空间，减少假止损
-TAKE_PROFIT_PCT = 0.12         # FIX P5         # 止盈 15%卖一半（从10%放宽）
+STOP_LOSS_PCT = 0.07           # v6 进攻性止损           # v4: 从6%放宽到12% — 给持仓更多波动空间，减少假止损
+TAKE_PROFIT_PCT = 0.11         # v6 进攻性止盈         # 止盈 15%卖一半（从10%放宽）
 MAX_ORDERS_PER_CYCLE = 8       # 每周期最多8笔
 
 # 持久化路径
@@ -98,7 +98,21 @@ def check_all_stops(positions: list, signals: dict) -> list:
                 })
             continue
 
-        # 2. 硬止损（从6%放宽到12%）
+        # 2. 波动率止损（ATR动态）— 高于硬止损时提前离场
+        #    低波动标的 ATR 止损收紧（如 4%），早于硬止损 7% 触发
+        atr_val = signals.get(sym, {}).get("atr", 0)
+        if atr_val > 0 and px > 0:
+            vol_stop = max(0.03, min(0.10, (atr_val / px) * 2.0))
+            if pnl_pct <= -vol_stop:
+                forced.append({
+                    "action": "SELL", "symbol": sym, "qty": qty,
+                    "reason": f"ATR止损 {pnl_pct:.1%} (ATR{vol_stop:.0%})",
+                    "pnl_pct": pnl_pct,
+                    "exit_type": "STOP_LOSS", "outcome": "LOSS",
+                })
+                continue
+
+        # 3. 硬止损（绝对底线）
         if pnl_pct <= -STOP_LOSS_PCT:
             forced.append({
                 "action": "SELL", "symbol": sym, "qty": qty,
@@ -106,22 +120,6 @@ def check_all_stops(positions: list, signals: dict) -> list:
                 "exit_type": "STOP_LOSS", "outcome": "LOSS",
             })
             continue
-
-        # 3. 波动率止损 — 只在硬止损未触发时检查，不叠加。
-        #    策略：取 max(硬止损阈值, 动态ATR阈值)，两者较大值才触发。
-        #    高波动标的用 ATR 止损（更宽），低波动用硬止损兜底。
-        atr_val = signals.get(sym, {}).get("atr", 0)
-        if atr_val > 0 and px > 0:
-            vol_stop = max(0.03, min(0.10, (atr_val / px) * 2.0))  # FIX P5: 乘数2.5→2.0
-            effective_stop = max(STOP_LOSS_PCT, vol_stop)  # FIX: max not min — high vol needs wider stops
-            if pnl_pct <= -effective_stop:
-                forced.append({
-                    "action": "SELL", "symbol": sym, "qty": qty,
-                    "reason": f"合并止损 {pnl_pct:.1%} (硬{STOP_LOSS_PCT:.0%} + ATR{vol_stop:.0%}→取{effective_stop:.0%})",
-                    "pnl_pct": pnl_pct,
-                    "exit_type": "STOP_LOSS", "outcome": "LOSS",
-                })
-                continue
 
     return forced
 

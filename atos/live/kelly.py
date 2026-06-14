@@ -22,8 +22,8 @@ STATS_PATH = os.path.join(
     "data", "trade_stats.json"
 )
 
-DEFAULT_WIN_RATE   = 0.55
-DEFAULT_WIN_LOSS_R = 2.0
+DEFAULT_WIN_RATE   = 0.50   # 进攻性升级
+DEFAULT_WIN_LOSS_R = 1.55   # 进攻性升级
 MIN_TRADES_FOR_LIVE_STATS = 20
 HALF_KELLY = 0.5
 MAX_KELLY_PCT = 0.15
@@ -91,23 +91,23 @@ def save_trade(pnl_pct: float) -> dict:
 
 def crouching_allocation(score: float, drawdown: float,
                           has_news_catalyst: bool = False) -> float:
-    """Crouching Method allocation."""
+    """Crouching Method allocation（真实市场保守版）"""
     if score >= 0.80:
-        base_pct = 0.07
+        base_pct = 0.045
     elif score >= 0.70:
-        base_pct = 0.05
+        base_pct = 0.032
     elif score >= 0.55:
-        base_pct = 0.03
+        base_pct = 0.020
     else:
         return 0.0
 
-    dd_penalty = max(0.0, 1.0 - (drawdown / 0.01) * 0.10)
+    dd_penalty = max(0.0, 1.0 - (drawdown / 0.02) * 0.15)
     after_dd = base_pct * dd_penalty
 
     if has_news_catalyst:
-        after_dd *= 1.15
+        after_dd *= 1.10
 
-    final = min(after_dd, 0.10)
+    final = min(after_dd, 0.08)
     return final
 
 

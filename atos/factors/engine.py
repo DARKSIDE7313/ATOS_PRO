@@ -20,7 +20,7 @@ logger = get_logger("factors.engine")
 
 # 默认权重
 DEFAULT_WEIGHTS = {
-    "value":      0.05,
+    "value":      0.12,   # v6 进攻性：价值因子基础权重提升"
     "momentum":   0.25,
     "quality":    0.05,
     "technical":  0.30,
@@ -32,6 +32,12 @@ DEFAULT_WEIGHTS = {
 _ic_history: dict[str, dict] = {}
 _ic_lock = __import__('threading').Lock()
 _per_factor_ic: dict[str, dict[str, float]] = {}
+
+# v5 基金级：动态 IC 加权（专业基金核心）
+# 每周期根据最近 N 个 IC 自动调整因子权重
+IC_WINDOW = 20          # 用最近20个周期的 IC
+IC_MIN_OBS = 8          # 至少8个观测才启用动态权重
+DYNAMIC_IC_ALPHA = 0.6  # 动态权重占 60%，固定权重占 40%
 
 # v5: BEAR模式下动量大幅降低、质量大幅提升（真正切换防守）
 # HIGH_VOL下降低动量+均值回归，提升趋势+突破（避免高波动抄底）
@@ -146,13 +152,14 @@ def adjust_weights_from_ic(regime: str) -> dict:
         base_weights[best_factor] = round(base_weights[best_factor] + boost, 4)
         logger.info(f"IC={last_ic:.4f} > 0.05: 提升 {best_factor} → {base_weights[best_factor]:.3f}")
     elif last_ic < -0.05:
+        # Negative IC: reduce the WORST-performing factor, not the highest-weighted
         if per_factor:
             worst_factor = min(per_factor, key=per_factor.get)
         else:
-            worst_factor = max(base_weights, key=base_weights.get)
-        reduction = base_weights[worst_factor] * 0.20
-        base_weights[worst_factor] = round(base_weights[worst_factor] - reduction, 4)
-        logger.info(f"IC={last_ic:.4f} < -0.05: 缩减 {worst_factor} → {base_weights[worst_factor]:.3f}")
+            worst_factor = min(base_weights, key=base_weights.get) if base_weights else "momentum"
+        reduction = base_weights.get(worst_factor, 0.05) * 0.20
+        base_weights[worst_factor] = round(base_weights.get(worst_factor, 0.05) - reduction, 4)
+        logger.info(f"IC={last_ic:.4f} < -0.05: 缩减 {worst_factor} (IC最低) → {base_weights[worst_factor]:.3f}")
 
     total = sum(base_weights.values())
     if total > 0:

@@ -178,7 +178,8 @@ def composite_signal(symbol: str, regime: str, sig: dict) -> dict:
 
     score = max(0.0, min(1.0, score))
 
-    decision = "BUY" if score > 0.20 else ("SELL" if score < 0.08 else "HOLD")
+    # BUY > 0.20, HOLD 0.05-0.20, SELL only if < 0.05 (actual bearish signal)
+    decision = "BUY" if score > 0.20 else ("SELL" if score < 0.05 else "HOLD")
 
     return {
         "symbol": symbol,

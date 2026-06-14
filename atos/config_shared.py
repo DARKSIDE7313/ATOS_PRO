@@ -31,8 +31,8 @@ RISK = {
     "max_daily_loss_pct":   0.02,   # 日亏损2%熔断
     "max_drawdown_pct":     0.15,   # 最大回撤15%
     "max_consecutive_losses": 5,    # 连续5次亏损降频
-    "stop_loss_pct":        0.08,   # 硬止损8%
-    "take_profit_pct":      0.12,   # 止盈12%
+    "stop_loss_pct":        0.07,   # 硬止损7% (v6 进攻性, 从8%收紧)
+    "take_profit_pct":      0.11,   # 止盈11% (v6 进攻性, 从12%收紧)
     "cooldown_cycles":      48,     # 冷却周期
 }
 
