@@ -54,3 +54,4 @@ dashboard.log
 .netlify
 phoenix_state.json
 .project/
+data/incidents/
