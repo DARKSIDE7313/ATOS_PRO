@@ -23,6 +23,7 @@ import json
 import time
 import datetime
 import queue
+import math
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
@@ -526,7 +527,6 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
         spy_ma20 = spy_close.rolling(20).mean().iloc[-1] if len(spy_close) >= 20 else float('nan')
         spy_ma50 = spy_close.rolling(50).mean().iloc[-1] if len(spy_close) >= 50 else float('nan')
         spy_current = spy_close.iloc[-1]
-        import math
         if math.isnan(spy_ma20) or math.isnan(spy_ma50):
             spy_trend = "UNKNOWN"
             logger.warning(f"⚠️ SPY趋势数据不足({len(spy_close)}根K线) → 降级UNKNOWN")
