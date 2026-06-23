@@ -152,6 +152,8 @@ function renderOverview(d){
   document.getElementById('ov-long').innerHTML='<div class="log"><span class="lt">Value</span><span class="lm">$'+fmt(l.pv)+'</span></div><div class="log"><span class="lt">Cash</span><span class="lm">$'+fmt(l.cash)+'</span></div><div class="log"><span class="lt">Return</span><span class="lm" class="'+cls(l.chg)+'">'+pct(l.chg)+'</span></div><div class="log"><span class="lt">Holdings</span><span class="lm">'+fmt(l.cnt)+'</span></div><div class="log"><span class="lt">Rebalance</span><span class="lm">'+(d.long_meta&&d.long_meta.rebalance||'--')+'</span></div>';
   var acts=d.activity||[];
   document.getElementById('ov-log').innerHTML=acts.length?acts.map(function(a){return'<div class="log"><span class="lt">'+a.time+'</span><span class="lm">'+a.msg+'</span></div>';}).join(''):'<div class="empty">No activity</div>';
+}
+function renderHealth(d){
   var hl=d.health||{};var me=d.monitor_events||[];
   var el=document.getElementById('ov-health');
   if(el){
