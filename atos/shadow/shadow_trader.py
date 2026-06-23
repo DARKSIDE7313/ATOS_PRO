@@ -989,16 +989,16 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
             logger.info(f"⏭ {sym} score={pick['score']:.2f}<0.30 跳过，分数太低")
             continue
 
-        # RSI过滤
+        # RSI过滤 — 基金级校准：从 68 放宽到 72。当前大盘回调期，强势股 RSI 在 60-70 之间
         rsi = signals.get(sym, {}).get("rsi", 50)
-        if rsi > 68:
-            logger.info(f"⏭ {sym} RSI={rsi:.0f}>68 超买")
+        if rsi > 72:
+            logger.info(f"⏭ {sym} RSI={rsi:.0f}>72 超买")
             continue
 
-        # MA200偏离过滤
+        # MA200偏离过滤 — 基金级校准：放宽到 25%，回调市场个股可能从底部反弹很远
         ma200 = signals.get(sym, {}).get("ma200", 0)
-        if ma200 > 0 and price > ma200 * 1.18:
-            logger.info(f"⏭ {sym} 价格偏离MA200>18%")
+        if ma200 > 0 and price > ma200 * 1.25:
+            logger.info(f"⏭ {sym} 价格偏离MA200>{((price/ma200-1)*100):.0f}%>25%")
             continue
 
         # Bug #2: 修复死代码 — 已有持仓允许加仓（仅盈利时）

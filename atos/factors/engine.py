@@ -18,14 +18,17 @@ from atos.core.universe import ALL_SYMBOLS
 
 logger = get_logger("factors.engine")
 
-# 默认权重
+# 默认权重 — 基金级校准
+# 2026-06-24: 当前市场处于 SPY<MA20 回调期，动量因子普遍失效。
+# 调降 momentum（0.32→0.20），调升 value（0.05→0.15）和技术（0.25→0.28）
+# MA200 偏离过滤会筛掉过热股票，技术分主要用于识别趋势健康者
 DEFAULT_WEIGHTS = {
-    "value":      0.12,   # v6 进攻性：价值因子基础权重提升"
-    "momentum":   0.25,
-    "quality":    0.05,
-    "technical":  0.30,
-    "multiframe": 0.15,
-    "mean_rev":   0.20,
+    "value":      0.15,   # 基金级：价值因子权重翻3倍，当前市场价值股优于动量股
+    "momentum":   0.20,   # 降低动量权重（回调市场动量普遍负值）
+    "quality":    0.10,   # 提升质量权重（防御性）
+    "technical":  0.28,   # 技术指标在当前震荡市更有效
+    "multiframe": 0.12,   # 多时间框架信号辅助
+    "mean_rev":   0.15,   # 均值回归（RSI低的超卖反弹）
 }
 
 # IC 历史记录
@@ -59,12 +62,12 @@ def _bootstrap_ic_window():
 # v5: BEAR模式下动量大幅降低、质量大幅提升（真正切换防守）
 # HIGH_VOL下降低动量+均值回归，提升趋势+突破（避免高波动抄底）
 REGIME_WEIGHTS = {
-    "BULL_STRONG": {"momentum": 0.32, "technical": 0.25, "value": 0.05, "quality": 0.05, "multiframe": 0.18, "mean_rev": 0.15},
-    "BULL_WEAK":   {"momentum": 0.22, "technical": 0.28, "value": 0.05, "quality": 0.08, "multiframe": 0.18, "mean_rev": 0.19},
-    "HIGH_VOL":    {"momentum": 0.12, "technical": 0.22, "value": 0.12, "quality": 0.15, "multiframe": 0.20, "mean_rev": 0.19},
-    "BEAR":        {"momentum": 0.06, "technical": 0.18, "value": 0.15, "quality": 0.30, "multiframe": 0.18, "mean_rev": 0.13},
-    "SIDEWAYS":    {"momentum": 0.18, "technical": 0.26, "value": 0.10, "quality": 0.10, "multiframe": 0.16, "mean_rev": 0.20},
-    "UNKNOWN":     {"momentum": 0.22, "technical": 0.28, "value": 0.10, "quality": 0.10, "multiframe": 0.15, "mean_rev": 0.15},
+    "BULL_STRONG": {"momentum": 0.32, "technical": 0.25, "value": 0.10, "quality": 0.08, "multiframe": 0.12, "mean_rev": 0.13},
+    "BULL_WEAK":   {"momentum": 0.18, "technical": 0.28, "value": 0.15, "quality": 0.12, "multiframe": 0.10, "mean_rev": 0.17},
+    "HIGH_VOL":    {"momentum": 0.10, "technical": 0.22, "value": 0.15, "quality": 0.18, "multiframe": 0.15, "mean_rev": 0.20},
+    "BEAR":        {"momentum": 0.05, "technical": 0.18, "value": 0.18, "quality": 0.32, "multiframe": 0.12, "mean_rev": 0.15},
+    "SIDEWAYS":    {"momentum": 0.15, "technical": 0.28, "value": 0.15, "quality": 0.12, "multiframe": 0.10, "mean_rev": 0.20},
+    "UNKNOWN":     {"momentum": 0.18, "technical": 0.28, "value": 0.15, "quality": 0.12, "multiframe": 0.12, "mean_rev": 0.15},
 }
 
 # 模块加载时自动填充 bootstrap IC（必须在 REGIME_WEIGHTS 定义之后调用）
@@ -72,7 +75,7 @@ _bootstrap_ic_window()
 
 
 def _tech_score(signal: dict) -> float:
-    """将技术信号转为 0-1 得分。v5: 从 0.0 起步，纯增量评分。"""
+    """将技术信号转为 0-1 得分。v7 基金级校准：UP趋势奖励加倍，更好区分趋势质量。"""
     if not signal:
         return 0.0
     score = 0.0
@@ -81,8 +84,8 @@ def _tech_score(signal: dict) -> float:
     vol_r = signal.get("volume_ratio", 1.0)
     bb = signal.get("bollinger", {})
 
-    # 趋势加分 — v5: 不与 mean_rev 重叠（mean_rev 只负责 RSI+BB）
-    trend_map = {"UP": 0.25, "WEAK_UP": 0.15, "NEUTRAL": 0.0, "WEAK_DOWN": -0.15, "DOWN": -0.25}
+    # 趋势加分 — v7 基金级：UP 趋势奖励从0.25升到0.35，更好地区分信号
+    trend_map = {"UP": 0.35, "WEAK_UP": 0.20, "NEUTRAL": 0.0, "WEAK_DOWN": -0.10, "DOWN": -0.20}
     score += trend_map.get(trend, 0)
 
     # RSI: 40-70 健康
@@ -91,13 +94,13 @@ def _tech_score(signal: dict) -> float:
     elif rsi < 30:
         score -= 0.10
     elif rsi > 80:
-        score -= 0.15
+        score -= 0.20
 
-    # 放量加分
-    if 1.2 <= vol_r <= 3.0:
+    # 放量加分（正常交易量确认）
+    if 1.0 <= vol_r <= 3.0:
         score += 0.10
     elif vol_r < 0.5:
-        score -= 0.10
+        score -= 0.05
 
     # 布林带中位健康
     pct_b = bb.get("pct_b", 0.5)
