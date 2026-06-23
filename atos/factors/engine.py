@@ -56,9 +56,6 @@ def _bootstrap_ic_window():
     logger.info(f"[IC Bootstrap] 已预填充 {len(REGIME_WEIGHTS)} 个市场状态的 IC 窗口")
 
 
-# 模块加载时自动填充 bootstrap IC
-_bootstrap_ic_window()
-
 # v5: BEAR模式下动量大幅降低、质量大幅提升（真正切换防守）
 # HIGH_VOL下降低动量+均值回归，提升趋势+突破（避免高波动抄底）
 REGIME_WEIGHTS = {
@@ -69,6 +66,9 @@ REGIME_WEIGHTS = {
     "SIDEWAYS":    {"momentum": 0.18, "technical": 0.26, "value": 0.10, "quality": 0.10, "multiframe": 0.16, "mean_rev": 0.20},
     "UNKNOWN":     {"momentum": 0.22, "technical": 0.28, "value": 0.10, "quality": 0.10, "multiframe": 0.15, "mean_rev": 0.15},
 }
+
+# 模块加载时自动填充 bootstrap IC（必须在 REGIME_WEIGHTS 定义之后调用）
+_bootstrap_ic_window()
 
 
 def _tech_score(signal: dict) -> float:
