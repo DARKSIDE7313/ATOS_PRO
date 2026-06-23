@@ -21,7 +21,9 @@ import json
 import datetime
 from datetime import timedelta
 from typing import Optional
+import time
 import yfinance as yf
+import concurrent.futures
 from atos.core.logging import get_logger
 
 logger = get_logger("market.regime_gate")
@@ -73,6 +75,22 @@ def _set_cache(key: str, value):
     _cache[key] = (datetime.datetime.now(), value)
 
 
+def _download_with_retry(symbol: str, **kwargs) -> Optional[pd.DataFrame]:
+    """带重试的 yfinance 下载（基金级容错）"""
+    for attempt in range(3):
+        try:
+            df = yf.download(symbol, progress=False, auto_adjust=True, **kwargs)
+            if df is not None and not df.empty:
+                return df
+        except Exception as e:
+            if attempt < 2:
+                time.sleep(2 * (attempt + 1))
+            else:
+                logger.warning(f"{symbol} yfinance下载失败 (3次): {e}")
+                return None
+    return None
+
+
 # ============================================================
 # 过滤器 1: SPY IV 百分位
 # ============================================================
@@ -86,13 +104,11 @@ def get_spy_iv_rank() -> Optional[float]:
     """
     sp = _get_cached("spy_hist_vol")
     if sp is None:
-        spy = yf.download("SPY", period="2y", interval="1d", progress=False, auto_adjust=True)
-        if spy.empty or len(spy) < 252:
+        spy = _download_with_retry("SPY", period="2y", interval="1d")
+        if spy is None or spy.empty or len(spy) < 252:
             return None
         close = spy["Close"].squeeze()
-        # 日收益率
         returns = close.pct_change().dropna()
-        # 20日滚动波动率（年化）
         rolling_vol = returns.rolling(20).std() * (252 ** 0.5)
         sp = {
             "current": float(rolling_vol.iloc[-1]),
@@ -123,8 +139,9 @@ def get_vxn_excess_rank() -> Optional[float]:
     """
     ve = _get_cached("vxn_vix_spread")
     if ve is None:
-        vix = yf.download("^VIX", period="2y", interval="1d", progress=False, auto_adjust=True)
-        vxn = yf.download("^VXN", period="2y", interval="1d", progress=False, auto_adjust=True)
+        # 并行下载 VIX 和 VXN
+        vix = _download_with_retry("^VIX", period="2y", interval="1d")
+        vxn = _download_with_retry("^VXN", period="2y", interval="1d")
 
         if vix.empty or vxn.empty or len(vix) < 252 or len(vxn) < 252:
             return None
@@ -160,11 +177,9 @@ def get_curve_slope_rank() -> Optional[float]:
     """
     cs = _get_cached("curve_slope")
     if cs is None:
-        # 用 5年 (^FVX) 和 10年 (^TNX) 近似 yield curve 斜率
-        # 注意: yfinance 没有 ^2YR，最接近国债短期端点是 ^FVX(5年)
-        # 但百分位排名法（252日窗口）对斜率绝对值误差不敏感
-        dgs2 = yf.download("^FVX", period="2y", interval="1d", progress=False, auto_adjust=True)
-        dgs10 = yf.download("^TNX", period="2y", interval="1d", progress=False, auto_adjust=True)
+        # 并行下载 FVX 和 TNX
+        dgs2 = _download_with_retry("^FVX", period="2y", interval="1d")
+        dgs10 = _download_with_retry("^TNX", period="2y", interval="1d")
 
         if dgs2.empty or dgs10.empty or len(dgs2) < 252 or len(dgs10) < 252:
             return None
