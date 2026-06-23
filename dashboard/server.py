@@ -310,7 +310,7 @@ class H(http.server.BaseHTTPRequestHandler):
             threading.Thread(target=refresh_all_prices,daemon=True).start()
             self._j({'ok':True})
         else:
-            self.send_response(200); self.send_header('Content-Type','text/html; charset=utf-8'); self.end_headers()
+            self.send_response(200); self.send_header('Content-Type','text/html; charset=utf-8'); self.send_header('Cache-Control','no-cache, no-store, must-revalidate'); self.send_header('Pragma','no-cache'); self.send_header('Expires','0'); self.end_headers()
             with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'index.html')) as f:
                 self.wfile.write(f.read().encode())
     def _j(self,d):
