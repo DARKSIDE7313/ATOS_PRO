@@ -20,6 +20,7 @@ dist/
 
 # OS
 Thumbs.db
+.claude/
 
 # Secrets & env
 .env

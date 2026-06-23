@@ -82,6 +82,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
     <div class="card"><h2>Long-Term</h2><div id="ov-long" class="loading">Loading...</div></div>
   </div>
   <div class="card"><h2>Activity Log</h2><div id="ov-log" class="loading">Loading...</div></div>
+  <div class="card"><h2>🩺 Auto Monitor</h2><div id="ov-health" class="loading">Loading...</div></div>
 </div>
 <div class="page" id="p-short">
   <div class="kpis" id="st-kpis"></div>
@@ -139,7 +140,7 @@ function badge(v){if(!v)return'<span class="badge neutral">?</span>';if(v==='BUL
 var _S=null;
 function load(){
   fetch('/api').then(function(r){return r.json()}).then(function(d){
-    _S=d;renderOverview(d);renderShort(d);renderLong(d);renderStops(d);renderTrades(d);
+  _S=d;renderOverview(d);renderShort(d);renderLong(d);renderStops(d);renderTrades(d);renderHealth(d);
   }).catch(function(e){var err='<div class="empty" style="color:#ff453a">Error: '+e.message+'</div>';document.querySelectorAll('.loading').forEach(function(el){if(el.classList.contains('loading'))el.innerHTML=err;});});
   fetch('/api/refresh').catch(function(){});
 }
@@ -151,6 +152,19 @@ function renderOverview(d){
   document.getElementById('ov-long').innerHTML='<div class="log"><span class="lt">Value</span><span class="lm">$'+fmt(l.pv)+'</span></div><div class="log"><span class="lt">Cash</span><span class="lm">$'+fmt(l.cash)+'</span></div><div class="log"><span class="lt">Return</span><span class="lm" class="'+cls(l.chg)+'">'+pct(l.chg)+'</span></div><div class="log"><span class="lt">Holdings</span><span class="lm">'+fmt(l.cnt)+'</span></div><div class="log"><span class="lt">Rebalance</span><span class="lm">'+(d.long_meta&&d.long_meta.rebalance||'--')+'</span></div>';
   var acts=d.activity||[];
   document.getElementById('ov-log').innerHTML=acts.length?acts.map(function(a){return'<div class="log"><span class="lt">'+a.time+'</span><span class="lm">'+a.msg+'</span></div>';}).join(''):'<div class="empty">No activity</div>';
+  var hl=d.health||{};var me=d.monitor_events||[];
+  var el=document.getElementById('ov-health');
+  if(el){
+    var h='<div class="log"><span class="lt">Status</span><span class="lm"><span class="badge '+(hl.status==='healthy'?'up':'down')+'">'+(hl.status||'unknown')+'</span></span></div>';
+    h+='<div class="log"><span class="lt">Checked</span><span class="lm">'+(hl.last_check||'--').slice(5,19)+'</span></div>';
+    h+='<div class="log"><span class="lt">Errors</span><span class="lm '+(hl.errors>0?'down':'')+'">'+(hl.errors||0)+'</span></div>';
+    h+='<div class="log"><span class="lt">Restarts</span><span class="lm '+(hl.restarts>0?'down':'')+'">'+(hl.restarts||0)+'</span></div>';
+    if(hl.trend)h+='<div class="log"><span class="lt">Trend</span><span class="lm">'+(hl.trend.direction||'?')+', slope='+(hl.trend.slope||'0')+'%/step</span></div>';
+    if(hl.perf)h+='<div class="log"><span class="lt">Trades</span><span class="lm">'+fmt(hl.perf.total_trades)+' WR='+(hl.perf.win_rate*100).toFixed(1)+'% Net=$'+fmt(hl.perf.net_pnl)+'</span></div>';
+    if(hl.exposure)h+='<div class="log"><span class="lt">Exposure</span><span class="lm '+(hl.exposure.level!=='normal'?'warn':'')+'">'+hl.exposure.exposure_pct+'% ('+hl.exposure.level+')</span></div>';
+    if(me.length)h+='<div class="log"><span class="lt">Events</span><span class="lm" style="font-size:10px;color:#ffcc00">'+me.join(' | ')+'</span></div>';
+    el.innerHTML=h;
+  }
 }
 function renderShort(d){
   var s=d.short||{};
