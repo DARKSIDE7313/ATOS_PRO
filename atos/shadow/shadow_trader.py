@@ -666,12 +666,23 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
     elif daily_pnl_pct > 0.02:
         dd_widen_factor = 1.3  # 日亏>2%：加宽30%
     
-    use_trailing = spy_trend not in ("BEAR", "CAUTIOUS")
-    if not use_trailing:
-        # BEAR/CAUTIOUS: 清除所有追踪止损（不止损，持有等反弹）
+    # 趋势分级止损策略：
+    #   BEAR     = 全关（持有等反弹）
+    #   CAUTIOUS = 保留追踪止损但加宽1.5倍止损线
+    #   BULL     = 正常追踪止损
+    if spy_trend == "BEAR":
+        use_trailing = False
+        trail_widen = 1.0
         if account.trailing_stops:
             account.trailing_stops.clear()
-            logger.info("🐻 BEAR/CAUTIOUS趋势: 关闭所有追踪止损，持有等反弹")
+            logger.info("🐻 BEAR趋势: 关闭所有追踪止损，持有等反弹")
+    elif spy_trend == "CAUTIOUS":
+        use_trailing = True
+        trail_widen = 1.5
+        logger.info("🟡 CAUTIOUS趋势: 保留追踪止损但加宽%.0f倍" % trail_widen)
+    else:
+        use_trailing = True
+        trail_widen = 1.0
     
     for sym, pos in list(account.positions.items()):
         price = signals.get(sym, {}).get("price", pos.get("last_price", 0))
@@ -683,8 +694,8 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
             # 波动率追踪止损（确认周期8次=40分钟，有效过滤假突破）
             atr_val = signals.get(sym, {}).get("atr", 0)
             trail = max(0.04, min(0.12, (atr_val / price) * 4)) if atr_val > 0 else 0.05
-            # 日亏损加宽止损线
-            trail = trail * dd_widen_factor
+            # 趋势分级加宽止损线（CAUTIOUS模式下给更大容忍度）
+            trail = trail * dd_widen_factor * trail_widen
             ts = TrailingStop(trail_pct=trail, confirm_cycles=8)
             ts.init(pos["avg_price"])
             account.trailing_stops[sym] = ts
@@ -830,8 +841,8 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
         logger.info(f"🐻 趋势BEAR — 不开新仓，仅维持风控")
         return
     if spy_trend == "CAUTIOUS":
-        logger.info(f"🟡 趋势CAUTIOUS — 允许小仓位进攻（上限3只）")
-        trend_max_pos = 3   # 覆盖后面的 effective_max_pos 计算
+        logger.info(f"🟡 趋势CAUTIOUS — 允许小仓位进攻（上限5只）")
+        trend_max_pos = 5   # 从3扩到5，匹配当前实际持仓水平
 
     # 🆕 v5: 运行 Serenity 瓶颈扫描，获取候选加分（缓存版，每小时最多一次）
     serenity_boosts = {}
