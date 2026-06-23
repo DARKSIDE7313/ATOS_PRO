@@ -984,10 +984,9 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
         # ============================================================
         # 当前止盈9% - 手续费0.6% = 8.4% 净空间，满足 MIN_PROFIT_EDGE
         # 但低分标的（0.55-0.60）需要额外buffer，防止被手续费吃掉
-        # 低分标的过滤：基金级校准 — 0.40以下非ETF跳过（原0.60，匹配新评分体系）
-        if pick["score"] < 0.40 and not force_etf_only:
-            # 低分 + 非ETF → 必须分数更高才允许交易
-            logger.info(f"⏭ {sym} score={pick['score']:.2f}<0.40 且非ETF，跳过以跑赢手续费")
+        # 低分标的过滤：基金级校准 — 0.30以下跳过（匹配新评分体系，最高分仅0.40）
+        if pick["score"] < 0.30 and not force_etf_only:
+            logger.info(f"⏭ {sym} score={pick['score']:.2f}<0.30 跳过，分数太低")
             continue
 
         # RSI过滤
