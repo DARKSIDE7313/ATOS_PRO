@@ -124,15 +124,27 @@ def _parse_signals(raw: dict) -> list[AtosSignal]:
     if report and isinstance(report, str):
         # Look for ticker patterns like 0700.HK, 9988.HK, AAPL, etc.
         import re
-        ticker_pattern = re.compile(r'\b(\d{4}\.HK|[\w]{1,5})\b')
+        # 严格 regex: 只匹配大写字母数字组合 + 港股格式
+        ticker_pattern = re.compile(r'\b([A-Z]{1,5}\b(?:\.HK)?|\d{4}\.HK)\b')
         direction_pattern = re.compile(r'(long|short|flat|buy|sell|hold)', re.IGNORECASE)
-        conf_pattern = re.compile(r'confidence[:\s]+(\d+\.?\d*)', re.IGNORECASE)
+        conf_pattern = re.compile(r'confidence[\s:]+(\d+\.?\d*)', re.IGNORECASE)
+
+        # 已知有效 ticker（防止正则误匹配普通英语单词）
+        _KNOWN_TICKERS = set()
+        try:
+            from atos.core.universe import ALL_SYMBOLS
+            _KNOWN_TICKERS = set(ALL_SYMBOLS)
+        except ImportError:
+            pass
 
         for line in report.split('\n'):
             ticker_match = ticker_pattern.search(line)
             if not ticker_match:
                 continue
             ticker = ticker_match.group(1).upper()
+            # 白名单过滤：只接受已知 universe 中的 ticker
+            if _KNOWN_TICKERS and ticker not in _KNOWN_TICKERS:
+                continue
             dir_match = direction_pattern.search(line)
             direction = "flat"
             if dir_match:

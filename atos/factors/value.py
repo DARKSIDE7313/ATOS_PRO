@@ -91,6 +91,8 @@ def batch_value_factors(symbols: list[str]) -> dict:
                 results[sym] = fut.result(timeout=_INFO_TIMEOUT)
             except Exception as e:
                 log_error("value", f"{sym}: {e}")
+                for f in fut_to_sym:
+                    f.cancel()
                 results[sym] = _empty()
             done_count += 1
             if done_count % 10 == 0:

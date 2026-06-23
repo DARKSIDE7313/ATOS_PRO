@@ -7,6 +7,7 @@ ATOS PRO v2 — 质量因子
 import yfinance as yf
 from atos.core.logging import get_logger, log_error
 from atos.longterm.serenity import serenity_quality_filter
+import concurrent.futures
 
 logger = get_logger("factors.quality")
 
@@ -78,12 +79,17 @@ def batch_quality_factors(symbols: list[str]) -> dict:
     最终 composite = (1 - SERENITY_BLEND_WEIGHT) * 传统质量得分
                     + SERENITY_BLEND_WEIGHT * Serenity 瓶颈得分
     """
-    # 1) 传统质量因子
+    # 1) 传统质量因子（并行）
     results = {}
-    for i, sym in enumerate(symbols):
-        results[sym] = get_quality_factors(sym)
-        if (i + 1) % 10 == 0:
-            logger.info(f"质量因子进度: {i+1}/{len(symbols)}")
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        fut_to_sym = {pool.submit(get_quality_factors, sym): sym for sym in symbols}
+        for fut in concurrent.futures.as_completed(fut_to_sym, timeout=60):
+            sym = fut_to_sym[fut]
+            try:
+                results[sym] = fut.result()
+            except Exception as e:
+                logger.warning(f"{sym} 质量因子并行超时: {e}")
+                results[sym] = {"composite": 0.0}
 
     # 2) Serenity 瓶颈质量评分
     try:

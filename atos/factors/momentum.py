@@ -8,6 +8,7 @@ import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta
 from atos.core.logging import get_logger, log_error
+import concurrent.futures
 
 logger = get_logger("factors.momentum")
 
@@ -91,12 +92,17 @@ def get_momentum_factors(symbol: str) -> dict:
 
 
 def batch_momentum_factors(symbols: list[str]) -> dict:
-    """批量获取动量因子"""
+    """批量获取动量因子（并行）"""
     results = {}
-    for i, sym in enumerate(symbols):
-        results[sym] = get_momentum_factors(sym)
-        if (i + 1) % 10 == 0:
-            logger.info(f"动量因子进度: {i+1}/{len(symbols)}")
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        fut_to_sym = {pool.submit(get_momentum_factors, sym): sym for sym in symbols}
+        for fut in concurrent.futures.as_completed(fut_to_sym, timeout=60):
+            sym = fut_to_sym[fut]
+            try:
+                results[sym] = fut.result()
+            except Exception as e:
+                logger.warning(f"{sym} 动量因子并行超时: {e}")
+                results[sym] = {"composite": 0.0}
     logger.info(f"动量因子完成: {len(results)} 只")
     return results
 

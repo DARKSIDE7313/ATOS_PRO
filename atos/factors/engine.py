@@ -33,6 +33,9 @@ _ic_history: dict[str, dict] = {}
 _ic_lock = __import__('threading').Lock()
 _per_factor_ic: dict[str, dict[str, float]] = {}
 
+# 真正的 IC 滑动窗口存储
+_ic_history_window: dict[str, list[float]] = {}  # {regime: [ic1, ic2, ...]}
+
 # v5 基金级：动态 IC 加权（专业基金核心）
 # 每周期根据最近 N 个 IC 自动调整因子权重
 IC_WINDOW = 20          # 用最近20个周期的 IC
@@ -97,75 +100,115 @@ def _mean_rev_score(signal: dict) -> float:
     rsi = signal.get("rsi", 50)
     bb = signal.get("bollinger", {})
     pct_b = bb.get("pct_b", 0.5)
-    score = 0.0
 
-    # RSI 均值回归信号（v5: 去掉与趋势的交叉项）
+    rsi_score = 0.0  # 计算 RSI 部分的总分
+    bb_score = 0.0   # 计算 BB 部分的总分
+
+    # RSI 均值回归信号
     if rsi < 25:
-        score += 0.35
+        rsi_score = 0.35
     elif rsi < 30:
-        score += 0.25
+        rsi_score = 0.25
     elif rsi < 35:
-        score += 0.15
+        rsi_score = 0.15
     elif rsi < 40:
-        score += 0.08
+        rsi_score = 0.08
     elif rsi > 75:
-        score -= 0.25
+        rsi_score = -0.25
     elif rsi > 70:
-        score -= 0.15
+        rsi_score = -0.15
     elif rsi > 65:
-        score -= 0.08
+        rsi_score = -0.08
 
     # Bollinger %B 位置
     if pct_b < 0.10:
-        score += 0.25
+        bb_score = 0.25
     elif pct_b < 0.20:
-        score += 0.15
+        bb_score = 0.15
     elif pct_b < 0.30:
-        score += 0.08
+        bb_score = 0.08
     elif pct_b > 0.90:
-        score -= 0.25
+        bb_score = -0.25
     elif pct_b > 0.80:
-        score -= 0.15
+        bb_score = -0.15
     elif pct_b > 0.70:
-        score -= 0.08
+        bb_score = -0.08
+
+    # 核心创新: RSI 和 BB 信号取最强者（不叠加）
+    if abs(rsi_score) >= abs(bb_score):
+        score = rsi_score
+    else:
+        score = bb_score
 
     return max(0.0, min(1.0, score))
 
 
 def adjust_weights_from_ic(regime: str) -> dict:
-    """根据历史 IC 调整因子权重。"""
+    """根据历史 IC 滑动窗口调整因子权重。基金级实现。"""
+    base_weights = dict(REGIME_WEIGHTS.get(regime, DEFAULT_WEIGHTS))
+
     with _ic_lock:
         history = _ic_history.get(regime)
         if not history:
-            return dict(REGIME_WEIGHTS.get(regime, DEFAULT_WEIGHTS))
+            return base_weights
         last_ic = history.get("last_ic", 0.0)
         per_factor = dict(_per_factor_ic.get(regime, {}))
 
-    base_weights = dict(REGIME_WEIGHTS.get(regime, DEFAULT_WEIGHTS))
+    # 更新滑动窗口
+    if regime not in _ic_history_window:
+        _ic_history_window[regime] = []
+    _ic_history_window[regime].append(last_ic)
+    if len(_ic_history_window[regime]) > IC_WINDOW:
+        _ic_history_window[regime] = _ic_history_window[regime][-IC_WINDOW:]
 
-    if last_ic > 0.05:
-        if per_factor:
-            best_factor = max(per_factor, key=per_factor.get)
-        else:
-            best_factor = max(base_weights, key=base_weights.get)
-        boost = base_weights[best_factor] * 0.10
-        base_weights[best_factor] = round(base_weights[best_factor] + boost, 4)
-        logger.info(f"IC={last_ic:.4f} > 0.05: 提升 {best_factor} → {base_weights[best_factor]:.3f}")
-    elif last_ic < -0.05:
-        # Negative IC: reduce the WORST-performing factor, not the highest-weighted
-        if per_factor:
-            worst_factor = min(per_factor, key=per_factor.get)
-        else:
-            worst_factor = max(base_weights, key=base_weights.get) if base_weights else "momentum"  # 惩罚最大的(guess worst)
-        reduction = base_weights.get(worst_factor, 0.05) * 0.20
-        base_weights[worst_factor] = round(base_weights.get(worst_factor, 0.05) - reduction, 4)
-        logger.info(f"IC={last_ic:.4f} < -0.05: 缩减 {worst_factor} (IC最低) → {base_weights[worst_factor]:.3f}")
+    window = _ic_history_window[regime]
 
-    total = sum(base_weights.values())
-    if total > 0:
-        base_weights = {k: round(v / total, 4) for k, v in base_weights.items()}
+    # 如果窗口数据不足，直接返回基础权重
+    if len(window) < IC_MIN_OBS:
+        return base_weights
 
-    return base_weights
+    # 用窗口 median IC 评估整体因子表现
+    window_ic = sorted(window)[len(window) // 2]  # median
+
+    # 计算动态权重（基于 per_factor IC 的滑动均值）
+    dynamic_weights = dict(base_weights)
+
+    if per_factor and len(window) >= 5:
+        total_ic_abs = sum(abs(v) for v in per_factor.values())
+        if total_ic_abs > 0:
+            for factor, ic_val in per_factor.items():
+                if factor in dynamic_weights:
+                    # IC > 0: 放大（最高 +25%），IC < 0: 惩罚（最低保留 30%）
+                    if ic_val > 0.02:
+                        boost = 1.0 + min(ic_val * 2.0, 0.25)
+                        dynamic_weights[factor] = base_weights[factor] * boost
+                    elif ic_val < -0.02:
+                        penalty = max(0.30, 1.0 - abs(ic_val) * 3.0)
+                        dynamic_weights[factor] = base_weights[factor] * penalty
+
+    # 归一化动态权重
+    dyn_total = sum(dynamic_weights.values())
+    if dyn_total > 0:
+        dynamic_weights = {k: v / dyn_total for k, v in dynamic_weights.items()}
+
+    # DYNAMIC_IC_ALPHA 混合: 60% 动态 + 40% 固定
+    final_weights = {}
+    for factor in base_weights:
+        final_weights[factor] = (
+            DYNAMIC_IC_ALPHA * dynamic_weights.get(factor, base_weights[factor]) +
+            (1 - DYNAMIC_IC_ALPHA) * base_weights[factor]
+        )
+
+    # 最终归一化
+    final_total = sum(final_weights.values())
+    if final_total > 0:
+        final_weights = {k: round(v / final_total, 4) for k, v in final_weights.items()}
+
+    if abs(window_ic) > 0.03:
+        best_f = max(final_weights, key=final_weights.get)
+        logger.info(f"IC窗口 median={window_ic:.4f} n={len(window)}: 动态权重已生效, top={best_f}={final_weights[best_f]:.3f}")
+
+    return final_weights
 
 
 def combine(signals: dict, value_factors: dict, momentum_factors: dict,
@@ -216,7 +259,7 @@ def combine(signals: dict, value_factors: dict, momentum_factors: dict,
         r_score = _mean_rev_score(signals[sym])
         smc_score_raw = signals[sym].get("smc_score", {}).get("smc_score", 0.0)
 
-        smc_normalized = 0.5 + smc_score_raw
+        smc_normalized = smc_score_raw  # SMC 直接从 0 起步，缺失数据得 0 分
         smc_normalized = max(0.0, min(1.0, smc_normalized))
 
         core_weights = {k: weights.get(k, 0) for k in ["value", "momentum", "quality", "technical", "multiframe", "mean_rev"]}

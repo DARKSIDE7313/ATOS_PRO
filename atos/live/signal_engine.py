@@ -406,6 +406,12 @@ def get_signals(symbols: list[str] = None) -> dict:
     for i, sym in enumerate(symbols):
         try:
             df = _get_cached_data(sym, period="1y", interval="1d")
+            # 基础 NaN 防御: 前向填充 + 后向填充，清除所有 NaN 污染
+            df = df.ffill().bfill()
+            # 检查是否所有列都是 NaN（数据完全不可用）
+            if df.empty or df.isna().all(axis=None):
+                logger.warning(f"{sym} 数据完全不可用，跳过")
+                continue
             if df.empty or len(df) < 50:
                 logger.debug(f"跳过 {sym}: 数据不足 ({len(df)}行)")
                 continue
@@ -417,6 +423,10 @@ def get_signals(symbols: list[str] = None) -> dict:
             close = df["Close"].squeeze()
             vol = df["Volume"].squeeze()
             price = _scalar(close)
+            # NaN 检查: 如果 price 是 NaN，尝试前一个非 NaN 值
+            if price is None or (isinstance(price, float) and str(price) == "nan"):
+                logger.debug(f"{sym} price 是 NaN，用 .iloc[-1] 兜底")
+                price = _scalar(close.ffill().iloc[-1]) if not close.empty and len(close) > 0 else 0.0
             # BUGFIX: 数据不足50行的已被跳过，但MA50/MA200仍需防御nan
             ma50_series = close.rolling(50).mean()
             ma50 = _scalar(ma50_series) if not ma50_series.empty and len(close) >= 50 else price

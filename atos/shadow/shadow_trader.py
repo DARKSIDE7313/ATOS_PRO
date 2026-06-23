@@ -507,12 +507,16 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
         run_shadow_cycle._regime_engine = RegimeEngine()
     engine = run_shadow_cycle._regime_engine
     # 先清除旧数据再用新数据填充（确保数据是最新的）
-    engine.spy_prices = []
-    engine.vix_prices = []
+    # 基础级: 保留最近 500 个点的滚动窗口，不丢失学习数据
     spy_c = spy["Close"].squeeze().tolist()
     vix_c = vix["Close"].squeeze().tolist()
     for i in range(min(len(spy_c), len(vix_c))):
         engine.update(float(spy_c[i]), float(vix_c[i]))
+    # 修剪到最近 500 个点，防止内存泄漏
+    if len(engine.spy_prices) > 500:
+        engine.spy_prices = engine.spy_prices[-500:]
+    if len(engine.vix_prices) > 500:
+        engine.vix_prices = engine.vix_prices[-500:]
     regime = engine.get_regime()
     current_vix = float(vix_c[-1]) if vix_c else 18.0
     logger.info(f"Regime={regime['regime']} | VIX={current_vix:.1f} | "
