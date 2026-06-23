@@ -63,6 +63,12 @@ EQUITY_TREND_DAYS = 7  # Lookback period for equity trend slope
 def log(msg, level="INFO"):
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"{ts} | {level:7s} | monitor | {msg}")
+    # 同时写入 ATOS 主日志，让 tail -f atos_*.log 能看到
+    try:
+        log_fn = os.path.join(ATOS_DIR, "logs", f"atos_{datetime.now().strftime('%Y%m%d')}.log")
+        with open(log_fn, "a") as f:
+            f.write(f"{ts} | {level:7s} | monitor | {msg}\n")
+    except: pass
 
 def check_port(port):
     try:
