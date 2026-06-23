@@ -80,8 +80,9 @@ def _get_api_key() -> str:
         key = key.strip().strip("'\"")
         if key:
             return key
-    # 从 Hermes .env 读取
+    # 从项目 .env 或 Hermes .env 读取
     for env_path in [
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"),
         os.path.expanduser("~/.hermes/.env"),
         os.path.expanduser("~/.env"),
     ]:

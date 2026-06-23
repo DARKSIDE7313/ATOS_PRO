@@ -63,6 +63,56 @@ def refresh_all_prices():
         if s not in _price_cache or _price_cache.get(s, 0) <= 0:
             _fetch_price(s)
 
+def _calc_daily_pnl():
+    """计算每日盈亏百分比（基于 shadow_state 中的 equity/trades）"""
+    fp = os.path.join(BASE, 'data', 'shadow_state.json')
+    if not os.path.exists(fp):
+        return {'today_pnl': 0.0, 'today_pnl_pct': 0.0, 'total_pnl': 0.0, 'total_pnl_pct': 0.0}
+    try:
+        with open(fp) as f:
+            raw = json.load(f)
+        equity = raw.get('equity', 0) or 0
+        init = raw.get('initial_cash', 1_000_000) or 1_000_000
+        peak = raw.get('peak_equity', init) or init
+
+        total_pnl = equity - init
+        total_pnl_pct = round((equity - init) / init * 100, 2) if init > 0 else 0
+
+        today = datetime.date.today().isoformat()
+
+        # 从 trade_history 计算今日成交盈亏
+        trades = raw.get('trade_history', []) or []
+        today_trades = [t for t in trades if str(t.get('date', ''))[:10] == today]
+        today_trade_pnl = sum(t.get('pnl', 0) or 0 for t in today_trades)
+
+        # 从 equity_history 取今日首个和末个净值估算今日盈亏
+        eq_hist = raw.get('equity_history', []) or []
+        today_equities = [e for e in eq_hist if isinstance(e, dict) and str(e.get('time', ''))[:10] == today]
+        if len(today_equities) >= 2:
+            open_eq = today_equities[0].get('equity', equity)
+            close_eq = today_equities[-1].get('equity', equity)
+            today_pnl = close_eq - open_eq
+        elif today_trade_pnl != 0:
+            today_pnl = today_trade_pnl
+        else:
+            today_pnl = 0.0
+
+        dd = round((peak - equity) / peak * 100, 2) if peak > 0 else 0
+
+        return {
+            'today_pnl': round(today_pnl, 2),
+            'today_pnl_pct': round(today_pnl / equity * 100, 4) if equity > 0 else 0,
+            'total_pnl': round(total_pnl, 2),
+            'total_pnl_pct': total_pnl_pct,
+            'drawdown': dd,
+            'equity': round(equity, 2),
+            'peak': round(peak, 2),
+            'today_trades': len(today_trades),
+            'today_trade_pnl': round(today_trade_pnl, 2),
+        }
+    except Exception:
+        return {'today_pnl': 0.0, 'today_pnl_pct': 0.0, 'total_pnl': 0.0, 'total_pnl_pct': 0.0}
+
 def read_state():
     d={'short':{},'long':{},'activity':[],'short_stops':[],'trades':[],'combined':{}}
     fpn=os.path.join(BASE,'data','shadow_state.json')
@@ -134,6 +184,7 @@ def read_state():
     c_pl=(si.get('pl',0)or 0)+(li.get('pl',0)or 0)
     c_chg=((c_pv-c_init)/c_init*100) if c_init>0 else 0
     d['combined']={'pv':round(c_pv,2),'pl':round(c_pl,2),'init':round(c_init,2),'chg':round(c_chg,2),'cash':round((si.get('cash',0)or 0)+(li.get('cash',0)or 0),2)}
+    d['daily'] = _calc_daily_pnl()
     rd=os.path.join(BASE,'reports')
     if os.path.exists(rd):
         for fn in sorted(os.listdir(rd),reverse=True)[:15]:
