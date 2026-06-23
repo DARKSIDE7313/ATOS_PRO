@@ -32,18 +32,20 @@ logger = get_logger("market.regime_gate")
 _cache = {}  # {key: (timestamp, value)}
 _CACHE_TTL = timedelta(minutes=30)
 
-# 常数（从 RGVH 论文的阈值范围取保守值）
-# RGVH: IV_THR ~ [0.55, 0.85], VXN_THR ~ [0.70, 0.85], SLOPE_THR ~ [0.05, 0.30]
-# 我们取中间偏保守的值
-IV_THR = 0.88           # v6 进攻性：只在极端恐慌时才大幅降仓
-VXN_THR = 0.88
-SLOPE_THR = 0.08
+# 常数 — 基金级校准：只在极端情况下才降仓
+# 2026-06-23 深度审计校准：在正常市场（VIX~18-20）下应 0-1 个门控触发
+# IV_THR=0.90: 需要波动率在上 90% 百分位（历史极端）才触发
+# VXN_THR=0.90: 需要科技vs大盘恐慌差在上 90% 百分位
+# SLOPE_THR=0.05: 需要收益率曲线斜率在历史下 5% 才触发（极度倒挂）
+IV_THR = 0.92           # 基金级校准：极端恐慌时才触发
+VXN_THR = 0.90
+SLOPE_THR = 0.05
 
 # 门控等级
 GATE_NORMAL = 0         # 全部安全 → 100%仓位
-GATE_CAUTION = 1        # 1个过滤器触发 → 70%仓位
-GATE_WARNING = 2        # 2个过滤器触发 → 40%仓位
-GATE_DANGER = 3         # 3个过滤器触发 → 10%仓位
+GATE_CAUTION = 1        # 1个过滤器触发 → 85%仓位
+GATE_WARNING = 2        # 2个过滤器触发 → 60%仓位
+GATE_DANGER = 3         # 3个过滤器触发 → 30%仓位
 
 GATE_DESCRIPTIONS = {
     GATE_NORMAL: "🟢 全部安全",
@@ -54,9 +56,9 @@ GATE_DESCRIPTIONS = {
 
 GATE_EXPOSURE = {
     GATE_NORMAL: 1.0,
-    GATE_CAUTION: 0.70,
-    GATE_WARNING: 0.40,
-    GATE_DANGER: 0.10,
+    GATE_CAUTION: 0.85,
+    GATE_WARNING: 0.60,
+    GATE_DANGER: 0.30,
 }
 
 

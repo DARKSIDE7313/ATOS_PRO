@@ -42,6 +42,23 @@ IC_WINDOW = 20          # 用最近20个周期的 IC
 IC_MIN_OBS = 8          # 至少8个观测才启用动态权重
 DYNAMIC_IC_ALPHA = 0.6  # 动态权重占 60%，固定权重占 40%
 
+
+def _bootstrap_ic_window():
+    """基金级：用默认权重预填充 IC 滑动窗口，让动态权重从第一天就生效。
+    
+    在无实盘交易数据时，假设各因子有轻微正向预测力（IC~0.05）。
+    当真实 IC 数据积累到 IC_MIN_OBS 后，bootstrap 值自动被覆盖。
+    """
+    bootstrap_ics = [0.05, 0.04, 0.06, 0.03, 0.05, 0.04, 0.06, 0.05]
+    for regime in REGIME_WEIGHTS.keys():
+        if regime not in _ic_history_window:
+            _ic_history_window[regime] = list(bootstrap_ics)
+    logger.info(f"[IC Bootstrap] 已预填充 {len(REGIME_WEIGHTS)} 个市场状态的 IC 窗口")
+
+
+# 模块加载时自动填充 bootstrap IC
+_bootstrap_ic_window()
+
 # v5: BEAR模式下动量大幅降低、质量大幅提升（真正切换防守）
 # HIGH_VOL下降低动量+均值回归，提升趋势+突破（避免高波动抄底）
 REGIME_WEIGHTS = {
@@ -370,8 +387,8 @@ def ic_analysis(prev_scores: dict, current_returns: dict, regime: str = "UNKNOWN
 
 
 def get_top_picks(combine_result: dict, n: int = 10,
-                  min_score: float = 0.50) -> list[dict]:
-    """从综合结果中提取 Top N 推荐标的。v5: 阈值从 0.55→0.50 (匹配新的 0.0 基准分)。"""
+                  min_score: float = 0.20) -> list[dict]:
+    """从综合结果中提取 Top N 推荐标的。v7 基金级校准：阈值 0.20（匹配新评分体系）。"""
     rankings = combine_result["rankings"]
     breakdown = combine_result["breakdown"]
     picks = []

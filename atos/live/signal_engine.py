@@ -32,6 +32,10 @@ except ImportError:
 # Bug #10: yfinance 缓存层 — 仅在交易日内缓存，周末不缓存
 _cache = {}  # {symbol: (timestamp, dataframe)}
 
+# 🔒 yfinance 全局线程锁 — 防止多线程并发写损坏 SQLite 缓存
+# 2026-06-23 深度审计修复：yfinance SQLite 在多线程下频繁 disk I/O error
+_yf_lock = threading.Lock()
+
 # 自愈: yfinance SQLite 缓存修复
 def _repair_yfinance_cache():
     """yfinance 的 SQLite 缓存 (tkr-tz.db/cookies.db) 有时会在异常退出后留下 .db-wal/.db-shm 
@@ -58,28 +62,29 @@ def _repair_yfinance_cache():
                 pass
     
     # 2. 预创建 yfinance 需要的表（表名必须匹配 yfinance 内部使用）
-    #    yfinance 使用 tkr-tz 表名（不是 _tz_kv！）和多线程竞争崩溃修复
+    # 3. 修复权限，防止 Permission denied
     for db_name in ('tkr-tz.db', 'cookies.db'):
         db_path = os.path.join(cache_dir, db_name)
         try:
-            conn = sqlite3.connect(db_path)
-            # 启用 WAL 模式 — 多线程读写更安全
-            conn.execute("PRAGMA journal_mode=WAL")
-            # yfinance 实际用的表是 tkr-tz，不是 _tz_kv
-            conn.execute("CREATE TABLE IF NOT EXISTS 'tkr-tz' (key TEXT PRIMARY KEY, value TEXT)")
-            # yfinance 1.4.1 需要额外列和新表
-            for col in ['strategy', 'exchange']:
-                try:
-                    conn.execute(f"ALTER TABLE 'tkr-tz' ADD COLUMN {col} TEXT DEFAULT ''")
-                except Exception:
-                    pass  # 列已存在
-            conn.execute("CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT)")
-            conn.execute("CREATE TABLE IF NOT EXISTS cookie (key TEXT PRIMARY KEY, value TEXT)")
-            conn.execute("CREATE TABLE IF NOT EXISTS '_cookieschema' (key TEXT PRIMARY KEY, value TEXT)")
-            conn.execute("CREATE TABLE IF NOT EXISTS _tz_kv (key TEXT PRIMARY KEY, value TEXT)")
-            conn.execute("CREATE TABLE IF NOT EXISTS cache (key TEXT PRIMARY KEY, value TEXT)")
-            conn.commit()
-            conn.close()
+            with _yf_lock:  # 🔒 串行化缓存修复
+                conn = sqlite3.connect(db_path)
+                # 启用 WAL 模式 — 多线程读写更安全
+                conn.execute("PRAGMA journal_mode=WAL")
+                # yfinance 实际用的表是 tkr-tz，不是 _tz_kv
+                conn.execute("CREATE TABLE IF NOT EXISTS 'tkr-tz' (key TEXT PRIMARY KEY, value TEXT)")
+                # yfinance 1.4.1 需要额外列和新表
+                for col in ['strategy', 'exchange']:
+                    try:
+                        conn.execute(f"ALTER TABLE 'tkr-tz' ADD COLUMN {col} TEXT DEFAULT ''")
+                    except Exception:
+                        pass  # 列已存在
+                conn.execute("CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT)")
+                conn.execute("CREATE TABLE IF NOT EXISTS cookie (key TEXT PRIMARY KEY, value TEXT)")
+                conn.execute("CREATE TABLE IF NOT EXISTS '_cookieschema' (key TEXT PRIMARY KEY, value TEXT)")
+                conn.execute("CREATE TABLE IF NOT EXISTS _tz_kv (key TEXT PRIMARY KEY, value TEXT)")
+                conn.execute("CREATE TABLE IF NOT EXISTS cache (key TEXT PRIMARY KEY, value TEXT)")
+                conn.commit()
+                conn.close()
             # 修复权限（防止其他进程不能写）
             try:
                 os.chmod(db_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP)
@@ -119,11 +124,12 @@ def _get_cached_data(symbol: str, period: str = "1y", interval: str = "1d"):
     last_error = None
     for attempt in range(max_attempts):
         try:
-            try:
-                df = yf.download(symbol, period=period, interval=interval, progress=False, auto_adjust=True)
-            except Exception:
-                ticker = yf.Ticker(symbol)
-                df = ticker.history(period=period, interval=interval, auto_adjust=True)
+            with _yf_lock:  # 🔒 串行化 yfinance 下载，防止 SQLite 并发损坏
+                try:
+                    df = yf.download(symbol, period=period, interval=interval, progress=False, auto_adjust=True)
+                except Exception:
+                    ticker = yf.Ticker(symbol)
+                    df = ticker.history(period=period, interval=interval, auto_adjust=True)
             if df is not None and not df.empty:
                 _cache[key] = (datetime.now(), df)
                 return df
@@ -156,8 +162,9 @@ def _prefetch_batch(symbols: list[str]) -> None:
     try:
         ticker_str = " ".join(need_fetch)
         logger.info(f"🚀 批量下载 {len(need_fetch)} 只股票...")
-        df_all = yf.download(ticker_str, period="1y", interval="1d",
-                            progress=False, auto_adjust=True, group_by="ticker")
+        with _yf_lock:  # 🔒 串行化 yfinance 下载，防止 SQLite 并发损坏
+            df_all = yf.download(ticker_str, period="1y", interval="1d",
+                                progress=False, auto_adjust=True, group_by="ticker")
         for sym in need_fetch:
             try:
                 if isinstance(df_all.columns, pd.MultiIndex):

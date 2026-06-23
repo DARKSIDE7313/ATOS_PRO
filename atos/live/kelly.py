@@ -91,13 +91,21 @@ def save_trade(pnl_pct: float) -> dict:
 
 def crouching_allocation(score: float, drawdown: float,
                           has_news_catalyst: bool = False) -> float:
-    """Crouching Method allocation（真实市场保守版）"""
-    if score >= 0.80:
-        base_pct = 0.045
-    elif score >= 0.70:
-        base_pct = 0.032
+    """Crouching Method allocation（基金级校准版）
+    
+    校准原则：
+    - 因子引擎新评分体系（0基准），最高分约0.40
+    - 阈值从0.55降到0.30，匹配实际分数范围
+    - 基础仓位放大3倍（之前2%→6%），让实际部署有意义
+    """
+    if score >= 0.70:
+        base_pct = 0.08
     elif score >= 0.55:
-        base_pct = 0.020
+        base_pct = 0.06
+    elif score >= 0.40:
+        base_pct = 0.05
+    elif score >= 0.30:
+        base_pct = 0.035
     else:
         return 0.0
 
@@ -107,7 +115,7 @@ def crouching_allocation(score: float, drawdown: float,
     if has_news_catalyst:
         after_dd *= 1.10
 
-    final = min(after_dd, 0.08)
+    final = min(after_dd, 0.10)
     return final
 
 

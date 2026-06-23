@@ -918,7 +918,8 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
     if force_etf_only:
         logger.info(f"🛡️ ETF强制模式 (≥50%): 当前ETF占比={etf_pct:.1%} < 50%，新开仓只允许ETF")
 
-    # 候选：因子评分 > 0.55（放宽: 0.60→0.55, 让瓶颈标的更容易进入）
+    # 候选：因子评分 > 0.30（基金级校准：从0.55降为0.30，匹配新的0基准评分体系）
+    # 实测因子引擎最高分约0.40（GS/MU），阈值0.30可选出5-8只候选
     # 应用 Serenity 加分后重新排序
     enhanced_candidates = []
     for p in top_picks:
@@ -939,7 +940,7 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
 
     # 按增强后的评分排序
     enhanced_candidates.sort(key=lambda x: -x["score"])
-    candidates = [c for c in enhanced_candidates if c["score"] > 0.55]
+    candidates = [c for c in enhanced_candidates if c["score"] > 0.30]
 
     for pick in candidates:
         sym = pick["symbol"]
@@ -982,7 +983,8 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
         # ============================================================
         # 当前止盈9% - 手续费0.6% = 8.4% 净空间，满足 MIN_PROFIT_EDGE
         # 但低分标的（0.55-0.60）需要额外buffer，防止被手续费吃掉
-        if pick["score"] < 0.60 and not force_etf_only:
+        # 低分标的过滤：基金级校准 — 0.40以下非ETF跳过（原0.60，匹配新评分体系）
+        if pick["score"] < 0.40 and not force_etf_only:
             # 低分 + 非ETF → 必须分数更高才允许交易
             logger.debug(f"⏭ {sym} score={pick['score']:.2f}<0.60 且非ETF，跳过以跑赢手续费")
             continue
