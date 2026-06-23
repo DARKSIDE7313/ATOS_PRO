@@ -951,6 +951,7 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
 
         # 冷却期检查
         if account.is_cooling_off(sym):
+            logger.info(f"⏭ {sym} 冷却期未过，跳过")
             continue
 
         # AI否决检查（新架构核心）
@@ -969,7 +970,7 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
             sym_sector = SECTOR_MAP.get(sym, "Unknown")
             sector_limit = SECTOR_LIMITS.get(sym_sector, 0.20)
             if sector_exposure.get(sym_sector, 0) >= sector_limit:
-                logger.debug(f"🚫 {sym} 行业{sym_sector}已超限")
+                logger.info(f"⏭ {sym} 行业{sym_sector}已超限 (容忍度最高{sector_limit:.0%})")
                 continue
         except Exception:
             pass
@@ -986,19 +987,19 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
         # 低分标的过滤：基金级校准 — 0.40以下非ETF跳过（原0.60，匹配新评分体系）
         if pick["score"] < 0.40 and not force_etf_only:
             # 低分 + 非ETF → 必须分数更高才允许交易
-            logger.debug(f"⏭ {sym} score={pick['score']:.2f}<0.60 且非ETF，跳过以跑赢手续费")
+            logger.info(f"⏭ {sym} score={pick['score']:.2f}<0.40 且非ETF，跳过以跑赢手续费")
             continue
 
         # RSI过滤
         rsi = signals.get(sym, {}).get("rsi", 50)
         if rsi > 68:
-            logger.debug(f"⏭ {sym} RSI={rsi:.0f}>68 超买")
+            logger.info(f"⏭ {sym} RSI={rsi:.0f}>68 超买")
             continue
 
         # MA200偏离过滤
         ma200 = signals.get(sym, {}).get("ma200", 0)
         if ma200 > 0 and price > ma200 * 1.18:
-            logger.debug(f"⏭ {sym} 价格偏离MA200>18%")
+            logger.info(f"⏭ {sym} 价格偏离MA200>18%")
             continue
 
         # Bug #2: 修复死代码 — 已有持仓允许加仓（仅盈利时）
