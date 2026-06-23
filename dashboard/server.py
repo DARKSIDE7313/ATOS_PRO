@@ -185,6 +185,23 @@ def read_state():
     c_chg=((c_pv-c_init)/c_init*100) if c_init>0 else 0
     d['combined']={'pv':round(c_pv,2),'pl':round(c_pl,2),'init':round(c_init,2),'chg':round(c_chg,2),'cash':round((si.get('cash',0)or 0)+(li.get('cash',0)or 0),2)}
     d['daily'] = _calc_daily_pnl()
+    # 📊 集成 auto-monitor 健康检查报告
+    try:
+        hp = os.path.join(BASE, 'data', 'health_check_state.json')
+        if os.path.exists(hp):
+            with open(hp) as f:
+                h = json.load(f)
+            d['health'] = {
+                'status': 'healthy' if h.get('consecutive_failures', 0) < 3 and h.get('consecutive_restarts', 0) < 2 else 'degraded',
+                'last_check': h.get('last_check', ''),
+                'last_cycle': h.get('last_cycle', 0),
+                'restarts': h.get('consecutive_restarts', 0),
+                'errors': h.get('consecutive_failures', 0),
+                'trend': h.get('trend', {}),
+                'perf': h.get('performance', {}),
+                'exposure': h.get('exposure', {}),
+            }
+    except: pass
     rd=os.path.join(BASE,'reports')
     if os.path.exists(rd):
         for fn in sorted(os.listdir(rd),reverse=True)[:15]:
@@ -195,6 +212,18 @@ def read_state():
                     d['activity'].append({'time':fn.replace('phoenix_report_','').replace('.json',''),
                         'msg':f"Phoenix #{s.get('run_id','?')} | {s.get('market_phase','?')} | {s.get('total_orders',0)} orders"})
                 except: pass
+    # 📊 添加 auto-monitor 活动日志（最近5条事件）
+    try:
+        ml=os.path.join(BASE,'logs','auto_monitor.log')
+        if os.path.exists(ml):
+            events=[]
+            with open(ml) as f:
+                for line in f:
+                    if 'ALERT' in line or 'CRITICAL' in line:
+                        m=re.search(r'\|.*?\| (.*)', line)
+                        if m: events.append(m.group(1).strip()[:120])
+            d['monitor_events']=events[-5:]
+    except: pass
     return d
 
 def read_ai_insights():
@@ -270,6 +299,13 @@ class H(http.server.BaseHTTPRequestHandler):
         p=urlparse(self.path)
         if p.path=='/api': self._j(read_state())
         elif p.path=='/api/ai': self._j(read_ai_insights())
+        elif p.path=='/api/health':
+            try:
+                hp=os.path.join(BASE,'data','health_check_state.json')
+                if os.path.exists(hp):
+                    with open(hp) as f: self._j(json.load(f))
+                else: self._j({'error':'no health data'})
+            except: self._j({'error':'read failed'})
         elif p.path=='/api/refresh':
             threading.Thread(target=refresh_all_prices,daemon=True).start()
             self._j({'ok':True})
