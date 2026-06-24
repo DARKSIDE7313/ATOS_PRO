@@ -19,8 +19,8 @@ MAX_DAILY_LOSS_PCT = 0.02      # 日亏损超过2% → 熔断当天交易
 MAX_DRAWDOWN_PCT = 0.15        # 最大回撤15%（从12%放宽）→ 暂停所有新开仓
 MAX_CONSECUTIVE_LOSSES = 5     # 连续5次亏损 → 降频
 COOLDOWN_CYCLES = 48           # v4: 冷却周期数从288(24h)降到48(4h) — 止损后还能回补
-STOP_LOSS_PCT = 0.07           # v6 进攻性止损           # v4: 从6%放宽到12% — 给持仓更多波动空间，减少假止损
-TAKE_PROFIT_PCT = 0.11         # v6 进攻性止盈         # 止盈 15%卖一半（从10%放宽）
+STOP_LOSS_PCT = 0.06           # 生存配置：6% 硬止损（覆盖 0.6% 费用+滑点）
+TAKE_PROFIT_PCT = 0.09         # 生存配置：9% 止盈
 MAX_ORDERS_PER_CYCLE = 8       # 每周期最多8笔
 
 # 持久化路径

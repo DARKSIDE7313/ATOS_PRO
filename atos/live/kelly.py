@@ -22,8 +22,8 @@ STATS_PATH = os.path.join(
     "data", "trade_stats.json"
 )
 
-DEFAULT_WIN_RATE   = 0.50   # 进攻性升级
-DEFAULT_WIN_LOSS_R = 1.55   # 进攻性升级
+DEFAULT_WIN_RATE   = 0.48   # 生存配置：真实市场 bootstrap
+DEFAULT_WIN_LOSS_R = 1.35   # 生存配置：真实市场 bootstrap
 MIN_TRADES_FOR_LIVE_STATS = 20
 HALF_KELLY = 0.5
 MAX_KELLY_PCT = 0.15
@@ -98,24 +98,23 @@ def crouching_allocation(score: float, drawdown: float,
     - 阈值从0.55降到0.30，匹配实际分数范围
     - 基础仓位放大3倍（之前2%→6%），让实际部署有意义
     """
-    if score >= 0.70:
-        base_pct = 0.08
-    elif score >= 0.55:
-        base_pct = 0.06
-    elif score >= 0.40:
-        base_pct = 0.05
-    elif score >= 0.30:
+    if score >= 0.80:
         base_pct = 0.035
+    elif score >= 0.70:
+        base_pct = 0.025
+    elif score >= 0.55:
+        base_pct = 0.015
     else:
         return 0.0
 
-    dd_penalty = max(0.0, 1.0 - (drawdown / 0.02) * 0.15)
+    # 生存配置：2% DD 即开始惩罚（更激进）
+    dd_penalty = max(0.0, 1.0 - (drawdown / 0.02) * 0.20)
     after_dd = base_pct * dd_penalty
 
     if has_news_catalyst:
-        after_dd *= 1.10
+        after_dd *= 1.10   # 新闻加成保守值
 
-    final = min(after_dd, 0.10)
+    final = min(after_dd, 0.08)  # 单仓硬上限 8%
     return final
 
 
