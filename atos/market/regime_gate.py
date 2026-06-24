@@ -22,6 +22,7 @@ import datetime
 from datetime import timedelta
 from typing import Optional
 import time
+import pandas as pd
 import yfinance as yf
 import concurrent.futures
 from atos.core.logging import get_logger
@@ -316,7 +317,13 @@ def evaluate_regime_gate() -> dict:
         if spy_info is None:
             spy_df = _download_with_retry("SPY", period="1y", interval="1d")
             if spy_df is not None and not spy_df.empty:
-                spy_close = spy_df["Close"] if "Close" in spy_df.columns else spy_df.iloc[:, 0]
+                # yf.download 单标的返回 MultiIndex columns: ('Close','SPY'), etc.
+                # 用 .xs() 安全提取一维 Series
+                if isinstance(spy_df.columns, pd.MultiIndex):
+                    spy_close = spy_df.xs('SPY', axis=1, level=1)['Close']
+                else:
+                    spy_close = spy_df["Close"] if "Close" in spy_df.columns else spy_df.iloc[:, 0]
+                spy_close = spy_close.squeeze()
                 spy_current_val = float(spy_close.iloc[-1])
                 spy_ma200_val = float(spy_close.tail(200).mean()) if len(spy_close) >= 200 else None
                 spy_info = {"current": spy_current_val, "ma200": spy_ma200_val}
