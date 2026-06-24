@@ -841,8 +841,8 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
         logger.info(f"🐻 趋势BEAR — 不开新仓，仅维持风控")
         return
     if spy_trend == "CAUTIOUS":
-        logger.info(f"🟡 趋势CAUTIOUS — 允许小仓位进攻（上限5只）")
-        trend_max_pos = 5   # 从3扩到5，匹配当前实际持仓水平
+        logger.info(f"🟡 趋势CAUTIOUS — 允许小仓位进攻（上限8只）")
+        trend_max_pos = 8   # v7: 5→8，释放头部空间让Crouching选优
 
     # 🆕 v5: 运行 Serenity 瓶颈扫描，获取候选加分（缓存版，每小时最多一次）
     serenity_boosts = {}
@@ -865,8 +865,8 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
     else:
         logger.debug(f"Serenity瓶颈扫描跳过: 距离上次不足1小时")
 
-    # 趋势限制（放宽: BULL 5→10, CAUTIOUS 3→5, BEAR 2→3, 配合5%现金下限可部署8个仓位）
-    trend_max_pos = {"BULL": 10, "CAUTIOUS": 5, "BEAR": 3}.get(spy_trend, 10)
+    # 趋势限制（v7: CAUTIOUS 5→8, 分散更多候选降低集中风险）
+    trend_max_pos = {"BULL": 10, "CAUTIOUS": 8, "BEAR": 3}.get(spy_trend, 10)
     effective_max_pos = min(account.max_positions, trend_max_pos)
 
     # 行业分散（扩展为所有行业都限制，不仅仅是 Tech）
