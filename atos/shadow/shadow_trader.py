@@ -694,8 +694,8 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
             # 波动率追踪止损（确认周期8次=40分钟，有效过滤假突破）
             atr_val = signals.get(sym, {}).get("atr", 0)
             trail = max(0.04, min(0.12, (atr_val / price) * 4)) if atr_val > 0 else 0.05
-            # 趋势分级加宽止损线（CAUTIOUS模式下给更大容忍度）
-            trail = trail * dd_widen_factor * trail_widen
+            # 趋势分级加宽止损线 — v7: 取max而非乘积，避免 CAUTIOUS×日损=2.25倍过度加宽
+            trail = trail * max(dd_widen_factor, trail_widen)
             ts = TrailingStop(trail_pct=trail, confirm_cycles=8)
             ts.init(pos["avg_price"])
             account.trailing_stops[sym] = ts

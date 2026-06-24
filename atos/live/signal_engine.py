@@ -430,8 +430,8 @@ def get_signals(symbols: list[str] = None) -> dict:
             close = df["Close"].squeeze()
             vol = df["Volume"].squeeze()
             price = _scalar(close)
-            # NaN 检查: 如果 price 是 NaN，尝试前一个非 NaN 值
-            if price is None or (isinstance(price, float) and str(price) == "nan"):
+            # NaN 检查: 用 math.isnan() 替代脆弱字符串检测
+            if price is None or (isinstance(price, float) and math.isnan(price)):
                 logger.debug(f"{sym} price 是 NaN，用 .iloc[-1] 兜底")
                 price = _scalar(close.ffill().iloc[-1]) if not close.empty and len(close) > 0 else 0.0
             # BUGFIX: 数据不足50行的已被跳过，但MA50/MA200仍需防御nan
@@ -463,7 +463,7 @@ def get_signals(symbols: list[str] = None) -> dict:
                 trend = "NEUTRAL"
 
             # 防御 nan：price 不能是 nan 或 0
-            safe_price = price if not (isinstance(price, float) and str(price) == "nan") else 0
+            safe_price = price if not (isinstance(price, float) and math.isnan(price)) else 0
             if safe_price <= 0 and len(close) > 1:
                 safe_price = _scalar(close.iloc[-2])  # 用前一天收盘价
 

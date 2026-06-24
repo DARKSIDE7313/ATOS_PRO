@@ -293,7 +293,8 @@ def combine(signals: dict, value_factors: dict, momentum_factors: dict,
         smc_score_raw = signals[sym].get("smc_score", {}).get("smc_score", 0.0)
 
         smc_normalized = smc_score_raw  # SMC 直接从 0 起步，缺失数据得 0 分
-        smc_normalized = max(0.0, min(1.0, smc_normalized))
+        # v7: SMC负分传递惩罚 — 强烈看空(-0.60)比无数据(0.0)更差
+        smc_adjusted = smc_normalized  # 保留原始范围 [-0.60, +0.60]
 
         core_weights = {k: weights.get(k, 0) for k in ["value", "momentum", "quality", "technical", "multiframe", "mean_rev"]}
         core_sum = sum(core_weights.values())

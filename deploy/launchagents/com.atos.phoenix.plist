@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PYTHONPATH</key>
+		<string>/Users/benson/ATOS_PRO</string>
+	</dict>
+	<key>KeepAlive</key>
+	<dict>
+		<key>SuccessfulExit</key>
+		<false/>
+	</dict>
+	<key>Label</key>
+	<string>com.atos.phoenix</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/Users/benson/ATOS_PRO/venv/bin/python3</string>
+		<string>-m</string>
+		<string>atos.longterm.phoenix_runner</string>
+		<string>--run</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>StandardErrorPath</key>
+	<string>/Users/benson/ATOS_PRO/logs/phoenix_stderr.log</string>
+	<key>StandardOutPath</key>
+	<string>/Users/benson/ATOS_PRO/logs/phoenix.log</string>
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Hour</key>
+		<integer>8</integer>
+		<key>Minute</key>
+		<integer>30</integer>
+	</dict>
+	<key>WorkingDirectory</key>
+	<string>/Users/benson/ATOS_PRO</string>
+</dict>
+</plist>

@@ -15,7 +15,7 @@
 import os
 import json
 
-MAX_DAILY_LOSS_PCT = 0.02      # 日亏损超过2% → 熔断当天交易
+MAX_DAILY_LOSS_PCT = 0.03      # 日亏损超过3% → 熔断当天交易（v7: 从2%放宽，$30K才熔断）
 MAX_DRAWDOWN_PCT = 0.15        # 最大回撤15%（从12%放宽）→ 暂停所有新开仓
 MAX_CONSECUTIVE_LOSSES = 5     # 连续5次亏损 → 降频
 COOLDOWN_CYCLES = 48           # v4: 冷却周期数从288(24h)降到48(4h) — 止损后还能回补
@@ -87,15 +87,14 @@ def check_all_stops(positions: list, signals: dict) -> list:
         pnl_pct = (px - avg) / avg
         qty = p["qty"]
 
-        # 1. 硬止盈（卖一半）
+        # 1. 硬止盈（卖一半，最少1股 — v7修复: qty=1 也能退出）
         if pnl_pct >= TAKE_PROFIT_PCT:
-            half = qty // 2
-            if half > 0:
-                forced.append({
-                    "action": "SELL", "symbol": sym, "qty": half,
-                    "reason": f"止盈 +{pnl_pct:.1%}", "pnl_pct": pnl_pct,
-                    "exit_type": "TAKE_PROFIT", "outcome": "WIN",
-                })
+            half = max(1, qty // 2)
+            forced.append({
+                "action": "SELL", "symbol": sym, "qty": half,
+                "reason": f"止盈 +{pnl_pct:.1%}", "pnl_pct": pnl_pct,
+                "exit_type": "TAKE_PROFIT", "outcome": "WIN",
+            })
             continue
 
         # 2. 波动率止损（ATR动态）— 高于硬止损时提前离场
