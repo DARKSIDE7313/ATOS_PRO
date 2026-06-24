@@ -9,8 +9,12 @@ import pandas as pd
 from datetime import datetime, timedelta
 from atos.core.logging import get_logger, log_error
 import concurrent.futures
+import threading
 
 logger = get_logger("factors.momentum")
+
+# yfinance 全局锁 — 防止多线程并发写 SQLite 缓存
+_yf_lock = threading.Lock()
 
 # Bug #10: yfinance 缓存（共享）
 _MOM_CACHE = {}
@@ -23,8 +27,9 @@ def _get_cached_mom(symbol: str, period: str = "2y", interval: str = "1mo"):
         ts, df = _MOM_CACHE[key]
         if now - ts < _MOM_CACHE_TTL:
             return df
-    df = yf.download(symbol, period=period, interval=interval,
-                     progress=False, auto_adjust=True)
+    with _yf_lock:
+        df = yf.download(symbol, period=period, interval=interval,
+                         progress=False, auto_adjust=True)
     _MOM_CACHE[key] = (datetime.now(), df)
     return df
 

@@ -7,8 +7,12 @@ ATOS PRO v2 — 价值因子
 import yfinance as yf
 from atos.core.logging import get_logger, log_error
 import concurrent.futures
+import threading
 
 logger = get_logger("factors.value")
+
+# yfinance 全局锁 — 防止多线程并发写 SQLite 缓存
+_yf_lock = threading.Lock()
 
 # 闭市时段 Yahoo Finance API 经常超时，全局超时控制
 _INFO_TIMEOUT = 20  # 单只最多等20秒
@@ -20,7 +24,8 @@ def get_value_factors(symbol: str) -> dict:
     返回归一化得分（0-1，越高越便宜/越有投资价值）。
     """
     try:
-        stock = yf.Ticker(symbol)
+        with _yf_lock:
+            stock = yf.Ticker(symbol)
         # 加超时防止闭市时段卡死
         info = stock.info or {}
     except Exception as e:

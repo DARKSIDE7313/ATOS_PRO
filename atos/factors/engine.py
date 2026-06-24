@@ -41,8 +41,12 @@ _ic_history_window: dict[str, list[float]] = {}  # {regime: [ic1, ic2, ...]}
 
 # v5 基金级：动态 IC 加权（专业基金核心）
 # 每周期根据最近 N 个 IC 自动调整因子权重
-IC_WINDOW = 20          # 用最近20个周期的 IC
-IC_MIN_OBS = 8          # 至少8个观测才启用动态权重
+# 2026-06-24 深度审计修复：bootstrap 中性化
+#   - IC_WINDOW 从 20 → 12（更快适应真实 IC）
+#   - IC_MIN_OBS 从 8 → 4（4 个真实周期后即可生效）
+#   - Bootstrap 值中心化在 0.0，含正负混合（避免正偏压）
+IC_WINDOW = 12
+IC_MIN_OBS = 4
 DYNAMIC_IC_ALPHA = 0.6  # 动态权重占 60%，固定权重占 40%
 
 
@@ -55,16 +59,16 @@ def _bootstrap_ic_window():
     2026-06-24 修复：同时预填充 _ic_history（单值存储），
     避免 adjust_weights_from_ic 在首次调用时因 _ic_history[regime] 为空而短路。
     """
-    bootstrap_ics = [0.05, 0.04, 0.06, 0.03, 0.05, 0.04, 0.06, 0.05]
+    bootstrap_ics = [0.02, -0.01, 0.03, 0.01]  # 中心化中性值（无正偏压）
     for regime in REGIME_WEIGHTS.keys():
         if regime not in _ic_history_window:
             _ic_history_window[regime] = list(bootstrap_ics)
         # 预填充 _ic_history 防止 adjust_weights_from_ic 首次短路
         if regime not in _ic_history:
             _ic_history[regime] = {"last_ic": bootstrap_ics[-1], "weight_adjustments": {}}
-        # 预填充空 per-factor IC 字典
+        # 预填充空 per-factor IC 字典（中性值，避免正偏压）
         if regime not in _per_factor_ic:
-            _per_factor_ic[regime] = {f: 0.02 for f in DEFAULT_WEIGHTS}
+            _per_factor_ic[regime] = {f: 0.01 for f in DEFAULT_WEIGHTS}
     logger.info(f"[IC Bootstrap] 已预填充 {len(REGIME_WEIGHTS)} 个市场状态的 IC 窗口 + _ic_history")
 
 

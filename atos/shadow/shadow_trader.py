@@ -1045,6 +1045,8 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
             drawdown=current_dd,
             has_news_catalyst=has_catalyst,
         )
+        if crouching_pct > 0:
+            logger.info(f"📐 Crouching: {sym} score={enhanced_score:.3f} → alloc={crouching_pct:.1%} (DD={current_dd:.1%})")
 
         # 波动率目标仓位（作为下限保护）
         atr_val = signals.get(sym, {}).get("atr", 0)
