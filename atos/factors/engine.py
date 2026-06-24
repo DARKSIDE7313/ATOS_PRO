@@ -51,12 +51,21 @@ def _bootstrap_ic_window():
     
     在无实盘交易数据时，假设各因子有轻微正向预测力（IC~0.05）。
     当真实 IC 数据积累到 IC_MIN_OBS 后，bootstrap 值自动被覆盖。
+    
+    2026-06-24 修复：同时预填充 _ic_history（单值存储），
+    避免 adjust_weights_from_ic 在首次调用时因 _ic_history[regime] 为空而短路。
     """
     bootstrap_ics = [0.05, 0.04, 0.06, 0.03, 0.05, 0.04, 0.06, 0.05]
     for regime in REGIME_WEIGHTS.keys():
         if regime not in _ic_history_window:
             _ic_history_window[regime] = list(bootstrap_ics)
-    logger.info(f"[IC Bootstrap] 已预填充 {len(REGIME_WEIGHTS)} 个市场状态的 IC 窗口")
+        # 预填充 _ic_history 防止 adjust_weights_from_ic 首次短路
+        if regime not in _ic_history:
+            _ic_history[regime] = {"last_ic": bootstrap_ics[-1], "weight_adjustments": {}}
+        # 预填充空 per-factor IC 字典
+        if regime not in _per_factor_ic:
+            _per_factor_ic[regime] = {f: 0.02 for f in DEFAULT_WEIGHTS}
+    logger.info(f"[IC Bootstrap] 已预填充 {len(REGIME_WEIGHTS)} 个市场状态的 IC 窗口 + _ic_history")
 
 
 # v5: BEAR模式下动量大幅降低、质量大幅提升（真正切换防守）

@@ -951,7 +951,12 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
 
     # 按增强后的评分排序
     enhanced_candidates.sort(key=lambda x: -x["score"])
-    candidates = [c for c in enhanced_candidates if c["score"] > 0.30]
+    # v7: 趋势自适应阈值 — CAUTIOUS市场放宽门槛，允许更多试探性仓位
+    base_score_threshold = 0.25 if spy_trend == "CAUTIOUS" else 0.30
+    candidates = [c for c in enhanced_candidates if c["score"] > base_score_threshold]
+    if spy_trend == "CAUTIOUS":
+        logger.info(f"🟡 CAUTIOUS趋势: 因子阈值从 0.30 → {base_score_threshold}, "
+                     f"增强候选={len(enhanced_candidates)}只, 通过={len(candidates)}只")
 
     for pick in candidates:
         sym = pick["symbol"]
@@ -995,9 +1000,9 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
         # ============================================================
         # 当前止盈9% - 手续费0.6% = 8.4% 净空间，满足 MIN_PROFIT_EDGE
         # 但低分标的（0.55-0.60）需要额外buffer，防止被手续费吃掉
-        # 低分标的过滤：基金级校准 — 0.30以下跳过（匹配新评分体系，最高分仅0.40）
-        if pick["score"] < 0.30 and not force_etf_only:
-            logger.info(f"⏭ {sym} score={pick['score']:.2f}<0.30 跳过，分数太低")
+        # 低分标的过滤：基金级校准 — 趋势自适应阈值（CAUTIOUS=0.25, 其他=0.30）
+        if pick["score"] < base_score_threshold and not force_etf_only:
+            logger.info(f"⏭ {sym} score={pick['score']:.2f}<{base_score_threshold} 跳过，分数太低")
             continue
 
         # RSI过滤 — 基金级校准：从 68 放宽到 72。当前大盘回调期，强势股 RSI 在 60-70 之间

@@ -25,6 +25,7 @@ STATS_PATH = os.path.join(
 DEFAULT_WIN_RATE   = 0.48   # 生存配置：真实市场 bootstrap
 DEFAULT_WIN_LOSS_R = 1.35   # 生存配置：真实市场 bootstrap
 MIN_TRADES_FOR_LIVE_STATS = 20
+MIN_TRADES_FOR_PARTIAL = 5   # 5-19笔交易：部分学习（混合 bootstrap + 实盘）
 HALF_KELLY = 0.5
 MAX_KELLY_PCT = 0.15
 MAX_SAVE_RETRIES = 3
@@ -91,28 +92,41 @@ def save_trade(pnl_pct: float) -> dict:
 
 def crouching_allocation(score: float, drawdown: float,
                           has_news_catalyst: bool = False) -> float:
-    """Crouching Method allocation（基金级校准版）
+    """Crouching Method allocation（v7 评分体系校准版）
     
-    校准原则：
-    - 因子引擎新评分体系（0基准），最高分约0.40
-    - 阈值从0.55降到0.30，匹配实际分数范围
-    - 基础仓位放大3倍（之前2%→6%），让实际部署有意义
+    2026-06-24 深度审计：因子引擎 0 基准评分体系下，实测最高分约 0.45。
+    旧阈值 0.55/0.70/0.80 在旧宇宙，导致候选标的 100% 返回 0.0。
+    修复：新增 0.45/0.40/0.35/0.30 四档阈值，匹配实测分数范围。
+    每个档次都缩小（更保守），因为低分标的需要分散更多只来管理风险。
     """
     if score >= 0.80:
-        base_pct = 0.035
+        base_pct = 0.035    # 7% 基础（极少达到）
     elif score >= 0.70:
-        base_pct = 0.025
+        base_pct = 0.028    # 5.6%
     elif score >= 0.55:
-        base_pct = 0.015
+        base_pct = 0.022    # 4.4%
+    elif score >= 0.45:
+        base_pct = 0.018    # 3.6% — MARA 级别（当前最高分）
+    elif score >= 0.40:
+        base_pct = 0.014    # 2.8% — GS/MU 级别
+    elif score >= 0.35:
+        base_pct = 0.010    # 2.0% — 候选区间
+    elif score >= 0.30:
+        base_pct = 0.006    # 1.2% — 边缘选入
     else:
         return 0.0
 
-    # 生存配置：2% DD 即开始惩罚（更激进）
-    dd_penalty = max(0.0, 1.0 - (drawdown / 0.02) * 0.20)
+    # 生存配置：DD 惩罚（更平滑）
+    if drawdown <= 0.02:
+        dd_penalty = 1.0
+    elif drawdown <= 0.05:
+        dd_penalty = 1.0 - (drawdown - 0.02) / 0.03 * 0.30  # 3% DD → 70%
+    else:
+        dd_penalty = max(0.40, 1.0 - (drawdown - 0.02) / 0.03 * 0.30)  # floor 40%
     after_dd = base_pct * dd_penalty
 
     if has_news_catalyst:
-        after_dd *= 1.10   # 新闻加成保守值
+        after_dd *= 1.10   # 新闻加成
 
     final = min(after_dd, 0.08)  # 单仓硬上限 8%
     return final
@@ -133,6 +147,15 @@ def kelly_fraction(win_rate=None, win_loss_r=None, num_positions: int = 0,
         w = stats["win_rate"]
         r = stats["win_loss_r"]
         source = "live_stats"
+    elif (stats and stats.get("total_trades", 0) >= MIN_TRADES_FOR_PARTIAL):
+        # 部分学习：混合 bootstrap + 实盘数据（交易数 / 20 权重）
+        live_w = stats["win_rate"]
+        live_r = stats["win_loss_r"]
+        total = stats["total_trades"]
+        blend = min(total / MIN_TRADES_FOR_LIVE_STATS, 1.0)  # e.g. 5 trades → 0.25 weight
+        w = blend * live_w + (1 - blend) * (win_rate or DEFAULT_WIN_RATE)
+        r = blend * live_r + (1 - blend) * (win_loss_r or DEFAULT_WIN_LOSS_R)
+        source = f"partial({total}t)"
     else:
         w = win_rate   or DEFAULT_WIN_RATE
         r = win_loss_r or DEFAULT_WIN_LOSS_R

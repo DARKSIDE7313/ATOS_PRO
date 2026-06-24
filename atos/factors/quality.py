@@ -3,26 +3,44 @@ ATOS PRO v2 — 质量因子
 =======================
 计算公司质量：ROE、利润率、负债率、盈利稳定性。
 融合 Serenity 瓶颈检测逻辑作为增强质量信号。
+
+2026-06-24 修复：添加 yfinance 全局锁 + 重试逻辑，防止多线程
+并发调用导致 SQLite 损坏和 TLS 连接拒绝（Yahoo rate limiting）。
 """
 import yfinance as yf
 from atos.core.logging import get_logger, log_error
 from atos.longterm.serenity import serenity_quality_filter
 import concurrent.futures
+import threading
+import time
 
 logger = get_logger("factors.quality")
+
+# yfinance 全局锁 — 防止多线程并发写 SQLite 缓存
+_yf_lock = threading.Lock()
 
 # 质量因子中 Serenity 分数的混合权重
 SERENITY_BLEND_WEIGHT = 0.30
 
+# 单标的 yfinance 调用最大重试次数
+MAX_QUALITY_RETRIES = 3
+
 
 def get_quality_factors(symbol: str) -> dict:
-    """获取单只股票的质量因子"""
-    try:
-        stock = yf.Ticker(symbol)
-        info = stock.info or {}
-    except Exception as e:
-        log_error("quality", f"{symbol}: {e}")
-        return _empty()
+    """获取单只股票的质量因子（带 yfinance 锁 + 重试）"""
+    for attempt in range(MAX_QUALITY_RETRIES):
+        try:
+            with _yf_lock:
+                stock = yf.Ticker(symbol)
+                info = stock.info or {}
+            break  # 成功，跳出重试循环
+        except Exception as e:
+            if attempt < MAX_QUALITY_RETRIES - 1:
+                logger.debug(f"{symbol} quality retry {attempt+1}/{MAX_QUALITY_RETRIES}: {e}")
+                time.sleep(1.0 * (attempt + 1))
+            else:
+                log_error("quality", f"{symbol}: {e}")
+                return _empty()
 
     roe = info.get("returnOnEquity")
     profit_margin = info.get("profitMargins")

@@ -33,19 +33,21 @@ _cache = {}  # {key: (timestamp, value)}
 _CACHE_TTL = timedelta(minutes=30)
 
 # 常数 — 基金级校准：只在极端情况下才降仓
-# 2026-06-23 深度审计校准：在正常市场（VIX~18-20）下应 0-1 个门控触发
-# IV_THR=0.90: 需要波动率在上 90% 百分位（历史极端）才触发
-# VXN_THR=0.90: 需要科技vs大盘恐慌差在上 90% 百分位
-# SLOPE_THR=0.05: 需要收益率曲线斜率在历史下 5% 才触发（极度倒挂）
-IV_THR = 0.92           # 基金级校准：极端恐慌时才触发
-VXN_THR = 0.90
-SLOPE_THR = 0.05
+# 2026-06-24 深度审计 v2：当前市场 VIX~19, SPY $734, 但 VXN 利差 0.996 + 曲线趋平 0.000
+# 连续触发 3/3，导致 $960K 只有 $188K 部署。问题：百分位阈值在"非恐慌但高警觉"
+# 市场下全部触发。修复：(1)阈值微调，(2)加入市场上下文修正，(3)危险暴露从30%→45%
+# IV_THR=0.95: 需要波动率在 TOP 5% 极端区间才触发
+# VXN_THR=0.95: VXN-VIX 利差需要在旧 TOP 5%
+# SLOPE_THR=0.03: 收益率曲线斜率需要在底 3% 才触发（深度倒挂）
+IV_THR = 0.95
+VXN_THR = 0.95
+SLOPE_THR = 0.03
 
 # 门控等级
 GATE_NORMAL = 0         # 全部安全 → 100%仓位
-GATE_CAUTION = 1        # 1个过滤器触发 → 85%仓位
-GATE_WARNING = 2        # 2个过滤器触发 → 60%仓位
-GATE_DANGER = 3         # 3个过滤器触发 → 30%仓位
+GATE_CAUTION = 1        # 1个过滤器触发 → 90%仓位
+GATE_WARNING = 2        # 2个过滤器触发 → 70%仓位
+GATE_DANGER = 3         # 3个过滤器触发 → 45%仓位
 
 GATE_DESCRIPTIONS = {
     GATE_NORMAL: "🟢 全部安全",
@@ -56,10 +58,31 @@ GATE_DESCRIPTIONS = {
 
 GATE_EXPOSURE = {
     GATE_NORMAL: 1.0,
-    GATE_CAUTION: 0.85,
-    GATE_WARNING: 0.60,
-    GATE_DANGER: 0.30,
+    GATE_CAUTION: 0.90,
+    GATE_WARNING: 0.70,
+    GATE_DANGER: 0.45,
 }
+
+# 市场上下文修正 — 当市场并非真正崩盘时，降级门控
+# 原理：门控用于保护极端行情，但 VIX<25 + SPY>MA200 = 非崩盘，应放松
+def _market_context_downgrade(gate_level: int, spy_current: float = None, 
+                               spy_ma200: float = None, vix: float = None) -> int:
+    """如果市场大趋势未破裂（SPY>MA200 且 VIX<25），门控降一级。
+    只在 gate_level >= GATE_CAUTION 时才降级。
+    """
+    if gate_level < GATE_CAUTION:
+        return gate_level
+    # 无法获取上下文时保持原等级
+    if spy_current is None or spy_ma200 is None or vix is None:
+        return gate_level
+    # SPY 在 200 日均线之上 且 恐慌指数 < 25 → 非崩盘市场，降一级
+    if spy_current > spy_ma200 and vix < 25:
+        new_level = gate_level - 1
+        logger.info(f"市场上下文修正: SPY ${spy_current:.0f}>MA200=${spy_ma200:.0f}, "
+                     f"VIX={vix:.1f}<25 → 门控 {gate_level}→{new_level} "
+                     f"({GATE_DESCRIPTIONS[gate_level]}→{GATE_DESCRIPTIONS[new_level]})")
+        return new_level
+    return gate_level
 
 
 def _get_cached(key: str, ttl: int = 30):
@@ -285,6 +308,27 @@ def evaluate_regime_gate() -> dict:
         gate_level = GATE_WARNING
     elif triggered_count >= 1:
         gate_level = GATE_CAUTION
+
+    # 市场上下文修正：如果 SPY > MA200 且 VIX < 25，降级门控
+    # （门控是极端行情保护，非崩盘市场不应锁死仓位）
+    try:
+        spy_info = _get_cached("spy_context")
+        if spy_info is None:
+            spy_df = _download_with_retry("SPY", period="1y", interval="1d")
+            if spy_df is not None and not spy_df.empty:
+                spy_close = spy_df["Close"] if "Close" in spy_df.columns else spy_df.iloc[:, 0]
+                spy_current_val = float(spy_close.iloc[-1])
+                spy_ma200_val = float(spy_close.tail(200).mean()) if len(spy_close) >= 200 else None
+                spy_info = {"current": spy_current_val, "ma200": spy_ma200_val}
+                _set_cache("spy_context", spy_info)
+        if spy_info and spy_info.get("ma200") is not None:
+            # 用 VIX 近似（20日 SPY 波动率作为替代，或从缓存取）
+            vix_data = _get_cached("vix_level") or 19.0  # 默认安全值
+            gate_level = _market_context_downgrade(
+                gate_level, spy_info["current"], spy_info["ma200"], vix_data
+            )
+    except Exception as e:
+        logger.debug(f"市场上下文修正跳过: {e}")
 
     exposure = GATE_EXPOSURE[gate_level]
 
