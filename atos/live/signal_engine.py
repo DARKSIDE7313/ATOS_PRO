@@ -13,12 +13,16 @@ import os
 import time
 import math
 import threading
+import socket
 import pandas as pd
 import yfinance as yf
 from functools import lru_cache
 from datetime import datetime, timedelta
 from atos.core.universe import ALL_SYMBOLS, LONG_TERM_SYMBOLS, SHORT_TERM_SYMBOLS
 from atos.core.logging import get_logger, log_signal, log_error
+
+# 🆕 全局 socket 超时 — 防止 yfinance HTTP 请求永久卡死
+socket.setdefaulttimeout(30)
 
 logger = get_logger("signal_engine")
 
@@ -33,67 +37,70 @@ except ImportError:
 # Bug #10: yfinance 缓存层 — 仅在交易日内缓存，周末不缓存
 _cache = {}  # {symbol: (timestamp, dataframe)}
 
+# v11: 信号缓存 — 防止 yfinance/Futu 全部宕机时系统完全停摆
+# 文件持久化, 重启也能恢复
+import os as _os
+_SIGNAL_CACHE_FILE = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))), "data", "signal_cache.json")
+_signal_cache: dict = {}       # 上周期完整信号
+_signal_cache_ts = None        # 缓存时间
+_SIGNAL_CACHE_TTL = 30 * 60    # 30分钟有效期
+_MAX_CACHE_CYCLES = 5          # 最多用缓存跑5个周期
+
+def _load_signal_cache():
+    global _signal_cache, _signal_cache_ts
+    try:
+        if _os.path.exists(_SIGNAL_CACHE_FILE):
+            with open(_SIGNAL_CACHE_FILE) as f:
+                data = json.load(f)
+            _signal_cache = data.get("signals", {})
+            ts = data.get("timestamp")
+            if ts:
+                _signal_cache_ts = datetime.fromisoformat(ts)
+            if _signal_cache:
+                logger.info(f"📦 信号缓存恢复: {len(_signal_cache)} 只标的")
+    except Exception:
+        pass
+
+def _save_signal_cache():
+    try:
+        _os.makedirs(_os.path.dirname(_SIGNAL_CACHE_FILE), exist_ok=True)
+        with open(_SIGNAL_CACHE_FILE, "w") as f:
+            json.dump({"signals": _signal_cache, "timestamp": datetime.now().isoformat()}, f)
+    except Exception:
+        pass
+
+# 模块加载时恢复缓存
+_load_signal_cache()
+
 # 🔒 yfinance 全局线程锁 — 防止多线程并发写损坏 SQLite 缓存
 # 2026-06-23 深度审计修复：yfinance SQLite 在多线程下频繁 disk I/O error
 _yf_lock = threading.Lock()
 
 # 自愈: yfinance SQLite 缓存修复
 def _repair_yfinance_cache():
-    """yfinance 的 SQLite 缓存 (tkr-tz.db/cookies.db) 有时会在异常退出后留下 .db-wal/.db-shm 
-    残留文件，导致后续下载失败 'unable to open database file'。
-    同时也修复 'no such table: _tz_kv' 错误——yfinance 懒创建表时多线程竞争会失败。
-    
-    BUGFIX 2026-06-11: 表名 _tz_kv 是错的，yfinance 实际用的是 tkr-tz 表。
-                      同时添加完整表创建和权限修复。"""
+    """清除 yfinance SQLite 缓存的 WAL/SHM 残留文件。
+
+    仅清除 1 小时以上的残留（异常退出后留下的）。正常的 WAL 文件
+    是 SQLite WAL 模式的正常工作文件，不应该被删除。"""
     import glob
-    import sqlite3
-    import stat
     cache_dir = os.path.expanduser('~/Library/Caches/py-yfinance')
-    if not os.path.exists(cache_dir):
-        os.makedirs(cache_dir, exist_ok=True)
-        return
-    
-    # 1. 清除 WAL/SHM 残留
+    os.makedirs(cache_dir, exist_ok=True)
+
+    now = time.time()
+    cleaned = 0
     for pattern in ('*.db-wal', '*.db-shm'):
         for f in glob.glob(os.path.join(cache_dir, pattern)):
             try:
-                os.remove(f)
-                logger.warning(f"自愈: 已清除 yfinance 缓存残留 {os.path.basename(f)}")
+                mtime = os.path.getmtime(f)
+                # 只清除 1 小时以上的残留（当前运行不会被误删）
+                if now - mtime > 3600:
+                    os.remove(f)
+                    cleaned += 1
+                    logger.debug(f"自愈: 已清除 yfinance 缓存残留 {os.path.basename(f)} (age={now-mtime:.0f}s)")
             except OSError:
                 pass
-    
-    # 2. 预创建 yfinance 需要的表（表名必须匹配 yfinance 内部使用）
-    # 3. 修复权限，防止 Permission denied
-    for db_name in ('tkr-tz.db', 'cookies.db'):
-        db_path = os.path.join(cache_dir, db_name)
-        try:
-            with _yf_lock:  # 🔒 串行化缓存修复
-                conn = sqlite3.connect(db_path)
-                # 启用 WAL 模式 — 多线程读写更安全
-                conn.execute("PRAGMA journal_mode=WAL")
-                # yfinance 实际用的表是 tkr-tz，不是 _tz_kv
-                conn.execute("CREATE TABLE IF NOT EXISTS 'tkr-tz' (key TEXT PRIMARY KEY, value TEXT)")
-                # yfinance 1.4.1 需要额外列和新表
-                for col in ['strategy', 'exchange']:
-                    try:
-                        conn.execute(f"ALTER TABLE 'tkr-tz' ADD COLUMN {col} TEXT DEFAULT ''")
-                    except Exception:
-                        pass  # 列已存在
-                conn.execute("CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT)")
-                conn.execute("CREATE TABLE IF NOT EXISTS cookie (key TEXT PRIMARY KEY, value TEXT)")
-                conn.execute("CREATE TABLE IF NOT EXISTS '_cookieschema' (key TEXT PRIMARY KEY, value TEXT)")
-                conn.execute("CREATE TABLE IF NOT EXISTS _tz_kv (key TEXT PRIMARY KEY, value TEXT)")
-                conn.execute("CREATE TABLE IF NOT EXISTS cache (key TEXT PRIMARY KEY, value TEXT)")
-                conn.commit()
-                conn.close()
-            # 修复权限（防止其他进程不能写）
-            try:
-                os.chmod(db_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP)
-            except Exception:
-                pass
-            logger.info(f"自愈: 已重建 yfinance 缓存 {db_name} (含正确表名 tkr-tz)")
-        except Exception as e:
-            logger.warning(f"自愈: 缓存 {db_name} 创建失败: {e}")
+    if cleaned:
+        logger.info(f"自愈: 共清除 {cleaned} 个过期 WAL/SHM 残留文件")
 
 # 启动时修复一次
 _repair_yfinance_cache()
@@ -145,8 +152,15 @@ def _get_cached_data(symbol: str, period: str = "1y", interval: str = "1d"):
     return pd.DataFrame()
 
 
+# v11: 批量下载熔断 — 如果>50%失败, 标记周末/宕机, 跳过后续单只下载
+_batch_fail_count = 0
+_batch_circuit_open = False
+
 def _prefetch_batch(symbols: list[str]) -> None:
-    """🚀 批量预下载所有股票数据到缓存（一次性调用，快 10-60 倍）"""
+    """🚀 批量预下载所有股票数据到缓存（一次性调用，快 10-60 倍）
+    v11: 如果批量下载全部失败 → 标记熔断, 不浪费时间去逐个下载"""
+    global _batch_fail_count, _batch_circuit_open
+
     need_fetch = []
     now = datetime.now()
     for sym in symbols:
@@ -159,6 +173,11 @@ def _prefetch_batch(symbols: list[str]) -> None:
 
     if len(need_fetch) < 5:
         return  # 太少不值得批量
+
+    # v11: 熔断检查
+    if _batch_circuit_open:
+        logger.warning(f"🔌 批量下载已熔断 — 跳过 {len(need_fetch)} 只标的下载")
+        return
 
     try:
         ticker_str = " ".join(need_fetch)
@@ -180,8 +199,23 @@ def _prefetch_batch(symbols: list[str]) -> None:
                     _cache[key] = (now, df_sym)
             except Exception:
                 pass
-        logger.info(f"✅ 批量预下载完成")
+        # v11: 检查批量下载成功率
+        fetched = sum(1 for sym in need_fetch if f"{sym}:1y:1d" in _cache)
+        success_rate = fetched / len(need_fetch) if need_fetch else 0
+        if success_rate < 0.5 and len(need_fetch) > 20:
+            _batch_fail_count += 1
+            if _batch_fail_count >= 2:
+                _batch_circuit_open = True
+                logger.critical(f"🔌 批量下载连续失败 → 熔断! (成功率={success_rate:.0%})")
+        else:
+            _batch_fail_count = 0
+            _batch_circuit_open = False
+        logger.info(f"✅ 批量预下载完成 ({fetched}/{len(need_fetch)} 成功)")
     except Exception as e:
+        _batch_fail_count += 1
+        if _batch_fail_count >= 2:
+            _batch_circuit_open = True
+            logger.critical(f"🔌 批量下载异常 → 熔断! ({e})")
         logger.warning(f"批量下载失败（将逐个下载）: {e}")
 
 def clear_cache():
@@ -518,8 +552,32 @@ def get_realtime_signals(symbols: list[str] = None,
     """
     # 1. 先用 yfinance 计算历史指标
     signals = get_signals(symbols)
+
+    # v11: 如果信号为空，使用上周期缓存（防止 yfinance 全部超时时系统停摆）
+    global _signal_cache, _signal_cache_ts
+    if not signals and _signal_cache:
+        age = (datetime.now() - _signal_cache_ts).total_seconds() if _signal_cache_ts else 999
+        cache_cycles = getattr(get_realtime_signals, '_cache_cycles_used', 0)
+        if age < _SIGNAL_CACHE_TTL and cache_cycles < _MAX_CACHE_CYCLES:
+            logger.warning(f"⚠️ 信号引擎返回空 → 使用缓存 (已{cache_cycles+1}次, 缓存{age:.0f}s前)")
+            signals = dict(_signal_cache)  # 浅拷贝
+            for sym in signals:
+                signals[sym]["data_source"] = "CACHED (yfinance降级)"
+                signals[sym]["realtime_price"] = signals[sym].get("price", 0)
+            get_realtime_signals._cache_cycles_used = cache_cycles + 1
+            return signals
+        elif cache_cycles >= _MAX_CACHE_CYCLES:
+            logger.error(f"❌ 信号缓存已用{cache_cycles}次(上限{_MAX_CACHE_CYCLES}) → 放弃, 等数据恢复")
+            return {}
+
     if not signals:
         return signals
+
+    # v11: 更新缓存 (内存+文件)
+    _signal_cache = dict(signals)
+    _signal_cache_ts = datetime.now()
+    get_realtime_signals._cache_cycles_used = 0
+    _save_signal_cache()  # 持久化到磁盘
 
     # 2. 如果不使用实时数据源，直接返回
     if not use_realtime or not _REALTIME_AVAILABLE:

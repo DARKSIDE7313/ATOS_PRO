@@ -13,8 +13,12 @@ from atos.longterm.serenity import serenity_quality_filter
 import concurrent.futures
 import threading
 import time
+import socket
 
 logger = get_logger("factors.quality")
+
+# 🆕 全局 socket 超时 — 防止 yfinance HTTP 请求永久卡死
+socket.setdefaulttimeout(30)
 
 # yfinance 全局锁 — 防止多线程并发写 SQLite 缓存
 _yf_lock = threading.Lock()
@@ -97,17 +101,22 @@ def batch_quality_factors(symbols: list[str]) -> dict:
     最终 composite = (1 - SERENITY_BLEND_WEIGHT) * 传统质量得分
                     + SERENITY_BLEND_WEIGHT * Serenity 瓶颈得分
     """
-    # 1) 传统质量因子（并行）
+    # 1) 传统质量因子（并行，带超时保护不卡死）
     results = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=6)
+    try:
         fut_to_sym = {pool.submit(get_quality_factors, sym): sym for sym in symbols}
-        for fut in concurrent.futures.as_completed(fut_to_sym, timeout=60):
+        for fut in concurrent.futures.as_completed(fut_to_sym, timeout=90):
             sym = fut_to_sym[fut]
             try:
-                results[sym] = fut.result()
+                results[sym] = fut.result(timeout=15)
             except Exception as e:
                 logger.warning(f"{sym} 质量因子并行超时: {e}")
                 results[sym] = {"composite": 0.0}
+    except (concurrent.futures.TimeoutError, TimeoutError):
+        logger.warning(f"质量因子批次超时，取消剩余任务")
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
 
     # 2) Serenity 瓶颈质量评分
     try:
@@ -117,8 +126,20 @@ def batch_quality_factors(symbols: list[str]) -> dict:
         logger.warning("Serenity quality filter unavailable — skipping")
         serenity_scores = {}
 
-    # 3) 融合
+    # 3) 融合 — 自适应权重：Serenity 无信号时自动降权
     blend = SERENITY_BLEND_WEIGHT
+    if serenity_scores:
+        s_comps = [v.get("composite", 0.3) for v in serenity_scores.values()]
+        if s_comps:
+            import numpy as _np
+            s_std = float(_np.std(s_comps))
+            # Serenity分数极压缩(std<0.05) → 几乎无信号 → 降权到5%
+            if s_std < 0.05:
+                blend = 0.05
+                logger.info(f"Serenity信号弱(std={s_std:.4f})，权重降至{blend:.0%}")
+            elif s_std < 0.10:
+                blend = 0.15
+                logger.info(f"Serenity信号偏弱(std={s_std:.4f})，权重降至{blend:.0%}")
     for sym in symbols:
         if sym in results:
             q_comp = results[sym].get("composite", 0.5)

@@ -203,6 +203,8 @@ class FutuRealtimeFeed:
         self._keepalive_thread: Optional[threading.Thread] = None
         self._keepalive_stop = threading.Event()
         self._ws_handler_set = False
+        self._reconnect_attempts = 0   # v5: 重连退避计数
+        self._last_reconnect_time = 0  # v5: 上次重连时间
 
         # 启动时尝试连接
         self._connect()
@@ -300,12 +302,52 @@ class FutuRealtimeFeed:
             return "FutuOpenD (实时)"
         return "yfinance (15-20 分钟延迟) ⚠️"
 
+    def _ensure_connected(self) -> bool:
+        """确保 FutuOpenD 连接可用。不可用时自动重连一次。"""
+        if self._connected and not self._fallback and self._futu_ctx is not None:
+            # Quick health check: try to ping
+            try:
+                ret, _ = self._futu_ctx.get_global_state()
+                if ret == 0:  # RET_OK
+                    return True
+            except Exception:
+                pass
+            # Connection dead — mark disconnected
+            logger.warning("FutuOpenD 健康检查失败 — 连接已断开")
+            self._connected = False
+
+        # Try reconnection once
+        if not self._connected or self._fallback:
+            import time as _time
+            self._reconnect_attempts += 1
+            backoff = min(60, 2 * (2 ** min(self._reconnect_attempts, 5)))
+            if _time.time() - self._last_reconnect_time < backoff:
+                return False  # Still in backoff
+            self._last_reconnect_time = _time.time()
+            logger.info(f"🔄 尝试重连FutuOpenD (第{self._reconnect_attempts}次)...")
+            self._disconnect()
+            self._connect()
+            if self._connected and not self._fallback:
+                self._reconnect_attempts = 0
+                # Re-subscribe
+                with self._lock:
+                    symbols = list(self._subscribed)
+                if symbols:
+                    self._futu_subscribe(symbols)
+                logger.info("✅ FutuOpenD 重连成功!")
+                return True
+            else:
+                logger.warning(f"❌ FutuOpenD 重连失败 — 继续降级到yfinance")
+                return False
+
+        return self._connected and not self._fallback
+
     def reconnect(self) -> bool:
         """手动触发重连"""
+        self._reconnect_attempts = 0
         self._disconnect()
         self._connect()
         if self._connected and not self._fallback:
-            # 重新订阅
             with self._lock:
                 symbols = list(self._subscribed)
             if symbols:
@@ -457,9 +499,10 @@ class FutuRealtimeFeed:
             self._ws_handler_set = False
 
     def _futu_subscribe(self, symbols: list[str]) -> bool:
-        """通过 FutuOpenD API 订阅实时报价"""
+        """通过 FutuOpenD API 订阅实时报价（含自动重连）"""
         if not self._futu_ctx or not self._connected:
-            return False
+            if not self._ensure_connected():
+                return False
 
         try:
             from futu import SubType, RET_OK
@@ -524,11 +567,14 @@ class FutuRealtimeFeed:
 
     def _keepalive_loop(self):
         """
-        Keepalive 线程 — 每 30 秒检查连接状态。
-        
-        如果连接断开，尝试重连并重新订阅。
+        Keepalive 线程 v5 — 智能退避重连。
+
+        - 周末/闭市时段跳过重连（节省资源）
+        - 重连失败后指数退避（5s→10s→20s→...最長5分钟）
+        - 避免频繁创建 OpenQuoteContext 打爆 FutuOpenD 连接数
         """
-        logger.debug("FutuOpenD keepalive 线程启动")
+        import time as _time
+        logger.debug("FutuOpenD keepalive 线程启动 (v5 智能退避)")
         while not self._keepalive_stop.is_set():
             try:
                 # 每 30 秒检查一次
@@ -536,10 +582,24 @@ class FutuRealtimeFeed:
                     break
 
                 if not self._connected or self._futu_ctx is None:
-                    logger.warning("FutuOpenD 连接断开，尝试重连...")
+                    # v5: 周末跳过重连
+                    from datetime import datetime, timezone
+                    now_utc = datetime.now(timezone.utc)
+                    if now_utc.weekday() >= 5:  # 周六日
+                        continue
+
+                    # v5: 指数退避
+                    self._reconnect_attempts += 1
+                    backoff = min(300, 5 * (2 ** min(self._reconnect_attempts, 6)))
+                    if _time.time() - self._last_reconnect_time < backoff:
+                        continue  # 还没到退避时间
+
+                    self._last_reconnect_time = _time.time()
+                    logger.warning(f"FutuOpenD 连接断开，尝试重连... (尝试#{self._reconnect_attempts}, 退避{backoff}s)")
                     self._disconnect()
                     self._connect()
                     if self._connected and not self._fallback:
+                        self._reconnect_attempts = 0  # 重置计数
                         with self._lock:
                             symbols = list(self._subscribed)
                         if symbols:
