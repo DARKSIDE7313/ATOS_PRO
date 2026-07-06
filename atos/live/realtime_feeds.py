@@ -58,14 +58,14 @@ class RealtimePriceCache:
     _instance = None
     _lock = threading.RLock()
 
-    def __new__(cls, ttl_seconds: int = 5):
+    def __new__(cls, ttl_seconds: int = 1):
         with cls._lock:
             if cls._instance is None:
                 cls._instance = super().__new__(cls)
                 cls._instance._initialized = False
             return cls._instance
 
-    def __init__(self, ttl_seconds: int = 5):
+    def __init__(self, ttl_seconds: int = 1):
         if getattr(self, "_initialized", False):
             return
         self._initialized = True
@@ -194,7 +194,7 @@ class FutuRealtimeFeed:
         self.host = host
         self.port = port
         self.api_version = api_version
-        self.cache = RealtimePriceCache(ttl_seconds=5)
+        self.cache = RealtimePriceCache(ttl_seconds=1)
         self._subscribed: set[str] = set()
         self._connected = False
         self._fallback = False  # True = 使用 yfinance 降级

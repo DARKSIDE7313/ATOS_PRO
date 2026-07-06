@@ -339,7 +339,7 @@ def _scalar(val):
 
 # 🆕 新闻催化剂分数 — 从Yahoo Finance RSS获取标题，关键词匹配加分
 _NEWS_CACHE = {}
-_NEWS_TTL = timedelta(hours=2)
+_NEWS_TTL = timedelta(minutes=10)  # 10分钟新闻缓存 — 确保资讯时效性
 
 NEWS_KEYWORDS = {
     'surge': 0.10, 'rally': 0.12, 'upgrade': 0.15, 'beat': 0.10,

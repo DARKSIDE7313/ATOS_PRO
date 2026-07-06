@@ -573,6 +573,20 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
     if "yfinance" in str(ds) and "Futu" not in str(ds):
         logger.warning(f"⚠️ 数据源降级: {ds} — 价格有15-20分钟延迟!")
 
+    # 数据时效性检查 — Futu价格必须新鲜
+    try:
+        from atos.live.realtime_feeds import get_feed
+        feed = get_feed()
+        cache_stats = feed.cache.stats
+        max_age = cache_stats.get("max_age_sec", 0)
+        if max_age > 10:
+            logger.warning(f"⏰ Futu数据过期: 最旧{max_age:.0f}秒 — 强制重连!")
+            feed.reconnect()
+        elif max_age > 3:
+            logger.debug(f"Futu数据年龄: 最旧{max_age:.1f}秒")
+    except Exception:
+        pass
+
     # ---- 3. 因子 ----
     symbols = sorted(signals.keys())[:66]  # 全部信号标的都跑因子
     top_picks = []
