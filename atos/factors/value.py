@@ -8,14 +8,20 @@ import yfinance as yf
 from atos.core.logging import get_logger, log_error
 import concurrent.futures
 import threading
+import socket
 
 logger = get_logger("factors.value")
+
+# 🆕 全局 socket 超时 — 防止 yfinance HTTP 请求永久卡死
+# 这是最关键的防御：requests 库默认无超时，闭市/网络问题时线程永久阻塞
+socket.setdefaulttimeout(30)
 
 # yfinance 全局锁 — 防止多线程并发写 SQLite 缓存
 _yf_lock = threading.Lock()
 
 # 闭市时段 Yahoo Finance API 经常超时，全局超时控制
-_INFO_TIMEOUT = 20  # 单只最多等20秒
+_INFO_TIMEOUT = 15             # 单只最多等 15 秒（从 20 收紧）
+_BATCH_TOTAL_TIMEOUT = 120     # 整批最多等 120 秒
 
 
 def get_value_factors(symbol: str) -> dict:
@@ -29,7 +35,10 @@ def get_value_factors(symbol: str) -> dict:
         # 加超时防止闭市时段卡死
         info = stock.info or {}
     except Exception as e:
-        log_error("value", f"{symbol}: {e}")
+        if "curl" in str(e) or "resolve host" in str(e) or "Recv failure" in str(e):
+            logger.warning(f"value {symbol}: yfinance网络波动 — {str(e)[:80]}")
+        else:
+            log_error("value", f"{symbol}: {e}")
         return _empty()
 
     # 原始数据提取
@@ -84,24 +93,27 @@ def get_value_factors(symbol: str) -> dict:
 
 
 def batch_value_factors(symbols: list[str]) -> dict:
-    """批量获取价值因子（并行，闭市时每个标的20秒超时兜底）"""
+    """批量获取价值因子（并行，带超时保护不卡死）"""
     results = {}
-    # 使用 ThreadPoolExecutor 并行获取，减少总等待时间
-    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=6)
+    try:
         fut_to_sym = {pool.submit(get_value_factors, sym): sym for sym in symbols}
         done_count = 0
-        for fut in concurrent.futures.as_completed(fut_to_sym, timeout=_INFO_TIMEOUT * 3):
+        for fut in concurrent.futures.as_completed(fut_to_sym, timeout=_BATCH_TOTAL_TIMEOUT):
             sym = fut_to_sym[fut]
             try:
                 results[sym] = fut.result(timeout=_INFO_TIMEOUT)
             except Exception as e:
                 log_error("value", f"{sym}: {e}")
-                for f in fut_to_sym:
-                    f.cancel()
                 results[sym] = _empty()
             done_count += 1
             if done_count % 10 == 0:
                 logger.info(f"价值因子进度: {done_count}/{len(symbols)}")
+    except (concurrent.futures.TimeoutError, TimeoutError):
+        logger.warning(f"价值因子批次超时 ({_BATCH_TOTAL_TIMEOUT}s)，取消剩余任务")
+    finally:
+        # 🆕 关键修复：强制关闭线程池，cancel 所有未完成的任务
+        pool.shutdown(wait=False, cancel_futures=True)
     logger.info(f"价值因子完成: {len(results)} 只")
     return results
 

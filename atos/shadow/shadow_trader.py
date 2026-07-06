@@ -864,29 +864,35 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
                 real_positions = []
                 for sym, pos in account.positions.items():
                     sig = signals.get(sym, {})
-                    pnl = (sig.get("price", 0) - pos.avg_cost) / pos.avg_cost if pos.avg_cost > 0 else 0
+                    qty = pos.get("qty", 0) if isinstance(pos, dict) else getattr(pos, 'qty', 0)
+                    avg_cost = pos.get("avg_price", 0) if isinstance(pos, dict) else getattr(pos, 'avg_cost', 0)
+                    cur_price = sig.get("price", 0)
+                    pnl = (cur_price - avg_cost) / avg_cost if avg_cost > 0 else 0
+                    mkt_val = qty * cur_price
+                    total_eq = account.total_equity if account.total_equity > 0 else 1
                     real_positions.append({
-                        "symbol": sym, "qty": pos.shares,
-                        "avg_price": pos.avg_cost,
-                        "last_price": sig.get("price", 0),
-                        "pnl_pct": pnl, "weight": pos.market_value / account.equity if account.equity > 0 else 0,
-                        "rsi": sig.get("rsi", 50), "sector": bd.get("sector", "Unknown") if (bd := factor_result.get("breakdown", {}).get(sym, {})) else "Unknown",
-                        "days_held": (datetime.datetime.now().date() - pos.buy_date.date()).days if hasattr(pos, 'buy_date') and pos.buy_date else 0,
+                        "symbol": sym, "qty": qty,
+                        "avg_price": avg_cost,
+                        "last_price": cur_price,
+                        "pnl_pct": pnl, "weight": mkt_val / total_eq,
+                        "rsi": sig.get("rsi", 50),
+                        "sector": bd.get("sector", "Unknown") if (bd := factor_result.get("breakdown", {}).get(sym, {})) else "Unknown",
+                        "days_held": 0,
                         "trend": sig.get("trend", "NEUTRAL"),
                     })
 
                 snapshot = {
                     "market": {
                         "spy_price": spy_c[-1] if spy_c else 745,
-                        "spy_ma20": float(np.mean(spy_c[-20:])) if len(spy_c) >= 20 else (spy_c[-1] if spy_c else 745),
-                        "spy_ma50": float(np.mean(spy_c[-50:])) if len(spy_c) >= 50 else (spy_c[-1] if spy_c else 745),
+                        "spy_ma20": float(sum(spy_c[-20:]) / len(spy_c[-20:])) if len(spy_c) >= 20 else (spy_c[-1] if spy_c else 745),
+                        "spy_ma50": float(sum(spy_c[-50:]) / len(spy_c[-50:])) if len(spy_c) >= 50 else (spy_c[-1] if spy_c else 745),
                         "vix": round(current_vix, 1),
                         "regime": regime.get("regime", "UNKNOWN") if isinstance(regime, dict) else "UNKNOWN",
                         "spy_trend": spy_trend,
                         "sentiment": "NEUTRAL",
                         "fear_greed": 50,
                     },
-                    "total_equity": account.equity,
+                    "total_equity": account.total_equity,
                     "cash": account.cash,
                     "max_drawdown": getattr(account, 'max_drawdown_pct', 0),
                     "positions": real_positions,

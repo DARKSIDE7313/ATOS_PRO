@@ -104,7 +104,8 @@ def _repair_yfinance_cache():
 
 # 启动时修复一次
 _repair_yfinance_cache()
-_CACHE_TTL = timedelta(minutes=3)  # 3 分钟短缓存（比原来的5分钟更短）
+_CACHE_TTL = timedelta(minutes=15)  # 15分钟缓存 — 批量下载后单只不再重试下载
+_batch_success = False  # 批量下载成功标记 — 跳过单只重试
 
 def _should_skip_cache() -> bool:
     """如果是非交易日或盘后，跳过缓存使用实时数据"""
@@ -118,21 +119,28 @@ def _should_skip_cache() -> bool:
     return False
 
 def _get_cached_data(symbol: str, period: str = "1y", interval: str = "1d"):
-    """带缓存的 yfinance 下载，同一标的 3 分钟内只下载一次。
-    有实时数据时跳过缓存直接下载最新。"""
+    """带缓存的 yfinance 下载，同一标的 15 分钟内只下载一次。
+    批量下载成功后跳过单只重试。"""
+    global _batch_success
     key = f"{symbol}:{period}:{interval}"
     now = datetime.now()
     if key in _cache:
         ts, df = _cache[key]
         if now - ts < _CACHE_TTL:
             return df
-    
-    # 多轮重试：yfinance 在缓存重建后首次下载可能失败
-    max_attempts = 3
+
+    # 批量下载成功 → 单只下载没必要，直接用实时数据兜底
+    if _batch_success:
+        logger.debug(f"{symbol} 批量缓存未命中，使用空数据兜底（Futu实时价格可用）")
+        _cache[key] = (datetime.now(), pd.DataFrame())
+        return pd.DataFrame()
+
+    # 多轮重试
+    max_attempts = 2
     last_error = None
     for attempt in range(max_attempts):
         try:
-            with _yf_lock:  # 🔒 串行化 yfinance 下载，防止 SQLite 并发损坏
+            with _yf_lock:
                 try:
                     df = yf.download(symbol, period=period, interval=interval, progress=False, auto_adjust=True)
                 except Exception:
@@ -145,9 +153,9 @@ def _get_cached_data(symbol: str, period: str = "1y", interval: str = "1d"):
         except Exception as e:
             last_error = str(e)
         if attempt < max_attempts - 1:
-            time.sleep(1.5 * (attempt + 1))
-    
-    logger.warning(f"yfinance 下载失败 ({max_attempts}次重试): {symbol} — {last_error}")
+            time.sleep(1.0 * (attempt + 1))
+
+    logger.debug(f"{symbol}: yfinance单只下载失败 — {last_error}")
     _cache[key] = (datetime.now(), pd.DataFrame())
     return pd.DataFrame()
 
@@ -211,6 +219,8 @@ def _prefetch_batch(symbols: list[str]) -> None:
             _batch_fail_count = 0
             _batch_circuit_open = False
         logger.info(f"✅ 批量预下载完成 ({fetched}/{len(need_fetch)} 成功)")
+        global _batch_success
+        _batch_success = fetched >= len(need_fetch) * 0.8  # 80%以上算成功
     except Exception as e:
         _batch_fail_count += 1
         if _batch_fail_count >= 2:
@@ -524,7 +534,11 @@ def get_signals(symbols: list[str] = None) -> dict:
         except Exception as e:
             log_error("signal_engine", f"{sym}: {e}")
 
-    logger.info(f"信号计算完成: {len(results)}/{total} 只标的")
+    skipped = total - len(results)
+    if skipped > 0:
+        logger.warning(f"信号计算完成: {len(results)}/{total} 只标的 ({skipped}只跳过, yfinance数据不可用)")
+    else:
+        logger.info(f"信号计算完成: {len(results)}/{total} 只标的")
     return results
 
 

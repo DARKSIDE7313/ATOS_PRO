@@ -43,7 +43,11 @@ def get_quality_factors(symbol: str) -> dict:
                 logger.debug(f"{symbol} quality retry {attempt+1}/{MAX_QUALITY_RETRIES}: {e}")
                 time.sleep(1.0 * (attempt + 1))
             else:
-                log_error("quality", f"{symbol}: {e}")
+                # yfinance网络波动属于正常现象，降级为WARNING
+                if "curl" in str(e) or "resolve host" in str(e) or "Recv failure" in str(e):
+                    logger.warning(f"quality {symbol}: yfinance网络波动 — {str(e)[:80]}")
+                else:
+                    log_error("quality", f"{symbol}: {e}")
                 return _empty()
 
     roe = info.get("returnOnEquity")

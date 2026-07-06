@@ -10,8 +10,12 @@ from datetime import datetime, timedelta
 from atos.core.logging import get_logger, log_error
 import concurrent.futures
 import threading
+import socket
 
 logger = get_logger("factors.momentum")
+
+# 🆕 全局 socket 超时 — 防止 yfinance HTTP 请求永久卡死
+socket.setdefaulttimeout(30)
 
 # yfinance 全局锁 — 防止多线程并发写 SQLite 缓存
 _yf_lock = threading.Lock()
@@ -92,22 +96,30 @@ def get_momentum_factors(symbol: str) -> dict:
         }
 
     except Exception as e:
-        log_error("momentum", f"{symbol}: {e}")
+        if "curl" in str(e) or "resolve host" in str(e) or "Recv failure" in str(e):
+            logger.warning(f"momentum {symbol}: yfinance网络波动 — {str(e)[:80]}")
+        else:
+            log_error("momentum", f"{symbol}: {e}")
         return _empty()
 
 
 def batch_momentum_factors(symbols: list[str]) -> dict:
-    """批量获取动量因子（并行）"""
+    """批量获取动量因子（并行，带超时保护不卡死）"""
     results = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=6)
+    try:
         fut_to_sym = {pool.submit(get_momentum_factors, sym): sym for sym in symbols}
-        for fut in concurrent.futures.as_completed(fut_to_sym, timeout=60):
+        for fut in concurrent.futures.as_completed(fut_to_sym, timeout=90):
             sym = fut_to_sym[fut]
             try:
-                results[sym] = fut.result()
+                results[sym] = fut.result(timeout=15)
             except Exception as e:
                 logger.warning(f"{sym} 动量因子并行超时: {e}")
                 results[sym] = {"composite": 0.0}
+    except (concurrent.futures.TimeoutError, TimeoutError):
+        logger.warning(f"动量因子批次超时，取消剩余任务")
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
     logger.info(f"动量因子完成: {len(results)} 只")
     return results
 
