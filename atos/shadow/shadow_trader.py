@@ -579,7 +579,7 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
         feed = get_feed()
         cache_stats = feed.cache.stats
         max_age = cache_stats.get("max_age_sec", 0)
-        if max_age > 10:
+        if max_age > 60:
             logger.warning(f"⏰ Futu数据过期: 最旧{max_age:.0f}秒 — 强制重连!")
             feed.reconnect()
         elif max_age > 3:
@@ -1162,19 +1162,19 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
             logger.info(f"⏭ {sym} score={pick['score']:.2f}<{base_score_threshold} 跳过，分数太低")
             continue
 
-        # RSI过滤 — v10 放宽: 75上限/20下限 (原 70/25)
+        # RSI过滤 — v11 放宽: 85上限/15下限 (原 75/20, 牛市中大把RSI>70的好票)
         rsi = signals.get(sym, {}).get("rsi", 50)
-        if rsi > 75:
-            logger.info(f"⏭ {sym} RSI={rsi:.0f}>75 超买，跳过")
+        if rsi > 85:
+            logger.info(f"⏭ {sym} RSI={rsi:.0f}>85 超买，跳过")
             continue
-        if rsi < 20:
-            logger.info(f"⏭ {sym} RSI={rsi:.0f}<20 极端超卖，等企稳")
+        if rsi < 15:
+            logger.info(f"⏭ {sym} RSI={rsi:.0f}<15 极端超卖，等企稳")
             continue
 
-        # 缩量过滤 (v10: 0.35→0.25 — 进一步放宽)
+        # 缩量过滤 — v11 放宽: 0.25→0.10 (盘初常有缩量)
         vol_r = signals.get(sym, {}).get("volume_ratio", 1.0)
-        if vol_r < 0.25:
-            logger.info(f"⏭ {sym} 缩量 vol_r={vol_r:.2f}<0.25")
+        if vol_r < 0.10:
+            logger.info(f"⏭ {sym} 极度缩量 vol_r={vol_r:.2f}<0.10")
             continue
 
         # 🆕 v8: MACD确认 — 回调市MACD必须>0
@@ -1183,10 +1183,10 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
             logger.info(f"⏭ {sym} MACD负({macd_hist:.4f}) 回调市禁开")
             continue
 
-        # MA200偏离过滤 — v8 收紧：从 25% 降到 20%，高位不追
+        # MA200偏离过滤 — v11 放宽: 20%→50% (牛市趋势股常大幅偏离)
         ma200 = signals.get(sym, {}).get("ma200", 0)
-        if ma200 > 0 and price > ma200 * 1.20:
-            logger.info(f"⏭ {sym} 价格偏离MA200>{((price/ma200-1)*100):.0f}%>20%")
+        if ma200 > 0 and price > ma200 * 1.50:
+            logger.info(f"⏭ {sym} 价格偏离MA200>{((price/ma200-1)*100):.0f}%>50%")
             continue
 
         # v9: 允许加仓 — 包括小幅浮亏 (<5%)
