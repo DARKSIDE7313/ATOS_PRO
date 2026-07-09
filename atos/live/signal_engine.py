@@ -129,9 +129,17 @@ def _get_cached_data(symbol: str, period: str = "1y", interval: str = "1d"):
         if now - ts < _CACHE_TTL:
             return df
 
-    # 批量下载成功 → 单只下载没必要，直接用实时数据兜底
+    # 批量下载成功但缓存未命中 → 试一次单只下载，不行再兜底
     if _batch_success:
-        logger.debug(f"{symbol} 批量缓存未命中，使用空数据兜底（Futu实时价格可用）")
+        try:
+            with _yf_lock:
+                df = yf.download(symbol, period=period, interval=interval, progress=False, auto_adjust=True)
+            if df is not None and not df.empty:
+                _cache[key] = (datetime.now(), df)
+                return df
+        except Exception:
+            pass
+        logger.debug(f"{symbol}: 批量+单只均失败，使用空数据兜底")
         _cache[key] = (datetime.now(), pd.DataFrame())
         return pd.DataFrame()
 
