@@ -1697,6 +1697,8 @@ def main():
                 time.sleep(backoff)
             else:
                 logger.error(f"⚠️ 未知错误，60s后继续: {err_type}: {err[:80]}")
+                import traceback as _tb
+                logger.debug(f"完整回溯:\n{_tb.format_exc()}")
                 time.sleep(60)
 
     # 保存最终状态
