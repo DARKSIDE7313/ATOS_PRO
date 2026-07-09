@@ -672,6 +672,47 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
         logger.critical(f"🚨 相关性崩盘: {stp_count}只持仓触发止损 — 本周期暂停新开仓")
         is_market_hours = False  # 强制跳过新开仓
 
+    # ── v12: 主动组合轮动 — 卖弱买强 ──
+    # 每 ~30 周期 (约2.5小时) 评估一次持仓, 卖出最弱的
+    ROTATION_INTERVAL = 30
+    if account.cycle_count % ROTATION_INTERVAL == 0 and account.positions:
+        # 计算每个持仓的综合分数
+        pos_scores = {}
+        for sym, pos in account.positions.items():
+            sig = signals.get(sym, {})
+            bd = factor_result.get("breakdown", {}).get(sym, {}) if factor_result else {}
+            price = sig.get("price", pos.get("avg_price", 0))
+            pnl = (price - pos["avg_price"]) / pos["avg_price"] if pos["avg_price"] > 0 else 0
+            # 综合分 = 因子分 * 0.5 + 动量分 * 0.3 - 跌幅惩罚
+            factor_score = bd.get("value", 0.5) * 0.3 + bd.get("momentum", 0.5) * 0.4 + bd.get("quality", 0.5) * 0.3
+            pos_scores[sym] = factor_score - max(0, -pnl) * 0.5  # 亏损惩罚
+
+        if pos_scores:
+            # 找出最弱的 25% 持仓
+            sorted_pos = sorted(pos_scores.items(), key=lambda x: x[1])
+            weak_count = max(1, len(sorted_pos) // 4)
+            for sym, score in sorted_pos[:weak_count]:
+                pos = account.positions[sym]
+                pnl = (signals.get(sym, {}).get("price", pos["avg_price"]) - pos["avg_price"]) / pos["avg_price"] if pos["avg_price"] > 0 else 0
+                if pnl < 0.02:  # 只在亏损或微利时轮换
+                    px = signals.get(sym, {}).get("price", 0)
+                    if px > 0:
+                        account.execute(sym, "SELL", pos["qty"], px,
+                                      reason=f"组合轮动 (因子分{score:.2f}, PnL{pnl:.1%})")
+                        logger.info(f"🔄 轮动卖出: {sym} {pos['qty']}股 (因子分{score:.3f}, PnL{pnl:.1%})")
+
+    # ── v12: 部分止盈 (涨5%卖1/3) ──
+    for sym, pos in list(account.positions.items()):
+        px = signals.get(sym, {}).get("price", pos.get("avg_price", 0))
+        if px <= 0: continue
+        pnl = (px - pos["avg_price"]) / pos["avg_price"] if pos["avg_price"] > 0 else 0
+        if pnl >= 0.05 and pos["qty"] >= 3:
+            sell_qty = pos["qty"] // 3
+            if sell_qty > 0:
+                account.execute(sym, "SELL", sell_qty, px,
+                              reason=f"部分止盈 +{pnl:.1%} (卖1/3锁定利润)")
+                logger.info(f"💰 部分止盈: {sym} {sell_qty}/{pos['qty']}股 +{pnl:.1%}")
+
     # 4b. 追踪止损（每个标的独立判断）
     # BUGFIX 2026-06-11: 
     #   - BEAR/CAUTIOUS 趋势下完全关闭追踪止损（不是只是不创建新的）
