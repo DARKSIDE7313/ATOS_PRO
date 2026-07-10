@@ -788,11 +788,30 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
             continue
         pnl_pct = (price - pos["avg_price"]) / pos["avg_price"] if pos["avg_price"] > 0 else 0
 
-        # 🆕 v8: 硬止盈 — 涨超 12% 全卖（比 8% 半卖更彻底）
-        if pnl_pct >= 0.12:
+        # ── v14: 利润保护 — 让赢家跑, 截断亏损 ──
+        # 1. +5%: 卖1/3锁定利润 + 止损提到成本价
+        if pnl_pct >= 0.05 and pos["qty"] >= 6:
+            sell_qty = pos["qty"] // 3
+            if sell_qty > 0:
+                account.execute(sym, "SELL", sell_qty, price, reason=f"部分止盈+{pnl_pct:.1%}(锁利1/3)")
+                logger.info(f"💰 锁利: {sym} {sell_qty}股 +{pnl_pct:.1%}")
+                # 剩余仓位止损提到成本价
+                if sym in account.trailing_stops:
+                    account.trailing_stops[sym].activation_price = pos["avg_price"] * 1.005
+        # 2. +3%: 止损提到成本价 (保本)
+        elif pnl_pct >= 0.03 and sym in account.trailing_stops:
+            ts = account.trailing_stops[sym]
+            if ts.activation_price is None or ts.activation_price < pos["avg_price"] * 1.001:
+                ts.activation_price = pos["avg_price"] * 1.001
+        # 3. +10%: 全卖 (之前12%, 降到10%更快锁定)
+        if pnl_pct >= 0.10:
             account.execute(sym, "SELL", pos["qty"], price, reason=f"硬止盈 +{pnl_pct:.1%}")
-            log_risk("TAKE_PROFIT_FULL", f"{sym}: +{pnl_pct:.1%}")
-            logger.info(f"💰 硬止盈: {sym} +{pnl_pct:.1%}")
+            logger.info(f"💰 止盈: {sym} +{pnl_pct:.1%}")
+            continue
+        # 4. -5%: 硬止损 (TIGHTEN from -8%)
+        if pnl_pct <= -0.05:
+            account.execute(sym, "SELL", pos["qty"], price, reason=f"硬止损 {pnl_pct:.1%}")
+            logger.info(f"🛑 止损: {sym} {pnl_pct:.1%}")
             continue
 
         if sym not in account.trailing_stops:
