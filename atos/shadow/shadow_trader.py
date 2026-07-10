@@ -1070,8 +1070,8 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
 
     # 行业分散 — 牛市放宽50% (集中火力在最強行业)
     if spy_trend == "BULL":
-        SECTOR_LIMITS = {"Tech": 0.50, "Financial": 0.45, "Healthcare": 0.50,
-                         "Consumer": 0.45, "Industrial": 0.45, "Energy": 0.35,
+        SECTOR_LIMITS = {"Tech": 0.55, "Financial": 0.50, "Healthcare": 0.50,
+                         "Consumer": 0.45, "Industrial": 0.45, "Energy": 0.40,
                          "ETF": 0.60, "Bond": 0.35, "Commodity": 0.30}
     else:
         SECTOR_LIMITS = {"Tech": 0.35, "Financial": 0.30, "Healthcare": 0.35,
