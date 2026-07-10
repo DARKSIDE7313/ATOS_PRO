@@ -182,7 +182,7 @@ class ShadowAccount:
         except Exception:
             pass
         
-        dynamic_cooldown = int(COOLDOWN_CYCLES * vol_mult)
+        dynamic_cooldown = min(int(COOLDOWN_CYCLES * vol_mult), 12)  # Fix: 上限12周期≈1小时
         self.stop_loss_blacklist[symbol] = {
             "sold_cycle": self.cycle_count,
             "cooldown": dynamic_cooldown,
@@ -211,17 +211,17 @@ class ShadowAccount:
         pos_val = 0.0
         for p in self.positions.values():
             lp = p.get("last_price", p.get("avg_price", 0))
-            qty = p.get("qty", 0)
+            qty = p.get("shares", p.get("qty", p.get("quantity", 0)))  # Fix: 兼容 shares/qty/quantity 三个键名
             # 防御 nan / None / 负数
             if lp is None: lp = 0
             if isinstance(lp, float) and math.isnan(lp):
                 lp = p.get("avg_price", 0)
             if lp is None: lp = 0
-            if isinstance(lp, float) and str(lp) == "nan":
+            if isinstance(lp, float) and math.isnan(lp):
                 lp = 0
             if lp <= 0:
                 ap = p.get("avg_price", 0)
-                lp = ap if ap and str(ap) != "nan" else 0
+                lp = ap if ap and (isinstance(ap, float) and not math.isnan(ap)) else 0
             if lp <= 0:
                 lp = 0
             pos_val += qty * lp
@@ -231,11 +231,12 @@ class ShadowAccount:
     def position_list(self) -> list:
         result = []
         for sym, p in self.positions.items():
+            qty = p.get("shares", p.get("qty", p.get("quantity", 0)))  # Fix: 兼容多键名
             last = p.get("last_price", p["avg_price"])
             pnl_pct = (last - p["avg_price"]) / p["avg_price"] if p["avg_price"] > 0 else 0
             result.append({
-                "symbol": sym, "qty": p["qty"], "avg_price": p["avg_price"],
-                "last": last, "mkt_val": last * p["qty"],
+                "symbol": sym, "qty": qty, "avg_price": p["avg_price"],
+                "last": last, "mkt_val": last * qty,
                 "pnl_pct": round(pnl_pct, 4),
             })
         return result
@@ -264,7 +265,10 @@ class ShadowAccount:
         return {"VERY_AGGRESSIVE": 0.02, "AGGRESSIVE": 0.02, "MODERATE": 0.05, "CONSERVATIVE": 0.03}[self.mode]
 
     def get_state(self) -> dict:
-        pos_val = sum(p["qty"] * p.get("last_price", p["avg_price"]) for p in self.positions.values())
+        pos_val = sum(
+            p.get("shares", p.get("qty", 0)) * p.get("last_price", p.get("avg_price", 0))
+            for p in self.positions.values()
+        )
         return {
             "total": self.total_equity,
             "cash": self.cash,
@@ -289,7 +293,7 @@ class ShadowAccount:
                 # 防御 nan：px 必须是 > 0 的数字
                 if px is None or not isinstance(px, (int, float)):
                     continue
-                if isinstance(px, float) and str(px) == "nan":
+                if isinstance(px, float) and math.isnan(px):
                     continue
                 if px <= 0:
                     continue
@@ -364,6 +368,7 @@ class ShadowAccount:
         slip = price * dynamic_slip
         fill = price + slip if action == "BUY" else price - slip
         comm = max(self.min_commission, shares * self.commission_per_share)
+        pnl = 0.0  # Fix: 声明在外层，log_trade 可以访问
 
         if action == "BUY":
             buy_val = fill * shares
@@ -384,30 +389,32 @@ class ShadowAccount:
             self.cash -= cost
             if symbol in self.positions:
                 old = self.positions[symbol]
-                total_qty = old["qty"] + shares
-                old_cost = old["qty"] * old["avg_price"]
+                old_shares = old.get("shares", old.get("qty", 0))
+                total_qty = old_shares + shares
+                old_cost = old_shares * old["avg_price"]
                 self.positions[symbol] = {
-                    "qty": total_qty,
+                    "shares": total_qty, "qty": total_qty,  # Fix: 双键同步
                     "avg_price": (old_cost + fill * shares) / total_qty,
                     "last_price": fill,
                 }
             else:
-                self.positions[symbol] = {"qty": shares, "avg_price": fill, "last_price": fill}
+                self.positions[symbol] = {"shares": shares, "qty": shares, "avg_price": fill, "last_price": fill}  # Fix: 双键同步
 
             self.trade_history.append({
                 "date": datetime.datetime.now().isoformat(),
                 "symbol": symbol, "action": action, "shares": shares,
-                "price": round(fill, 2), "pnl": 0,
+                "price": round(fill, 2), "pnl": 0, "pnl_pct": 0,
                 "reason": reason,
-                "source": "factor_engine",  # Fix #8: 策略归因
+                "source": "factor_engine",
             })
 
         elif action == "SELL":
             if symbol not in self.positions:
                 return False
             pos = self.positions[symbol]
-            if pos["qty"] < shares:
-                shares = pos["qty"]
+            actual_qty = pos.get("shares", pos.get("qty", 0))  # Fix: 用实际持仓量
+            if actual_qty < shares:
+                shares = actual_qty
 
             pnl = (fill - pos["avg_price"]) * shares
             pnl_pct = (fill - pos["avg_price"]) / pos["avg_price"] if pos["avg_price"] > 0 else 0
@@ -425,6 +432,16 @@ class ShadowAccount:
                 logger.warning(f"[Kelly] save_trade failed: {e}")
 
             pos["qty"] -= shares
+            pos["shares"] = pos["qty"]  # Fix: 同步 shares 键
+
+            # Fix: 反馈闭环 — 每次卖出记录结果供 AI 学习
+            try:
+                from atos.ai.memory import record_outcome, auto_learn_from_outcome
+                outcome = "WIN" if pnl > 0 else ("LOSS" if pnl < 0 else "BREAKEVEN")
+                record_outcome(0, outcome, pnl_pct, 0, reason)
+            except Exception:
+                pass
+
             if pos["qty"] <= 0:
                 del self.positions[symbol]
                 if symbol in self.trailing_stops:
@@ -434,6 +451,7 @@ class ShadowAccount:
                 "date": datetime.datetime.now().isoformat(),
                 "symbol": symbol, "action": action, "shares": shares,
                 "price": round(fill, 2), "pnl": round(pnl, 2),
+                "pnl_pct": round(pnl_pct, 4),
                 "reason": reason,
             })
 
@@ -451,9 +469,9 @@ class ShadowAccount:
                 return False
             return self.execute(symbol, "BUY", add_shares, price, reason)
 
-        log_trade(symbol, action, shares, price, reason=reason)
+        log_trade(symbol, action, shares, price, pnl=pnl, reason=reason)
         # P0 修复: 每次成交后立即保存状态 (防止中断丢失)
-        _save_account_state(account)
+        _save_account_state(self)  # Fix: self 就是 account，execute() 是 ShadowAccount 的方法
         return True
 
 
@@ -487,6 +505,8 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
                 "positions": account.positions,
                 "cycle_count": account.cycle_count,
                 "equity": account.total_equity,
+                "peak_equity": account.peak_equity,
+                "drawdown": round((account.peak_equity - account.total_equity) / account.peak_equity, 6) if account.peak_equity > 0 else 0,
                 "stopped_at": datetime.datetime.now().isoformat(),
                 "reason": "EMERGENCY_STOP",
             }
@@ -636,7 +656,15 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
             if len(current_returns) >= 10:
                 ic_result = ic_analysis(prev_scores, current_returns,
                                         regime["regime"], prev_breakdown)
-                logger.info(f"[IC反馈] IC={ic_result['ic']:.4f} | {ic_result.get('verdict','')} | n={ic_result['n']}")
+                # Fix: IC EMA 平滑 — 减少噪音，更稳定判断因子是否有效
+                prev_ic_ema = getattr(run_shadow_cycle, '_ic_ema', None)
+                current_ic = ic_result['ic']
+                if prev_ic_ema is None:
+                    run_shadow_cycle._ic_ema = current_ic
+                else:
+                    run_shadow_cycle._ic_ema = prev_ic_ema * 0.7 + current_ic * 0.3
+                smoothed_ic = run_shadow_cycle._ic_ema
+                logger.info(f"[IC反馈] IC={current_ic:.4f} (平滑={smoothed_ic:.4f}) | {ic_result.get('verdict','')} | n={ic_result['n']}")
 
         # 存储本周期分数和价格，供下周期使用
         run_shadow_cycle._prev_scores = factor_result.get("scores", {}) if factor_result else {}
@@ -674,7 +702,7 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
 
     # ── v12: 主动组合轮动 — 卖弱买强 ──
     # 每 ~30 周期 (约2.5小时) 评估一次持仓, 卖出最弱的
-    ROTATION_INTERVAL = 30
+    ROTATION_INTERVAL = 15
     if account.cycle_count % ROTATION_INTERVAL == 0 and account.positions:
         # 计算每个持仓的综合分数
         pos_scores = {}
@@ -701,17 +729,18 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
                                       reason=f"组合轮动 (因子分{score:.2f}, PnL{pnl:.1%})")
                         logger.info(f"🔄 轮动卖出: {sym} {pos['qty']}股 (因子分{score:.3f}, PnL{pnl:.1%})")
 
-    # ── v12: 部分止盈 (涨5%卖1/3) ──
+    # ── v13: 部分止盈 (涨5%卖1/2，比1/3更快锁定利润) ──
     for sym, pos in list(account.positions.items()):
+        qty_now = pos.get("shares", pos.get("qty", 0))
         px = signals.get(sym, {}).get("price", pos.get("avg_price", 0))
         if px <= 0: continue
         pnl = (px - pos["avg_price"]) / pos["avg_price"] if pos["avg_price"] > 0 else 0
-        if pnl >= 0.05 and pos["qty"] >= 3:
-            sell_qty = pos["qty"] // 3
+        if pnl >= 0.05 and qty_now >= 2:
+            sell_qty = max(1, qty_now // 2)
             if sell_qty > 0:
                 account.execute(sym, "SELL", sell_qty, px,
-                              reason=f"部分止盈 +{pnl:.1%} (卖1/3锁定利润)")
-                logger.info(f"💰 部分止盈: {sym} {sell_qty}/{pos['qty']}股 +{pnl:.1%}")
+                              reason=f"部分止盈 +{pnl:.1%} (卖1/2锁定利润)")
+                logger.info(f"💰 部分止盈: {sym} {sell_qty}/{qty_now}股 +{pnl:.1%}")
 
     # 4b. 追踪止损（每个标的独立判断）
     # BUGFIX 2026-06-11: 
@@ -805,72 +834,41 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
                         "circuit_open", spy_trend)
         return
 
-    # ---- 5. AI 否决审查（进攻版: 每12周期，闭市时也检查持仓紧急情况） ----
-    # 进攻模式:
-    #   - 每12周期运行一次（从24提频）
-    #   - 交易时段: 跑全部候选审查
-    #   - 闭市时段: 只跑持仓检查（紧急情况）
-    AI_CYCLE_INTERVAL = 6  # 每6周期≈30分钟（从12提频，更多AI决策）
+    # ---- 5. 智能质量门控（替代低胜率 AI 辩论：基于因子质量+动量+RSI） ----
+    # 每6周期过滤一次，多维度打分 ≥50 才通过
+    QUALITY_GATE_INTERVAL = 6
     ai_veto_map = {}
-    if account.cycle_count % AI_CYCLE_INTERVAL == 0:
+    if account.cycle_count % QUALITY_GATE_INTERVAL == 0 and is_market_hours:
         try:
-            from atos.ai.engine_v5 import veto_candidates
-            
-            # 构建前3候选的简化 veto 数据
-            veto_candidate_list = []
-            for pick in (top_picks or [])[:3]:
+            for pick in (top_picks or [])[:8]:
                 sym = pick["symbol"]
                 sig = signals.get(sym, {})
                 bd = pick.get("breakdown", {})
-                factor_score = pick.get("score", 0.5)
-                # 计算评分理由摘要
-                score_parts = []
-                for k in ["value", "momentum", "quality", "technical"]:
-                    v = bd.get(k, 0.5)
-                    if v > 0.6:
-                        score_parts.append(f"{k}={v:.2f}")
-                score_reason = "+".join(score_parts) if score_parts else f"总分={factor_score:.2f}"
-                
-                veto_candidate_list.append({
-                    "symbol": sym,
-                    "price": sig.get("price", 0),
-                    "factor_score": round(factor_score, 2),
-                    "reason": score_reason,
-                    "rsi": sig.get("rsi", 50),
-                    "spy_price": spy_c[-1] if spy_c else 0,
-                    "spy_trend": spy_trend,
-                    "vix": round(current_vix, 1),
-                    "regime": regime.get("regime", "UNKNOWN") if isinstance(regime, dict) else "UNKNOWN",
-                })
-            
-            if veto_candidate_list:
-                raw_veto_map = veto_candidates(veto_candidate_list)
-                ai_veto_map = raw_veto_map
-                vetoed_count = sum(1 for v in ai_veto_map.values() if v)
-                if vetoed_count:
-                    logger.info(f"🧠 AI否决: {vetoed_count}/{len(veto_candidate_list)} 被阻止")
-                else:
-                    logger.info(f"🧠 AI否决: 全部批准 ({len(veto_candidate_list)}候选)")
+                factor_score = pick.get("score", 0)
 
-                # Fix #5: 记录 AI 决策到记忆库
-                try:
-                    from atos.ai.memory import record_decision
-                    for c in veto_candidate_list:
-                        vetoed = bool(ai_veto_map.get(c["symbol"], False))
-                        record_decision(
-                            symbol=c["symbol"],
-                            action="VETO" if vetoed else "APPROVE",
-                            confidence=0.7,
-                            factor_score=c.get("factor_score", 0.5),
-                            reasons={"vetoed": vetoed, "regime": regime.get("regime", "UNKNOWN")},
-                            debate_summary=f"AI veto {'blocked' if vetoed else 'approved'} {c['symbol']}",
-                            market_regime=regime.get("regime", "UNKNOWN") if isinstance(regime, dict) else "UNKNOWN",
-                        )
-                except Exception as mem_err:
-                    logger.debug(f"AI记忆写入失败: {mem_err}")
+                # 多维度质量评估 (业内标准: 因子质量 + 动量确认 + 趋势 + RSI)
+                quality_factors = sum(1 for k in ["value","momentum","quality","technical"] if bd.get(k, 0) > 0.4)
+                macd_ok = sig.get("macd_hist", 0) > -0.01
+                trend_ok = sig.get("trend", "") in ("UP", "WEAK_UP")
+                rsi_ok = 30 < sig.get("rsi", 50) < 75
+
+                quality_score = (
+                    quality_factors * 18 +     # 最多72分
+                    (10 if macd_ok else 0) +
+                    (10 if trend_ok else 0) +
+                    (8 if rsi_ok else 0) -
+                    (25 if factor_score < 0.35 else 0)
+                )
+
+                if quality_score < 50:
+                    ai_veto_map[sym] = True
+                    logger.info(f"🚫 否决 {sym}: Q={quality_score}/100 (因子{quality_factors}/4 macd={macd_ok} trend={trend_ok} rsi={rsi_ok})")
+                else:
+                    ai_veto_map[sym] = False
+            vetoed_count = sum(1 for v in ai_veto_map.values() if v)
+            logger.info(f"🎯 质量门控: {len(ai_veto_map)}候选中 {vetoed_count}否决 {len(ai_veto_map)-vetoed_count}通过")
         except Exception as e:
-            logger.error(f"AI否决审查失败: {e}")
-            ai_veto_map = {}
+            logger.warning(f"质量门控跳过: {e}")
     else:
         ai_veto_map = {}
 
@@ -1040,7 +1038,6 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
         return
     if spy_trend == "CAUTIOUS":
         logger.info(f"🟡 趋势CAUTIOUS — 正常进攻（上限12只）")
-        trend_max_pos = 12  # v9: 8→12，金叉回调该买就买
 
     # 🆕 v5: 运行 Serenity 瓶颈扫描，获取候选加分（缓存版，每小时最多一次）
     serenity_boosts = {}
@@ -1064,13 +1061,13 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
         logger.debug(f"Serenity瓶颈扫描跳过: 距离上次不足1小时")
 
     # 趋势限制 (v9: CAUTIOUS 8→12 — 金叉回调该买就买)
-    trend_max_pos = {"BULL": 12, "CAUTIOUS": 12, "BEAR": 3}.get(spy_trend, 12)
+    trend_max_pos = {"BULL": 18, "CAUTIOUS": 12, "BEAR": 3}.get(spy_trend, 18)  # Fix: BULL加仓至18只
     effective_max_pos = min(account.max_positions, trend_max_pos)
 
     # 行业分散 (v9: 放宽 ETF 上限 35%→45%, Healthcare 25%→30%)
-    SECTOR_LIMITS = {"Tech": 0.30, "Financial": 0.25, "Healthcare": 0.30,
-                     "Consumer": 0.25, "Industrial": 0.25, "Energy": 0.20,
-                     "ETF": 0.45, "Bond": 0.20, "Commodity": 0.15}
+    SECTOR_LIMITS = {"Tech": 0.35, "Financial": 0.30, "Healthcare": 0.35,
+                     "Consumer": 0.30, "Industrial": 0.30, "Energy": 0.25,
+                     "ETF": 0.50, "Bond": 0.25, "Commodity": 0.20}
     sector_exposure = {}
     if account.positions:
         try:
@@ -1090,7 +1087,7 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
 
     # v9: 现金缓冲放宽 — CAUTIOUS 也不需要那么保守
     current_cash_pct = account.cash / account.total_equity if account.total_equity > 0 else 0
-    target_cash_pct = 0.03 if spy_trend == "BULL" else (0.05 if spy_trend == "CAUTIOUS" else 0.10)
+    target_cash_pct = 0.02 if spy_trend == "BULL" else (0.04 if spy_trend == "CAUTIOUS" else 0.10)  # Fix: BULL中更积极
     if current_cash_pct < target_cash_pct:
         logger.warning(f"💰 现金不足 {current_cash_pct:.1%} < {target_cash_pct:.0%}，只卖不买")
         return
@@ -1293,7 +1290,7 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
 
         shares = max(1, int(delta_val / price))
 
-        if shares < 1 or shares * price < 100:
+        if shares < 5 or shares * price < 500:
             continue
 
         # 交易成本检查
@@ -1483,6 +1480,7 @@ def _save_account_state(account: ShadowAccount):
         "cycle_count": account.cycle_count,
         "equity": account.total_equity,
         "peak_equity": account.peak_equity,
+        "drawdown": round((account.peak_equity - account.total_equity) / account.peak_equity, 6) if account.peak_equity > 0 else 0,
         "equity_history": getattr(account, "equity_history", []),
         "last_cycle": datetime.datetime.now().isoformat(),
         "stop_loss_blacklist": account.stop_loss_blacklist,
@@ -1560,6 +1558,14 @@ def main():
         account = ShadowAccount(initial_cash=initial)
         account.cash = min(saved.get("cash", account.initial_cash), max_short_capital)
         account.positions = saved.get("positions", {})
+        # Fix: 标准化持仓键名（shares ↔ qty 一致性）
+        for sym, p in account.positions.items():
+            if "shares" in p and "qty" not in p:
+                p["qty"] = p["shares"]
+            elif "qty" in p and "shares" not in p:
+                p["shares"] = p["qty"]
+            elif "quantity" in p:
+                p["shares"] = p["qty"] = p["quantity"]
         account.trade_history = saved.get("trade_history", [])
         account.cycle_returns = saved.get("cycle_returns", [])
         account.cycle_count = saved.get("cycle_count", 0)
