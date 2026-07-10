@@ -229,7 +229,82 @@ def _run_nighthawk(ticker: str, data, capital: int) -> dict:
 
 
 def _get_live_data() -> dict:
-    """Build live portfolio dashboard data from trade log + simulated positions."""
+    """v10: 从真实状态文件读取实时数据"""
+    # Read shadow state
+    shadow_path = PROJECT_ROOT / "data" / "shadow_state.json"
+    shadow_positions = []
+    shadow_value = 0
+    shadow_cash = 0
+    shadow_pnl = 0
+    shadow_cycles = 0
+    shadow_equity = 0
+    shadow_last_cycle = ""
+    if shadow_path.exists():
+        try:
+            with open(shadow_path) as f:
+                ss = json.load(f)
+            shadow_cash = ss.get("cash", 0)
+            shadow_cycles = ss.get("cycle_count", 0)
+            shadow_equity = ss.get("equity", shadow_cash)
+            shadow_last_cycle = ss.get("last_cycle", "")
+            for sym, pos in ss.get("positions", {}).items():
+                price = pos.get("last_price", pos.get("avg_price", 0))
+                qty = pos.get("qty", 0)
+                val = qty * price
+                pnl = (price - pos.get("avg_price", 0)) * qty
+                shadow_value += val
+                shadow_pnl += pnl
+                shadow_positions.append({
+                    "sym": sym, "shares": qty,
+                    "avg": round(pos.get("avg_price", 0), 2),
+                    "price": round(price, 2),
+                    "value": round(val, 2), "pnl": round(pnl, 2),
+                    "return": round((price/pos.get("avg_price",1)-1)*100, 2) if pos.get("avg_price", 0) > 0 else 0,
+                    "day_chg": 0, "day_chg_pct": 0,
+                    "weight": round(val/shadow_equity*100, 1) if shadow_equity > 0 else 0,
+                })
+            if not shadow_positions and shadow_equity == 0:
+                shadow_equity = shadow_cash
+        except Exception:
+            shadow_cash = 0
+
+    short_return = (shadow_equity - (ss.get("initial_cash", shadow_equity))) / ss.get("initial_cash", 1) * 100 if shadow_path.exists() else 0
+
+    # Read long-term holdings from old state (过渡期，等Phoenix接管)
+    long_path = PROJECT_ROOT / "data" / "longterm_state.json"
+    long_holdings = []
+    long_value = 0
+    long_cash = 0
+    long_pnl = 0
+    long_last_rebalance = ""
+    if long_path.exists():
+        try:
+            with open(long_path) as f:
+                ls = json.load(f)
+            long_cash = ls.get("cash", 0)
+            long_last_rebalance = ls.get("last_rebalance", "")
+            for sym, pos in ls.get("holdings", {}).items():
+                price = pos.get("last_price", pos.get("avg_cost", 0))
+                qty = pos.get("shares", 0)
+                val = qty * price
+                pnl = (price - pos.get("avg_cost", 0)) * qty
+                pnl_pct = (price/pos.get("avg_cost",1)-1)*100 if pos.get("avg_cost", 0) > 0 else 0
+                long_value += val
+                long_pnl += pnl
+                long_holdings.append({
+                    "sym": sym, "shares": qty,
+                    "avg": round(pos.get("avg_cost", 0), 2),
+                    "price": round(price, 2),
+                    "value": round(val, 2), "pnl": round(pnl, 2),
+                    "return": round(pnl_pct, 2),
+                    "score": pos.get("composite_score", 50),
+                    "weight": round(val/(long_value or 1)*100, 1),
+                })
+        except Exception:
+            long_cash = 0
+
+    long_return = (long_pnl / (long_value - long_pnl)) * 100 if (long_value - long_pnl) > 0 else 0
+
     # Read trade log
     trade_log_path = PROJECT_ROOT / "data" / "trade_log.jsonl"
     trades = []
@@ -241,90 +316,91 @@ def _get_live_data() -> dict:
                 except json.JSONDecodeError:
                     pass
 
-    # Simulated live positions (short-term)
-    short_positions = [
-        {"sym": "IWM",  "shares": 118, "avg": 281.93, "price": 290.41,
-         "value": 34268.38, "pnl": 1000.45, "return": 3.01, "day_chg": 0.00, "day_chg_pct": 0.00, "weight": 28.4},
-        {"sym": "SPY",  "shares": 109, "avg": 738.29, "price": 737.76,
-         "value": 80415.84, "pnl": -57.50, "return": -0.07, "day_chg": 0.00, "day_chg_pct": 0.00, "weight": 66.7},
-        {"sym": "CVX",  "shares": 32,  "avg": 191.78, "price": 185.82,
-         "value": 5946.24,  "pnl": -190.77, "return": -3.11, "day_chg": 0.00, "day_chg_pct": 0.00, "weight": 4.9},
-    ]
-    short_value = sum(p["value"] for p in short_positions)
-    short_cash = 840777.69
-    short_pnl = sum(p["pnl"] for p in short_positions)
-    short_return = -3.86
-
-    # Live long-term holdings
-    long_holdings = [
-        {"sym": "META", "shares": 139, "avg": 597.63, "price": 584.59, "value": 81258.01, "pnl": -1812.56, "return": -2.18, "score": 72.5, "weight": 8.1},
-        {"sym": "CVX",  "shares": 444, "avg": 187.55, "price": 185.82, "value": 82504.08, "pnl": -768.12,  "return": -0.92, "score": 68.5, "weight": 8.2},
-        {"sym": "MRK",  "shares": 720, "avg": 115.65, "price": 119.60, "value": 86112.00, "pnl": 2844.00,  "return": 3.42,  "score": 66.1, "weight": 8.6},
-        {"sym": "DIS",  "shares": 821, "avg": 101.41, "price": 99.33,  "value": 81549.93, "pnl": -1707.68, "return": -2.05, "score": 65.7, "weight": 8.1},
-        {"sym": "BLK",  "shares": 81,  "avg": 1018.96,"price": 1011.96,"value": 81968.76, "pnl": -567.00,  "return": -0.69, "score": 62.6, "weight": 8.2},
-        {"sym": "ABBV", "shares": 386, "avg": 215.40, "price": 225.42, "value": 87012.12, "pnl": 3867.72,  "return": 4.65,  "score": 59.6, "weight": 8.7},
-        {"sym": "JNJ",  "shares": 373, "avg": 222.89, "price": 237.00, "value": 88401.00, "pnl": 5263.03,  "return": 6.33,  "score": 58.9, "weight": 8.8},
-        {"sym": "MSFT", "shares": 188, "avg": 441.31, "price": 403.41, "value": 75841.08, "pnl": -7125.20, "return": -8.59, "score": 56.0, "weight": 7.6},
-        {"sym": "DHR",  "shares": 473, "avg": 176.11, "price": 188.41, "value": 89117.93, "pnl": 5817.90,  "return": 6.98,  "score": 55.1, "weight": 8.9},
-        {"sym": "MCD",  "shares": 301, "avg": 276.36, "price": 282.25, "value": 84957.25, "pnl": 1772.89,  "return": 2.13,  "score": 54.3, "weight": 8.5},
-        {"sym": "AMZN", "shares": 324, "avg": 256.52, "price": 244.19, "value": 79117.56, "pnl": -3994.92, "return": -4.81, "score": 52.0, "weight": 7.9},
-        {"sym": "HD",   "shares": 267, "avg": 311.52, "price": 321.33, "value": 85795.11, "pnl": 2619.27,  "return": 3.15,  "score": 51.2, "weight": 8.5},
-    ]
-    long_value = sum(h["value"] for h in long_holdings)
-    long_cash = 2574.51
-    long_pnl = sum(h["pnl"] for h in long_holdings)
-    long_return = 0.62
-
-    combined_pv = short_value + short_cash + long_value + long_cash
-    combined_pnl = short_pnl + long_pnl
-    # Fix #1: 从 config_shared 读取真实资金，不再编造 $2M
+    combined_pv = shadow_equity + long_value + long_cash
+    combined_pnl = shadow_pnl + long_pnl
     from atos.config_shared import TOTAL_CAPITAL
-    initial_capital = TOTAL_CAPITAL
-    combined_return = (combined_pv - initial_capital) / initial_capital * 100
+    combined_return = (combined_pv - TOTAL_CAPITAL) / TOTAL_CAPITAL * 100
+
+    # Build activity log from trade history
+    activity_log = []
+    if shadow_path.exists():
+        try:
+            with open(shadow_path) as f:
+                ss = json.load(f)
+            for t in ss.get("trade_history", [])[-8:]:
+                activity_log.append({
+                    "time": t.get("date", ""),
+                    "msg": f"{t.get('symbol','')} {t.get('action','')} {t.get('shares',0)} @ ${t.get('price',0):.2f} — {t.get('reason','')}",
+                })
+            activity_log.append({
+                "time": shadow_last_cycle,
+                "msg": f"Shadow cycle #{shadow_cycles} — Equity ${shadow_equity:,.0f}, {len(shadow_positions)} positions"
+            })
+            if long_last_rebalance:
+                activity_log.append({
+                    "time": long_last_rebalance,
+                    "msg": f"Long-term rebalance — {len(long_holdings)} holdings, cash ${long_cash:,.0f}"
+                })
+        except Exception:
+            pass
+
+    # v11: Add US market time
+    import datetime as _dt
+    now_utc = _dt.datetime.now(_dt.timezone.utc)
+    is_dst = now_utc.month > 3 and now_utc.month < 11
+    et_offset = -4 if is_dst else -5
+    et_now = now_utc + _dt.timedelta(hours=et_offset)
+    et_hour = et_now.hour + et_now.minute / 60
+    et_day = et_now.weekday()
+    is_weekday = 0 <= et_day <= 4
+    mkt_open = 9.5 <= et_hour <= 16.0 and is_weekday
+    market_time = {
+        "us_eastern": et_now.strftime("%H:%M:%S"),
+        "timezone": "EDT" if is_dst else "EST",
+        "day_of_week": ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][et_day],
+        "market_open": mkt_open,
+        "next_open": "Monday 9:30 AM ET" if et_day >= 4 else "Tomorrow 9:30 AM ET" if et_hour >= 16 else "Today 9:30 AM ET" if et_hour < 9.5 else "Now",
+    }
 
     return {
+        "market_time": market_time,
         "overview": {
-            "combined_pv": combined_pv,
-            "combined_pnl": combined_pnl,
+            "combined_pv": round(combined_pv, 2),
+            "combined_pnl": round(combined_pnl, 2),
             "return_pct": round(combined_return, 2),
-            "initial_capital": initial_capital,
-            "total_cash": round(short_cash + long_cash, 2),
+            "initial_capital": TOTAL_CAPITAL,
+            "total_cash": round(shadow_cash + long_cash, 2),
             "short": {
-                "value": short_value, "cash": short_cash,
-                "pnl": short_pnl, "return_pct": short_return,
-                "positions": len(short_positions), "cycles": 769,
+                "value": round(shadow_value, 2), "cash": round(shadow_cash, 2),
+                "pnl": round(shadow_pnl, 2), "return_pct": round(short_return, 2),
+                "positions": len(shadow_positions), "cycles": shadow_cycles,
             },
             "long": {
-                "value": long_value, "cash": long_cash,
-                "pnl": long_pnl, "return_pct": long_return,
+                "value": round(long_value, 2), "cash": round(long_cash, 2),
+                "pnl": round(long_pnl, 2), "return_pct": round(long_return, 2),
                 "holdings": len(long_holdings),
-                "rebalance": "2026-06-03",
+                "rebalance": long_last_rebalance,
             },
         },
         "short_term": {
-            "portfolio_value": short_value + short_cash,
-            "pnl": short_pnl,
-            "return_pct": short_return,
-            "cash": short_cash,
-            "positions_count": len(short_positions),
-            "positions": short_positions,
-            "system": {"cycles": 769, "last_cycle": "2026-06-12T16:28:36", "equity": short_value + short_cash},
+            "portfolio_value": round(shadow_equity, 2),
+            "pnl": round(shadow_pnl, 2),
+            "return_pct": round(short_return, 2),
+            "cash": round(shadow_cash, 2),
+            "positions_count": len(shadow_positions),
+            "positions": shadow_positions,
+            "system": {"cycles": shadow_cycles, "last_cycle": shadow_last_cycle, "equity": round(shadow_equity, 2)},
         },
         "long_term": {
-            "portfolio_value": long_value + long_cash,
-            "pnl": long_pnl,
-            "return_pct": long_return,
-            "cash": long_cash,
+            "portfolio_value": round(long_value + long_cash, 2),
+            "pnl": round(long_pnl, 2),
+            "return_pct": round(long_return, 2),
+            "cash": round(long_cash, 2),
             "holdings_count": len(long_holdings),
             "holdings": long_holdings,
-            "strategy": {"rebalance": "2026-06-03", "cash": long_cash},
+            "strategy": {"rebalance": long_last_rebalance, "cash": round(long_cash, 2)},
         },
         "stops": [],
-        "trades": trades,
-        "activity_log": [
-            {"time": "2026-06-12T16:28:36", "msg": "Short-term cycle #769 completed"},
-            {"time": "2026-06-11T01:09:23", "msg": "CVX BUY 32 @ $191.78 — factor score 0.61"},
-            {"time": "2026-06-10T21:26:32", "msg": "BAC SELL 747 @ $54.37 — PnL +$359.87"},
-            {"time": "2026-06-03T09:00:00", "msg": "Long-term rebalance — 12 holdings, cash $2,574"},
-        ],
+        "trades": trades[-20:] if trades else [],
+        "activity_log": activity_log,
     }

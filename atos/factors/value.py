@@ -119,9 +119,9 @@ def batch_value_factors(symbols: list[str]) -> dict:
 
 
 def _normalize(val: float, low: float, high: float, cap: float = 0.05) -> float:
-    """正向归一化：值越大分越高"""
+    """正向归一化：值越大分越高。无效数据返回 0.0 避免假性中性分"""
     if high <= low:
-        return 0.5
+        return 0.0  # Fix: 退化数据不参与排名
     raw = (val - low) / (high - low)
     return max(cap, min(1.0 - cap, raw))
 

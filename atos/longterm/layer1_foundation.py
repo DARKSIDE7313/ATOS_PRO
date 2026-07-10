@@ -17,7 +17,46 @@ import os, json
 from atos.core.logging import get_logger
 from atos.longterm.config import LAYER1, CAPITAL
 
+# Futu 数据源（优先），yfinance 后备
+try:
+    from atos.data.futu_provider import get_stock_info
+except ImportError:
+    get_stock_info = None
+
 logger = get_logger("phoenix.layer1")
+
+
+def _get_info(symbol: str) -> dict:
+    """获取股票基本面 — Futu优先，yfinance后备"""
+    if get_stock_info:
+        data = get_stock_info(symbol)
+        if data.get("_valid"):
+            return data
+    try:
+        return (yf.Ticker(symbol).info or {})
+    except Exception:
+        return {}
+
+def _get_price(symbol: str) -> float:
+    """v11: 从 OHLCV 获取价格 (比 stock.info 可靠得多)"""
+    try:
+        # 先用 info (快)
+        info = yf.Ticker(symbol).fast_info if hasattr(yf.Ticker(symbol), 'fast_info') else {}
+        price = getattr(info, 'lastPrice', 0) or getattr(info, 'regularMarketPrice', 0)
+        if price and price > 0:
+            return float(price)
+    except Exception:
+        pass
+    try:
+        # 降级: 用 history (慢但可靠)
+        df = yf.download(symbol, period="5d", interval="1d", progress=False, auto_adjust=True)
+        if not df.empty and len(df) > 0:
+            close = df["Close"].squeeze()
+            if hasattr(close, 'iloc'):
+                return float(close.iloc[-1])
+    except Exception:
+        pass
+    return 0.0
 
 
 class Layer1Foundation:
@@ -101,8 +140,7 @@ class Layer1Foundation:
     def score_aristocrat(self, symbol: str) -> dict:
         """评分一只股息贵族"""
         try:
-            stock = yf.Ticker(symbol)
-            info = stock.info or {}
+            info = _get_info(symbol)
             div_yield = info.get("dividendYield", 0) or 0
             if div_yield > 1:
                 div_yield = div_yield / 100
@@ -239,15 +277,23 @@ class Layer1Foundation:
         result["dca"] = self.execute_dca()
         return result
 
-    def get_orders(self) -> list[dict]:
-        """生成订单列表（复用缓存，避免重复API调用）"""
+    def get_buy_orders(self, existing_positions: dict = None) -> list[dict]:
+        """生成买入订单，跳过已持有的标的"""
+        if existing_positions is None:
+            existing_positions = {}
+
         orders = []
         aristocrats = getattr(self, '_cached_aristocrats', None) or self.select_aristocrats()
-        capital_per = (self.capital * LAYER1.get("aristocrats_pct", 0.50)) / max(len(aristocrats), 1)
-        for a in aristocrats:
+        # 过滤已有持仓
+        new_picks = [a for a in aristocrats if a["symbol"] not in existing_positions]
+        if not new_picks:
+            logger.info("Layer1: 所有股息贵族已在持仓中，跳过买入")
+            return orders
+
+        capital_per = (self.capital * LAYER1.get("aristocrats_pct", 0.50)) / max(len(new_picks), 1)
+        for a in new_picks:
             try:
-                stock = yf.Ticker(a["symbol"])
-                price = float(stock.info.get("currentPrice", 0) or stock.info.get("regularMarketPrice", 0) or 0)
+                price = _get_price(a["symbol"])  # v11: 用可靠的 OHLCV 价格
                 if price > 0:
                     orders.append({
                         "layer": "foundation", "symbol": a["symbol"],
@@ -257,6 +303,129 @@ class Layer1Foundation:
                     })
             except Exception as e:
                 logger.warning(f"{a['symbol']} 订单失败: {e}")
+        return orders
+
+    # Legacy alias — do NOT remove (called by phoenix_runner.py pre-v3)
+    def get_orders(self) -> list[dict]:
+        return self.get_buy_orders()
+
+    # ── 卖出检查 ──
+
+    def _check_aristocrat_health(self, symbol: str) -> str:
+        """
+        检查股息贵族持仓健康状态。
+
+        返回: "SELL" | "REDUCE" | "HOLD"
+        """
+        try:
+            info = _get_info(symbol)
+
+            div_yield = info.get("dividendYield", 0) or 0
+            if div_yield > 1: div_yield = div_yield / 100
+            payout = info.get("payoutRatio", 0) or 0
+            if payout > 1: payout = payout / 100
+            roe = info.get("returnOnEquity", 0) or 0
+            pe = info.get("trailingPE", 0) or info.get("forwardPE", 0) or 0
+            debt_equity = info.get("debtToEquity", 0) or 0
+            revenue_growth = info.get("revenueGrowth", 0) or 0
+
+            # 🔴 红灯：必须卖出
+            if div_yield <= 0 and payout <= 0:
+                return "SELL"  # 股息被削减
+            if payout > 0.80:
+                return "SELL"  # 派息率不可持续
+            if roe < 0:
+                return "SELL"  # 亏损
+            if debt_equity > 200:
+                return "SELL"  # 负债爆炸
+
+            # 🟡 黄灯：减仓
+            if pe > 30:
+                return "REDUCE"  # 估值过高
+            if revenue_growth < -0.15:
+                return "REDUCE"  # 营收严重萎缩
+
+            return "HOLD"
+        except Exception as e:
+            logger.warning(f"股息贵族健康检查失败 {symbol}: {e}")
+            return "HOLD"
+
+    def get_sell_orders(self, positions: dict) -> list[dict]:
+        """
+        检查 Layer 1 持仓，生成卖出订单。
+
+        Args:
+            positions: 来自 Phoenix 总持仓的 dict
+        """
+        orders = []
+        aristocrat_list = self.load_dividend_aristocrats()
+
+        for symbol, pos in positions.items():
+            if pos.get("layer") != "foundation":
+                continue
+
+            # 检查是否被移出股息贵族名单
+            if symbol not in aristocrat_list:
+                try:
+                    stock = yf.Ticker(symbol)
+                    info = stock.info or {}
+                    price = float(info.get("currentPrice", 0) or info.get("regularMarketPrice", 0) or pos.get("avg_cost", 0))
+                except Exception:
+                    price = pos.get("avg_cost", 0)
+
+                orders.append({
+                    "layer": "foundation",
+                    "symbol": symbol,
+                    "action": "SELL",
+                    "quantity": pos.get("shares", 0),
+                    "price": round(price, 2) if price > 0 else 0,
+                    "reason": "被移出股息贵族名单",
+                })
+                logger.warning(f"🔴 L1 卖出: {symbol} — 不再属于股息贵族")
+                continue
+
+            # 健康检查
+            decision = self._check_aristocrat_health(symbol)
+
+            if decision == "SELL":
+                try:
+                    stock = yf.Ticker(symbol)
+                    info = stock.info or {}
+                    price = float(info.get("currentPrice", 0) or info.get("regularMarketPrice", 0) or pos.get("avg_cost", 0))
+                except Exception:
+                    price = pos.get("avg_cost", 0)
+
+                orders.append({
+                    "layer": "foundation",
+                    "symbol": symbol,
+                    "action": "SELL",
+                    "quantity": pos.get("shares", 0),
+                    "price": round(price, 2) if price > 0 else 0,
+                    "reason": f"基本面恶化触发卖出",
+                })
+                logger.warning(f"🔴 L1 卖出: {symbol} — 基本面恶化")
+
+            elif decision == "REDUCE":
+                try:
+                    stock = yf.Ticker(symbol)
+                    info = stock.info or {}
+                    price = float(info.get("currentPrice", 0) or info.get("regularMarketPrice", 0) or pos.get("avg_cost", 0))
+                except Exception:
+                    price = pos.get("avg_cost", 0)
+
+                reduce_shares = max(1, pos.get("shares", 0) // 2)
+                orders.append({
+                    "layer": "foundation",
+                    "symbol": symbol,
+                    "action": "SELL",
+                    "quantity": reduce_shares,
+                    "price": round(price, 2) if price > 0 else 0,
+                    "reason": f"PE过高或营收萎缩，减仓50%",
+                })
+                logger.warning(f"🟡 L1 减仓: {symbol} — 估值/营收走弱")
+
+        if orders:
+            logger.info(f"Layer1 生成 {len(orders)} 个卖出/减仓订单")
         return orders
 
 

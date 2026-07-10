@@ -4,7 +4,7 @@ ATOS Shadow Trader 紧急修复脚本
 修复所有 last_price=nan 为 last_price=avg_price
 然后重启 Shadow Trader
 """
-import json, os, sys, signal, time
+import json, os, sys, signal, time, math
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATE_FILE = os.path.join(BASE, "data", "shadow_state.json")
@@ -21,7 +21,7 @@ if os.path.exists(STATE_FILE):
             continue
         last = p.get("last_price", 0)
         avg = p.get("avg_price", 0)
-        if last is None or (isinstance(last, float) and str(last) == "nan"):
+        if last is None or (isinstance(last, float) and math.isnan(last)):
             p["last_price"] = avg if avg and str(avg) != "nan" else 0
             fixed += 1
     
@@ -33,7 +33,7 @@ if os.path.exists(STATE_FILE):
     
     # 修复 equity_history 中的 nan
     for eh in state.get("equity_history", []):
-        if eh.get("equity") is None or (isinstance(eh.get("equity"), float) and str(eh["equity"]) == "nan"):
+        if eh.get("equity") is None or (isinstance(eh.get("equity"), float) and math.isnan(eh["equity"])):
             eh["equity"] = state["equity"]
     
     with open(STATE_FILE, "w") as f:

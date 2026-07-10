@@ -64,6 +64,10 @@ tr:hover td{background:rgba(255,255,255,.03)}
   <a href="#" data-page="long">Long-Term</a>
   <a href="#" data-page="trades">Trades</a>
   <a href="#" data-page="backtest">Backtest</a>
+  <span id="market-clock" style="margin-left:auto;padding:10px 16px;font-size:11px;font-family:JetBrains Mono,monospace;color:#838990;display:flex;align-items:center;gap:8px;white-space:nowrap">
+    <span id="mkt-time">--:--:--</span>
+    <span id="mkt-status" style="padding:2px 8px;border-radius:4px;font-size:9px;font-weight:600">--</span>
+  </span>
 </nav>
 <div id="app">
 
@@ -134,6 +138,51 @@ document.querySelectorAll('nav a').forEach(a=>{
 
 let allResults = {};  // strategy -> {trades, signals, price_data, etc}
 let equityChart=null, wrChart=null, pnlDistChart=null;
+
+// ---- Market Clock (US Eastern Time) ----
+function updateMarketClock() {
+  const now = new Date();
+  // US Eastern Time (EDT=UTC-4, EST=UTC-5). Simple: check if between Mar-Nov for EDT.
+  const mar = new Date(now.getUTCFullYear(), 2, 14); // 2nd Sunday March
+  const nov = new Date(now.getUTCFullYear(), 10, 7); // 1st Sunday Nov
+  const isDst = now >= mar && now < nov;
+  const offset = isDst ? -4 : -5;
+  const etHours = (now.getUTCHours() + offset + 24) % 24;
+  const etMins = now.getUTCMinutes();
+  const etSecs = now.getUTCSeconds();
+  const etDay = new Date(now.getTime() + offset * 3600000).getUTCDay();
+
+  const timeStr = `${String(etHours).padStart(2,'0')}:${String(etMins).padStart(2,'0')}:${String(etSecs).padStart(2,'0')}`;
+  const tz = isDst ? 'EDT' : 'EST';
+  document.getElementById('mkt-time').textContent = `🇺🇸 ${timeStr} ${tz}`;
+
+  // Market status: Mon-Fri 9:30-16:00 ET
+  const mktMin = etHours * 60 + etMins;
+  const openMin = 9*60 + 30;
+  const closeMin = 16*60;
+  const isWeekday = etDay >= 1 && etDay <= 5;
+  let status, cls;
+  if (!isWeekday) {
+    status = 'WEEKEND';
+    cls = 'badge warn';
+  } else if (mktMin < openMin) {
+    const minsToOpen = openMin - mktMin;
+    status = `PRE-MARKET (${Math.floor(minsToOpen/60)}h${minsToOpen%60}m to open)`;
+    cls = 'badge neutral';
+  } else if (mktMin >= closeMin) {
+    status = 'CLOSED';
+    cls = 'badge down';
+  } else {
+    const minsLeft = closeMin - mktMin;
+    status = `🟢 OPEN (${Math.floor(minsLeft/60)}h${minsLeft%60}m left)`;
+    cls = 'badge up';
+  }
+  const el = document.getElementById('mkt-status');
+  el.textContent = status;
+  el.className = cls;
+}
+updateMarketClock();
+setInterval(updateMarketClock, 1000); // every second
 
 // ---- Load live data on startup ----
 async function loadLiveData(){

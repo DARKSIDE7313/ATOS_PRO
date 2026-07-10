@@ -7,10 +7,14 @@ Phoenix 长线综合策略所有可调参数集中管理。
 # ═══════════════════════════════════════════
 # 资金配置（共享配置 → 避免长短期策略抢资金）
 # ═══════════════════════════════════════════
-from atos.config_shared import ALLOCATION
+try:
+    from atos.config_shared import ALLOCATION
+    _long_term_capital = ALLOCATION.get("long_term", 1_000_000)
+except ImportError:
+    _long_term_capital = 1_000_000  # 默认 $1M paper trading
 
 CAPITAL = {
-    "total": ALLOCATION["long_term"],   # Fix #1: 从 config_shared 读取，不再硬编码
+    "total": _long_term_capital,
     "layer1_pct": 0.30,
     "layer2_pct": 0.50,
     "layer3_pct": 0.20,
@@ -150,10 +154,10 @@ RISK = {
 # 调度配置
 # ═══════════════════════════════════════════
 SCHEDULE = {
-    "layer1_interval_minutes": 60 * 24 * 15,  # 每 15 天
-    "layer2_interval_minutes": 60 * 24 * 91,  # 每 91 天
-    "layer3_interval_minutes": 60 * 24 * 30,  # 每 30 天
-    "risk_check_interval_minutes": 60 * 24,   # 每天
-    "dip_check_interval_minutes": 60,         # 每小时检查回撤
-    "report_interval_minutes": 60 * 24 * 30,  # 月报
+    "layer1_interval_minutes": 60 * 4,     # v11: 每 4 小时 (定投加速)
+    "layer2_interval_minutes": 60 * 8,     # v11: 每 8 小时 (核心组合)
+    "layer3_interval_minutes": 60 * 6,     # v11: 每 6 小时 (战术轮动)
+    "risk_check_interval_minutes": 60,     # 每小时
+    "dip_check_interval_minutes": 30,      # 每30分钟检查回撤
+    "report_interval_minutes": 60 * 24,    # 日报
 }

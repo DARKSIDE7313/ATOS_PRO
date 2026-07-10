@@ -305,7 +305,7 @@ def full_health_check(account_state: dict = None) -> dict:
 # ═══════════════════════════════════════════
 
 def is_safe_to_trade() -> tuple[bool, str]:
-    """综合判断现在是否应该交易（支持夏令时/冬令时自动切换）"""
+    """综合判断现在是否应该交易（精确DST检测）"""
     import datetime
     now = datetime.datetime.now(datetime.timezone.utc)
 
@@ -313,25 +313,41 @@ def is_safe_to_trade() -> tuple[bool, str]:
     if now.weekday() >= 5:
         return False, "周末休市"
 
-    # 动态 DST 检测（美国）：3月第2个周日～11月第1个周日
-    # 简化规则：3月～10月为 EDT (UTC-4), 11月～2月为 EST (UTC-5)
-    month = now.month
-    if 3 <= month <= 10:  # EDT (夏令时): UTC = ET + 4
-        open_hour, close_hour = 13, 20   # 9:30AM ET = 13:30 UTC, 4PM ET = 20:00 UTC
-    else:                  # EST (冬令时): UTC = ET + 5
-        open_hour, close_hour = 14, 21   # 9:30AM ET = 14:30 UTC, 4PM ET = 21:00 UTC
+    # 精确 DST 检测:
+    # 美国 EDT 从3月第2个周日开始, 到11月第1个周日结束
+    # 规则: 3月8-14日第一个周日之后 → EDT; 11月1-7日第一个周日之后 → EST
+    year = now.year
 
-    # 留 15 分钟缓冲
-    open_t = now.replace(hour=open_hour, minute=30, second=0)
-    close_t = now.replace(hour=close_hour, minute=15, second=0)
-    if now < open_t:
-        return False, "盘前"
-    if now > close_t:
-        return False, "已收盘"
+    def _nth_sunday(year, month, n):
+        """返回指定年月中第n个周日的日期"""
+        first = datetime.datetime(year, month, 1, tzinfo=datetime.timezone.utc)
+        days_until_sun = (6 - first.weekday()) % 7
+        return first + datetime.timedelta(days=days_until_sun + (n-1)*7)
 
-    # 月末/季末可能有异常波动（期权到期日前后）
-    # 简单检测但不阻止交易
+    dst_start = _nth_sunday(year, 3, 2)   # 3月第2个周日
+    dst_end = _nth_sunday(year, 11, 1)    # 11月第1个周日
+
+    is_dst = dst_start <= now < dst_end
+    if is_dst:
+        open_hour, close_hour = 13, 20   # EDT: 9:30AM=13:30UTC, 4PM=20:00UTC
+        tz_name = "EDT"
+    else:
+        open_hour, close_hour = 14, 21   # EST: 9:30AM=14:30UTC, 4PM=21:00UTC
+        tz_name = "EST"
+
+    # 当前 UTC 时间的时分
+    current_minutes = now.hour * 60 + now.minute
+    open_minutes = open_hour * 60 + 30   # 9:30 AM ET
+    close_minutes = close_hour * 60      # 4:00 PM ET (收盘后还有15分钟可交易)
+
+    if current_minutes < open_minutes:
+        mins_to_open = open_minutes - current_minutes
+        return False, f"盘前 ({tz_name} 距开盘{mins_to_open}分钟)"
+    if current_minutes > close_minutes:
+        return False, f"已收盘 ({tz_name})"
+
+    # 月末/季末警告
     if now.day >= 28:
         logger.debug("月末/季末 — 注意可能的高波动")
 
-    return True, "交易时间"
+    return True, f"交易时间 ({tz_name})"

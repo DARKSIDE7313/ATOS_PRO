@@ -29,6 +29,7 @@ import time
 import socket
 import subprocess
 import datetime
+from collections import defaultdict  # Fix: 顶部导入，check_log_errors() L109 使用
 
 ATOS_DIR = os.path.expanduser("/Users/benson/ATOS_PRO")
 TIMESTAMP = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -234,7 +235,7 @@ def restart_shadow_trader():
     try:
         # kill current
         subprocess.run(
-            ["launchctl", "kickstart", "gui/501/com.atos.shadowtrader"],
+            ["launchctl", "kickstart", "-k", "gui/501/com.atos.shadowtrader"],
             capture_output=True, timeout=10
         )
         log("LaunchAgent kickstart 已发送", "INFO")
@@ -328,5 +329,4 @@ def main():
 
 
 if __name__ == "__main__":
-    from collections import defaultdict  # 放在顶部兼容
     sys.exit(main())

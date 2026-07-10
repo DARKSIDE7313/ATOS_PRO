@@ -52,6 +52,7 @@ EXPOSURE_SIGNAL_FILE = "/tmp/atos_EXPOSURE"
 NETWORK_CHECK_HOSTS = ["8.8.8.8", "1.1.1.1", "api.deepseek.com"]
 NETWORK_CHECK_TIMEOUT = 5       # seconds per host
 NETWORK_RETRY_BACKOFF = [60, 120, 300, 600]  # progressive backoff on disconnect
+_network_consecutive_failures = 0  # Fix: 模块级变量替代 Function.__dict__
 MAX_NETWORK_FAILURES = 3        # After this many consecutive failures, do a full reconnect sweep
 EMERGENCY_STOP_FILE = "/tmp/atos_EMERGENCY_STOP"
 
@@ -70,13 +71,33 @@ def log(msg, level="INFO"):
             f.write(f"{ts} | {level:7s} | monitor | {msg}\n")
     except: pass
 
-def check_port(port):
+def check_port(port, retries=3):
+    """检查端口是否监听，带重试防止瞬断误判"""
+    for attempt in range(retries):
+        try:
+            r = subprocess.run(["lsof", "-i", f":{port}", "-sTCP:LISTEN"],
+                              capture_output=True, text=True, timeout=10)
+            if "LISTEN" in r.stdout:
+                return True
+        except:
+            pass
+        if attempt < retries - 1:
+            time.sleep(2)  # 等 2 秒再试
+    return False
+
+def check_futu_api():
+    """更可靠的方式：直接通过 Python API 检查 Futu 连接"""
     try:
-        r = subprocess.run(["lsof", "-i", f":{port}", "-sTCP:LISTEN"],
-                          capture_output=True, text=True, timeout=5)
-        return "LISTEN" in r.stdout
+        code = "from futu import OpenQuoteContext, RET_OK; ctx = OpenQuoteContext(host='127.0.0.1', port=11111); ret, _ = ctx.get_market_snapshot(['US.SPY']); ctx.close(); print('OK' if ret == 0 else 'FAIL')"
+        r = subprocess.run(["/Users/benson/ATOS_PRO/venv/bin/python3", "-c", code],
+                          capture_output=True, text=True, timeout=15)
+        return "OK" in r.stdout
     except:
         return False
+
+# 防止频繁重启 FutuOpenD
+_last_futu_restart = 0
+_FUTU_RESTART_COOLDOWN = 600  # 10分钟内不重复重启
 
 def check_http(url):
     try:
@@ -182,46 +203,37 @@ def check_network() -> dict:
         except Exception:
             continue
     
-    # Track consecutive failures for backoff
-    _net_state = check_network.__dict__
-    _net_state["consecutive_failures"] = _net_state.get("consecutive_failures", 0) + (0 if network_ok else 1)
-    if network_ok:
-        _net_state["consecutive_failures"] = 0
-    
+    # Track consecutive failures for backoff (模块级变量)
+    global _network_consecutive_failures
+    if not network_ok:
+        _network_consecutive_failures += 1
+    else:
+        _network_consecutive_failures = 0
+
     return {
         "online": network_ok,
-        "consecutive_failures": _net_state["consecutive_failures"],
-        "backoff_seconds": NETWORK_RETRY_BACKOFF[min(_net_state["consecutive_failures"], len(NETWORK_RETRY_BACKOFF)-1)] if not network_ok else 0,
+        "consecutive_failures": _network_consecutive_failures,
+        "backoff_seconds": NETWORK_RETRY_BACKOFF[min(_network_consecutive_failures, len(NETWORK_RETRY_BACKOFF)-1)] if not network_ok else 0,
     }
 
 
 def reconnect_all_services():
-    """Full reconnect sweep: restart FutuOpenD + ShadowTrader to refresh connections."""
-    log("Network restored — performing full reconnect sweep", "RECONNECT")
-    
-    # 1. Restart FutuOpenD (primary data source — needs fresh connection)
-    log("Reconnecting FutuOpenD...", "RECONNECT")
-    try:
-        subprocess.run(["launchctl", "kickstart", "-k", "gui/501/com.futunn.FutuOpenD"],
-                      capture_output=True, timeout=15)
-        log("FutuOpenD reconnected", "RECONNECT")
-    except:
+    """Network恢复后的重连: 不杀进程，只重新订阅数据"""
+    log("Network restored — refreshing data subscriptions", "RECONNECT")
+
+    # 检查 Futu 是否已经在运行 — 如果是，只重连数据层，不杀进程
+    if check_port(11111):
+        log("FutuOpenD already running — skipping restart, just re-subscribing", "RECONNECT")
+    else:
+        log("FutuOpenD not running — starting...", "RECONNECT")
         try:
             subprocess.Popen(["open", "/Applications/Futu_OpenD.app"])
-            log("FutuOpenD launched via open", "RECONNECT")
         except:
-            log("FutuOpenD reconnect failed — will retry next cycle", "RECONNECT")
-    
-    time.sleep(5)
-    
-    # 2. Restart ShadowTrader (gets new data subscriptions)
-    log("Reconnecting ShadowTrader...", "RECONNECT")
-    try:
-        subprocess.run(["launchctl", "kickstart", "-k", "gui/501/com.atos.shadowtrader"],
-                      capture_output=True, timeout=15)
-        log("ShadowTrader reconnected", "RECONNECT")
-    except:
-        log("ShadowTrader reconnect failed", "RECONNECT")
+            pass
+        time.sleep(10)
+
+    # v2: 不要杀任何服务 — 守护脚本各自管理
+    log("Network restored — services will auto-reconnect", "RECONNECT")
 
 
 def compute_health():
@@ -231,7 +243,7 @@ def compute_health():
     """
     # Port checks
     shadow = check_port(19999)
-    futu = check_port(11111)
+    futu = "running" if check_port(11111) else "degraded"  # Fix: 检查 Futu 端口，但降级标记（有 yfinance fallback）
     dash_port_check = check_port(9000)
     dash_http = check_http("http://localhost:9000/api")
     
@@ -361,17 +373,8 @@ def fix_tier1(health):
             log(f"Shadow restart failed: {e}", "ERROR")
     
     if s["futu"] == "stopped":
-        log("FutuOpenD is DOWN — restarting", "FIX")
-        try:
-            subprocess.run(["launchctl", "kickstart", "-k", "gui/501/com.futunn.FutuOpenD"],
-                          capture_output=True, timeout=10)
-            fixed.append("futu")
-        except:
-            try:
-                subprocess.Popen(["open", "/Applications/Futu_OpenD.app"])
-                fixed.append("futu")
-            except:
-                pass
+        log("FutuOpenD appears DOWN — futu_guardian will handle recovery", "INFO")
+        # 不再由 monitor 重启 Futu — 交给 futu_guardian.sh 守护脚本
     
     if s["dashboard"] == "stopped":
         log("Dashboard is DOWN — restarting", "FIX")

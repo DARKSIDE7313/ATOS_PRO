@@ -1,0 +1,131 @@
+{
+  "version": "3.0",
+  "created": "2026-06-01T00:00:00",
+  "runs": 49,
+  "market_phase": "NEUTRAL",
+  "risk_last_check": "2026-06-26T21:54:08.157320",
+  "layer1_last_run": "2026-06-24T23:41:52.990195",
+  "layer2_last_run": "2026-06-24T23:42:30.168453",
+  "layer3_last_run": "2026-06-24T23:42:48.965758",
+  "last_full_run": "2026-06-26T21:54:14.750379",
+  "last_saved": "2026-06-26T21:54:14.750497",
+  "portfolio_value": 1001831.37,
+  "cash": 2574.51,
+  "total_deposited": 2000000.0,
+  "positions": {
+    "META": {
+      "layer": "core",
+      "sub": "",
+      "shares": 139,
+      "avg_cost": 597.63,
+      "buy_date": "2026-06-03",
+      "composite_score": 72.5
+    },
+    "CVX": {
+      "layer": "core",
+      "sub": "",
+      "shares": 444,
+      "avg_cost": 187.55,
+      "buy_date": "2026-06-03",
+      "composite_score": 68.5
+    },
+    "MRK": {
+      "layer": "core",
+      "sub": "",
+      "shares": 720,
+      "avg_cost": 115.65,
+      "buy_date": "2026-06-03",
+      "composite_score": 66.1
+    },
+    "DIS": {
+      "layer": "core",
+      "sub": "",
+      "shares": 821,
+      "avg_cost": 101.41,
+      "buy_date": "2026-06-03",
+      "composite_score": 65.7
+    },
+    "BLK": {
+      "layer": "core",
+      "sub": "",
+      "shares": 81,
+      "avg_cost": 1018.96,
+      "buy_date": "2026-06-03",
+      "composite_score": 62.6
+    },
+    "ABBV": {
+      "layer": "core",
+      "sub": "",
+      "shares": 386,
+      "avg_cost": 215.4,
+      "buy_date": "2026-06-03",
+      "composite_score": 59.6
+    },
+    "JNJ": {
+      "layer": "core",
+      "sub": "",
+      "shares": 373,
+      "avg_cost": 222.89,
+      "buy_date": "2026-06-03",
+      "composite_score": 58.9
+    },
+    "MSFT": {
+      "layer": "core",
+      "sub": "",
+      "shares": 188,
+      "avg_cost": 441.31,
+      "buy_date": "2026-06-03",
+      "composite_score": 56.0
+    },
+    "DHR": {
+      "layer": "core",
+      "sub": "",
+      "shares": 473,
+      "avg_cost": 176.11,
+      "buy_date": "2026-06-03",
+      "composite_score": 55.1
+    },
+    "MCD": {
+      "layer": "core",
+      "sub": "",
+      "shares": 301,
+      "avg_cost": 276.36,
+      "buy_date": "2026-06-03",
+      "composite_score": 54.3
+    },
+    "AMZN": {
+      "layer": "core",
+      "sub": "",
+      "shares": 324,
+      "avg_cost": 256.52,
+      "buy_date": "2026-06-03",
+      "composite_score": 52.0
+    },
+    "HD": {
+      "layer": "core",
+      "sub": "",
+      "shares": 267,
+      "avg_cost": 311.52,
+      "buy_date": "2026-06-03",
+      "composite_score": 51.2
+    },
+    "PLTR": {
+      "layer": "core",
+      "sub": "",
+      "shares": 16,
+      "avg_cost": 114.46,
+      "buy_date": "2026-06-24"
+    }
+  },
+  "trade_history": [
+    {
+      "date": "2026-06-24T23:42:54.882944",
+      "symbol": "PLTR",
+      "layer": "core",
+      "action": "BUY",
+      "shares": 16,
+      "price": 114.46,
+      "value": 1831.36
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+# ATOS → Wiki 同步 (每天 21:05)
+5 21 * * * cd /Users/benson/ATOS_PRO && /usr/bin/python3 /Users/benson/llm-wiki/ops/scripts/atos_sync.py >> /Users/benson/llm-wiki/04_logs/atos_sync.log 2>&1
+
+# Wiki 健康检查 (每周一 9:30)
+30 9 * * 1 cd /Users/benson && /usr/bin/python3 /Users/benson/llm-wiki/ops/scripts/wiki_cli.py lint --json >> /Users/benson/llm-wiki/04_logs/lint_weekly.log 2>&1
+
+# Wiki 索引重建 (每天 8:00)
+0 8 * * * cd /Users/benson && /usr/bin/python3 /Users/benson/llm-wiki/ops/scripts/wiki_cli.py rebuild >> /Users/benson/llm-wiki/04_logs/rebuild_daily.log 2>&1

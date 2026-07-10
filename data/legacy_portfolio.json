@@ -1,0 +1,68 @@
+{
+  "source": "Phoenix v2 (last rebalance 2026-06-03)",
+  "initial_cash": 1000000,
+  "cash": 2574.5,
+  "last_rebalance": "2026-06-03",
+  "positions": {
+    "META": {
+      "shares": 139,
+      "avg_cost": 597.63,
+      "buy_date": "2026-06-03"
+    },
+    "CVX": {
+      "shares": 444,
+      "avg_cost": 187.55,
+      "buy_date": "2026-06-03"
+    },
+    "MRK": {
+      "shares": 720,
+      "avg_cost": 115.65,
+      "buy_date": "2026-06-03"
+    },
+    "DIS": {
+      "shares": 821,
+      "avg_cost": 101.41,
+      "buy_date": "2026-06-03"
+    },
+    "BLK": {
+      "shares": 81,
+      "avg_cost": 1018.96,
+      "buy_date": "2026-06-03"
+    },
+    "ABBV": {
+      "shares": 386,
+      "avg_cost": 215.4,
+      "buy_date": "2026-06-03"
+    },
+    "JNJ": {
+      "shares": 373,
+      "avg_cost": 222.89,
+      "buy_date": "2026-06-03"
+    },
+    "MSFT": {
+      "shares": 188,
+      "avg_cost": 441.31,
+      "buy_date": "2026-06-03"
+    },
+    "DHR": {
+      "shares": 473,
+      "avg_cost": 176.11,
+      "buy_date": "2026-06-03"
+    },
+    "MCD": {
+      "shares": 301,
+      "avg_cost": 276.36,
+      "buy_date": "2026-06-03"
+    },
+    "AMZN": {
+      "shares": 324,
+      "avg_cost": 256.52,
+      "buy_date": "2026-06-03"
+    },
+    "HD": {
+      "shares": 267,
+      "avg_cost": 311.52,
+      "buy_date": "2026-06-03"
+    }
+  }
+}

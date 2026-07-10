@@ -126,18 +126,29 @@ class TrailingStop:
       - 不会在 $103 就卖出（固定止损会）
     """
 
-    def __init__(self, trail_pct: float = 0.05, confirm_cycles: int = 3):
+    def __init__(self, trail_pct: float = 0.05, confirm_cycles: int = 2):
+        """
+        Args:
+            trail_pct: 追踪止损百分比 (e.g. 0.05 = 5%)
+            confirm_cycles: 连续跌破确认次数 (默认2次，约10-20分钟)
+                           生存配置: 2次足够防止噪音误杀，3次以上太慢
+        """
         self.trail_pct = trail_pct
         self.highest_price = 0.0
         self.stop_price = 0.0
         self.entry_price = 0.0
         self.confirm_cycles = confirm_cycles
         self._breach_count = 0
+        self._min_trail_pct = 0.03   # 最低追踪 3%（保护利润）
+        self._max_trail_pct = 0.08   # 最高追踪 8%（防止止损太宽）
 
     def init(self, entry_price: float):
         self.entry_price = entry_price
         self.highest_price = entry_price
-        self.stop_price = entry_price * (1 - self.trail_pct)
+        # 夹紧 trail_pct 到 [3%, 8%]
+        effective_trail = max(self._min_trail_pct, min(self._max_trail_pct, self.trail_pct))
+        self.stop_price = entry_price * (1 - effective_trail)
+        self.trail_pct = effective_trail
         self._breach_count = 0
 
     def update(self, current_price: float) -> dict:

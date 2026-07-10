@@ -150,15 +150,18 @@ class CashManager:
             if (datetime.datetime.now() - last["time"]) < datetime.timedelta(hours=24):
                 return result
         
-        thresholds = sorted(RISK.get("dip_buy_thresholds", {}).items())
-        
+        # v11: 按数值(最负优先)排序，第一个匹配即 break
+        thresholds = sorted(RISK.get("dip_buy_thresholds", {}).items(),
+                          key=lambda x: float(x[0]))
+
         for threshold_str, pct in thresholds:
             threshold = float(threshold_str)
             if current_drawdown <= threshold:
                 result["triggered"] = True
                 result["target_pct"] = float(pct)
                 result["reason"] = f"标普500回撤超过{abs(threshold)*100:.0f}%"
-        
+                break  # v11: 第一个匹配即停止 (修复覆盖bug)
+
         return result
 
     def check_pessimism_trigger(self) -> dict:

@@ -239,6 +239,8 @@ def repair_restart_service(service: str) -> bool:
         name = 'ai.atos.dashboard'
     elif service == 'futu_opend':
         name = 'com.futunn.FutuOpenD'
+    elif service in ('web_dashboard', 'dashboard_legacy'):
+        name = 'ai.atos.dashboard'  # Fix: 8000 和 9000 指向同一个 launchd service
     else:
         return False
     

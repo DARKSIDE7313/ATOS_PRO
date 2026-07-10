@@ -26,12 +26,13 @@ import logging
 import pandas as pd
 from datetime import datetime, timedelta
 from typing import Optional
+import math
 
 def safe_float(val, default=0.0) -> float:
     """安全转换 float，防止 NaN 污染数据"""
     try:
         v = float(val)
-        if isinstance(v, float) and str(v) == "nan":
+        if isinstance(v, float) and math.isnan(v):
             return float(default)
         return v
     except (TypeError, ValueError):
@@ -109,13 +110,13 @@ class RealtimePriceCache:
         # 优先 last_price，其次 price，最后 close
         # 注意：必须显式检查 NaN，因为 float('nan') 在 Python 中是 truthy
         lp = quote.get("last_price")
-        if lp is not None and isinstance(lp, (int, float)) and not (isinstance(lp, float) and str(lp) == "nan"):
+        if lp is not None and isinstance(lp, (int, float)) and not (isinstance(lp, float) and math.isnan(lp)):
             return float(lp)
         p = quote.get("price")
-        if p is not None and isinstance(p, (int, float)) and not (isinstance(p, float) and str(p) == "nan"):
+        if p is not None and isinstance(p, (int, float)) and not (isinstance(p, float) and math.isnan(p)):
             return float(p)
         c = quote.get("close")
-        if c is not None and isinstance(c, (int, float)) and not (isinstance(c, float) and str(c) == "nan"):
+        if c is not None and isinstance(c, (int, float)) and not (isinstance(c, float) and math.isnan(c)):
             return float(c)
         return None
     def get_all(self) -> dict[str, dict]:
@@ -140,7 +141,7 @@ class RealtimePriceCache:
         result = {}
         for sym, q in quotes.items():
             p = q.get("last_price") if q.get("last_price") is not None else (q.get("price") if q.get("price") is not None else q.get("close"))
-            if p is not None and isinstance(p, (int, float)) and not (isinstance(p, float) and str(p) == "nan"):
+            if p is not None and isinstance(p, (int, float)) and not (isinstance(p, float) and math.isnan(p)):
                 result[sym] = float(p)
         return result
 

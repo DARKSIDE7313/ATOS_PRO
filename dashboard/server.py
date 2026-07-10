@@ -154,29 +154,91 @@ def read_state():
             d['last_cycle']=raw.get('last_cycle','')
             d['equity_total']=round(raw.get('equity',0),2)
         except: pass
-    fpn=os.path.join(BASE,'data','longterm_state.json')
-    if os.path.exists(fpn):
+    # 读取 Phoenix 长期仓位 (合并新旧两个来源)
+    d['long'] = {'pv':0, 'pl':0, 'cash':0, 'init':0, 'chg':0, 'pos':[], 'cnt':0}
+
+    def _add_long_positions(pos_dict, cash, init, source_name):
+        """添加一批长期仓位到显示数据"""
+        pv = d['long']['pv'] + cash
+        pl_total = d['long']['pl']
+        plist = list(d['long']['pos'])
+        total_init = d['long']['init'] + init
+
+        for sym, dt in pos_dict.items():
+            if not isinstance(dt, dict): continue
+            sh = dt.get('shares', 0) or 0
+            avg = dt.get('avg_cost', 0) or 0
+            if sh == 0: continue
+            live = _live_price(sym)
+            price = live if live > 0 else avg
+            val = sh * price
+            pl = (price - avg) * sh
+            pl_total += pl
+            pv += val
+            plist.append({
+                'sym': sym, 'shares': sh, 'avg': round(avg, 2), 'price': round(price, 2),
+                'val': round(val, 2), 'pl': round(pl, 2),
+                'pl_pct': round((price-avg)/avg*100, 2) if avg > 0 else 0,
+                'buy_date': dt.get('buy_date', ''), 'source': source_name,
+                'day_chg': 0, 'day_pct': 0
+            })
+
+        tv = sum(x['val'] for x in plist) or 1
+        for x in plist: x['wt'] = round(x['val']/tv*100, 1)
+        chg = (pv - total_init) / total_init * 100 if total_init > 0 else 0
+
+        d['long'] = {
+            'pv': round(pv, 2), 'pl': round(pl_total, 2),
+            'cash': round(cash, 2), 'init': round(total_init, 2),
+            'chg': round(chg, 2), 'pos': plist, 'cnt': len(plist)
+        }
+
+    # 1. 旧 Phoenix v2 仓位 (legacy_portfolio.json — 永久安全，Phoenix 不会碰)
+    fpn_legacy = os.path.join(BASE, 'data', 'legacy_portfolio.json')
+    if os.path.exists(fpn_legacy):
         try:
-            with open(fpn) as f: raw=json.load(f)
-            pos=raw.get('holdings',{}); cash=raw.get('cash',0); init=raw.get('initial_cash',1_000_000)
-            pv=cash; pl_total=0; plist=[]
-            for sym,dt in pos.items():
-                if not isinstance(dt,dict): continue
-                sh=dt.get('shares',0) or 0; avg=dt.get('avg_cost',0) or 0
-                if sh==0: continue
-                live=_live_price(sym); price=live if live>0 else avg
-                val=sh*price; pl=(price-avg)*sh; pl_total+=pl; pv+=val
-                plist.append({'sym':sym,'shares':sh,'avg':round(avg,2),'price':round(price,2),
-                    'val':round(val,2),'pl':round(pl,2),
-                    'pl_pct':round((price-avg)/avg*100,2) if avg>0 else 0,
-                    'score':dt.get('composite_score',''),'buy_date':dt.get('buy_date',''),
-                    'day_chg':0,'day_pct':0})
-            tv=sum(x['val'] for x in plist) or 1
-            for x in plist: x['wt']=round(x['val']/tv*100,1)
-            chg=(pv-init)/init*100 if init>0 else 0
-            d['long']={'pv':round(pv,2),'pl':round(pl_total,2),'cash':round(cash,2),
-                'init':round(init,2),'chg':round(chg,2),'pos':plist,'cnt':len(plist)}
-            d['long_meta']={'rebalance':raw.get('last_rebalance','')}
+            with open(fpn_legacy) as f:
+                leg = json.load(f)
+            _add_long_positions(
+                leg.get('positions', {}),
+                leg.get('cash', 0),
+                leg.get('initial_cash', 1_000_000),
+                'legacy'
+            )
+        except: pass
+
+    # 2. Phoenix v3 仓位 — 只添加不在 legacy 里的，不额外加资金
+    fpn_new = os.path.join(BASE, 'phoenix_state.json')
+    if os.path.exists(fpn_new):
+        try:
+            with open(fpn_new) as f:
+                raw = json.load(f)
+            new_pos = raw.get('positions', {}) or {}
+            legacy_syms = set()
+            if os.path.exists(fpn_legacy):
+                try:
+                    with open(fpn_legacy) as f:
+                        leg = json.load(f)
+                    legacy_syms = set(leg.get('positions', {}).keys())
+                except: pass
+            new_only = {k: v for k, v in new_pos.items() if k not in legacy_syms}
+            if new_only:
+                # 不加额外资金 — 只用 legacy 的 $1M 初始
+                _add_long_positions(new_only, 0, 0, 'phoenix_v3')
+        except: pass
+
+    d['long_meta'] = {'rebalance': '2026-06-03 (legacy) + Phoenix v3',
+                      'last_run': '', 'runs': 0}
+    # 从 phoenix_state.json 获取运行次数
+    if os.path.exists(fpn_new):
+        try:
+            with open(fpn_new) as f:
+                raw = json.load(f)
+            d['long_meta'] = {
+                'rebalance': '2026-06-03',
+                'last_run': str(raw.get('last_full_run', ''))[:19],
+                'runs': raw.get('runs', 0)
+            }
         except: pass
     si=d.get('short',{}); li=d.get('long',{})
     c_init=(si.get('init',0)or 0)+(li.get('init',0)or 0)
@@ -204,14 +266,24 @@ def read_state():
     except: pass
     rd=os.path.join(BASE,'reports')
     if os.path.exists(rd):
-        for fn in sorted(os.listdir(rd),reverse=True)[:15]:
+        # 先收集所有 phoenix_report_ 文件，按修改时间排序
+        all_reports = []
+        for fn in os.listdir(rd):
             if fn.startswith('phoenix_report_'):
-                try:
-                    with open(os.path.join(rd,fn)) as f: rpt=json.load(f)
-                    s=rpt.get('summary',{})
-                    d['activity'].append({'time':fn.replace('phoenix_report_','').replace('.json',''),
-                        'msg':f"Phoenix #{s.get('run_id','?')} | {s.get('market_phase','?')} | {s.get('total_orders',0)} orders"})
-                except: pass
+                fpath = os.path.join(rd, fn)
+                if os.path.isfile(fpath):
+                    all_reports.append((os.path.getmtime(fpath), fn))
+        all_reports.sort(reverse=True)  # 最新的在前
+        for _, fn in all_reports[:15]:
+            fpath = os.path.join(rd, fn)
+            try:
+                with open(fpath) as f:
+                    rpt = json.load(f)
+                s = rpt.get('summary', {})
+                d['activity'].append({'time': fn.replace('phoenix_report_', '').replace('.json', ''),
+                    'msg': f"Phoenix #{s.get('run_id', '?')} | {s.get('market_phase', '?')} | {s.get('total_orders', 0)} orders"})
+            except:
+                pass
     # 📊 添加 auto-monitor 活动日志（最近5条事件）
     try:
         ml=os.path.join(BASE,'logs','auto_monitor.log')
@@ -299,6 +371,12 @@ class H(http.server.BaseHTTPRequestHandler):
         p=urlparse(self.path)
         if p.path=='/api': self._j(read_state())
         elif p.path=='/api/ai': self._j(read_ai_insights())
+        elif p.path=='/api/daily':
+            try:
+                from atos.core.daily_returns import get_summary
+                self._j(get_summary())
+            except Exception as e:
+                self._j({'error': str(e)})
         elif p.path=='/api/health':
             try:
                 hp=os.path.join(BASE,'data','health_check_state.json')

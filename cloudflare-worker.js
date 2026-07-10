@@ -3,7 +3,7 @@
 // 部署后得到固定 URL: https://atos-dashboard.darkside7313.workers.dev
 
 // ⚡ 这个 URL 由 tools/tunnel_url_watchdog.py 自动更新，不要手动改
-const TUNNEL_ORIGIN = "https://literacy-valentine-counter-typical.trycloudflare.com";
+const TUNNEL_ORIGIN = "https://flower-metropolitan-hydrocodone-sun.trycloudflare.com";
 
 // 最后一份成功获取的数据缓存（Tunnel 断连时用）
 let lastGoodData = null;
@@ -49,18 +49,13 @@ export default {
 
       const response = await fetch(newRequest, { timeout: 10 });
 
-      // 如果 Tunnel 返回了正常数据
       if (response.ok) {
-        // 如果是 API 请求，缓存数据
         if (url.pathname === '/api') {
-          try {
-            lastGoodData = await response.clone().text();
-          } catch(e) {}
+          try { lastGoodData = await response.clone().text(); } catch(e) {}
         }
 
         const newHeaders = new Headers(response.headers);
         newHeaders.set("Cache-Control", "no-store, no-cache");
-        // 允许跨域
         newHeaders.set("Access-Control-Allow-Origin", "*");
 
         return new Response(response.body, {
@@ -69,13 +64,10 @@ export default {
         });
       }
 
-      // Tunnel 返回了错误状态
-      throw new Error(`Tunnel returned ${response.status}`);
+      throw new Error("Tunnel returned " + response.status);
 
     } catch (err) {
-      // Tunnel 连接失败 — 返回降级页面或缓存数据
       if (url.pathname === '/api') {
-        // API 请求：返回缓存数据或错误
         if (lastGoodData) {
           return new Response(lastGoodData, {
             status: 200,
@@ -101,7 +93,6 @@ export default {
         });
       }
 
-      // 页面请求：返回降级 HTML
       return new Response(FALLBACK_HTML, {
         status: 200,
         headers: {

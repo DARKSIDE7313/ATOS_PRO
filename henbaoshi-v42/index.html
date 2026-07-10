@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>恒宝士PCB</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}html,body{width:100%;height:100%;overflow:hidden;background:#03050a}
+#L{position:fixed;inset:0;z-index:9999;background:#03050a;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#6e7d99;font:14px sans-serif}
+#L .r{width:40px;height:40px;border:2px solid rgba(212,168,67,0.2);border-top-color:#d4a843;border-radius:50%;animation:s 0.8s linear infinite;margin-bottom:12px}
+@keyframes s{to{transform:rotate(360deg)}}
+canvas{display:block}
+</style>
+</head>
+<body>
+<div id="L"><div class="r"></div><span>PRECISION PCB</span></div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+(function(){
+var L=document.getElementById('L');
+if(typeof THREE==='undefined'){L.innerHTML='<div style="color:#f44">CDN fail</div>';return}
+
+var R=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true});
+R.setPixelRatio(Math.min(window.devicePixelRatio,2));R.setSize(window.innerWidth,window.innerHeight);
+R.shadowMap.enabled=true;R.shadowMap.type=THREE.PCFSoftShadowMap;
+R.toneMapping=THREE.ACESFilmicToneMapping;R.toneMappingExposure=1.35;
+R.outputColorSpace=THREE.SRGBColorSpace;document.body.appendChild(R.domElement);
+
+var S=new THREE.Scene();S.background=new THREE.Color('#03050a');S.fog=new THREE.FogExp2('#03050a',0.00008);
+var C=new THREE.PerspectiveCamera(40,window.innerWidth/window.innerHeight,0.1,60);
+C.position.set(0,4.5,11);C.lookAt(0,0.1,0);
+
+// === ENV MAP (bright studio lighting for metallic reflections) ===
+var pm2=new THREE.PMREMGenerator(R);var eS2=new THREE.Scene();eS2.background=new THREE.Color('#020408');
+[[0,14,-5,22,14,'#ffffff'],[9,3,3,12,20,'#fff5e5'],[-7,0,4,8,18,'#c8ddff'],[0,3,10,18,18,'#eef6ff'],[0,-8,0,20,18,'#060a14'],[0,4,-9,18,10,'#88aacc']].forEach(function(a){var g=new THREE.PlaneGeometry(a[3],a[4]),m4=new THREE.MeshBasicMaterial({color:a[5],side:THREE.DoubleSide}),me2=new THREE.Mesh(g,m4);me2.position.set(a[0],a[1],a[2]);me2.lookAt(0,0,0);eS2.add(me2)});
+S.environment=pm2.fromScene(eS2,0.04).texture;pm2.dispose();
+
+// === MATERIALS (tuned for realism) ===
+var matFR4_2=new THREE.MeshStandardMaterial({roughness:0.35,metalness:0.02});
+var matCu2=new THREE.MeshStandardMaterial({color:'#e88840',roughness:0.07,metalness:0.99});
+var matAu2=new THREE.MeshStandardMaterial({color:'#f2c838',roughness:0.03,metalness:1.0});
+var matChip2=new THREE.MeshStandardMaterial({color:'#1a1a1a',roughness:0.52,metalness:0});
+var matPin3=new THREE.MeshStandardMaterial({color:'#ddd',roughness:0.1,metalness:0.96});
+var matSolder=new THREE.MeshStandardMaterial({color:'#c8c0b0',roughness:0.2,metalness:0.85});
+var matHole2=new THREE.MeshStandardMaterial({color:'#020202',roughness:1,metalness:0});
+
+// === PCB: 120×80mm → scale 1unit=10mm, board=12×8 ===
+var BW2=6.0,BH2=4.0,BR2=0.2,BT2=0.16,SY2=BT2;
+
+var shp2=new THREE.Shape();
+shp2.moveTo(-BW2+BR2,-BH2);shp2.lineTo(BW2-BR2,-BH2);shp2.quadraticCurveTo(BW2,-BH2,BW2,-BH2+BR2);
+shp2.lineTo(BW2,BH2-BR2);shp2.quadraticCurveTo(BW2,BH2,BW2-BR2,BH2);shp2.lineTo(-BW2+BR2,BH2);
+shp2.quadraticCurveTo(-BW2,BH2,-BW2,BH2-BR2);shp2.lineTo(-BW2,-BH2+BR2);shp2.quadraticCurveTo(-BW2,-BH2,-BW2+BR2,-BH2);
+
+var P2=new THREE.Group();S.add(P2);
+var bG2=new THREE.ExtrudeGeometry(shp2,{depth:BT2,bevelEnabled:true,bevelThickness:0.01,bevelSize:0.01,bevelSegments:2});
+var bM2=new THREE.Mesh(bG2,matFR4_2);bM2.rotation.x=-Math.PI/2;bM2.position.y=0;bM2.receiveShadow=true;P2.add(bM2);
+
+var top2=new THREE.Group();P2.add(top2);
+
+// === DATA STORAGE for texture generation ===
+var ALL_T=[],ALL_P=[];
+
+function T2(x1,z1,x2,z2,w,curve){
+  var dx=x2-x1,dz=z2-z1,len=Math.sqrt(dx*dx+dz*dz);if(len<0.001)return;
+  ALL_T.push({x1:x1,z1:z1,x2:x2,z2:z2,w:w,curve:curve||0});
+  // 3D trace
+  var g2=new THREE.BoxGeometry(len,0.004,w),m5=new THREE.Mesh(g2,matCu2);
+  m5.position.set((x1+x2)/2,SY2+0.003,(z1+z2)/2);m5.rotation.y=-Math.atan2(dz,dx);top2.add(m5);
+}
+function PAD2(x,z,r,s){if(!r)r=0.1;if(!s)s='r';
+  ALL_P.push({x:x,z:z,r:r,s:s});
+  var g3=new THREE.CylinderGeometry(r,r,0.005,16),m6=new THREE.Mesh(g3,matAu2);m6.position.set(x,SY2+0.004,z);top2.add(m6);
+}
+function VIA2(x,z,or,ir){
+  or=or||0.08;ir=ir||0.04;
+  var rg4=new THREE.TorusGeometry((or+ir)/2,(or-ir)/2,8,14),rM2=new THREE.Mesh(rg4,matAu2);rM2.rotation.x=-Math.PI/2;rM2.position.set(x,SY2+0.005,z);top2.add(rM2);
+  var hg4=new THREE.CylinderGeometry(ir,ir,0.007,8),hM2=new THREE.Mesh(hg4,matHole2);hM2.position.set(x,SY2+0.005,z);top2.add(hM2);
+  ALL_P.push({x:x,z:z,r:or,s:'r'});
+}
+
+// === ULTRA-DENSE PCB ROUTING (no empty space) ===
+var bX2=-1.8,bZ3=1.0,gN2=8,gP2=0.18;
+// BGA fanout
+for(var r=0;r<gN2;r++)for(var c=0;c<gN2;c++){
+  var px3=bX2+(c-(gN2-1)/2)*gP2,pz3=bZ3+(r-(gN2-1)/2)*gP2;PAD2(px3,pz3,0.05);
+  var dr2=Math.abs(r-3.5)/3.5,dc2=Math.abs(c-3.5)/3.5;
+  if(dr2>=dc2){var d3=r<3.5?-1:1;T2(px3,pz3,px3,pz3+d3*(0.25+Math.max(dr2,dc2)*0.3),0.03)}
+  else{var d4=c<3.5?-1:1;T2(px3,pz3,px3+d4*(0.25+Math.max(dr2,dc2)*0.3),pz3,0.03)}
+}
+// 32-line data bus
+for(var i=0;i<32;i++){var z4=-1.2+i*0.07;PAD2(-2.5,z4,0.05);PAD2(3,z4,0.05);T2(-2.5,z4,3,z4,0.025)}
+// 12 diff pairs
+for(var p3=0;p3<12;p3++){var bz4=0.3+p3*0.18;PAD2(1.2,bz4,0.04);PAD2(1.2,bz4+0.05,0.04);PAD2(3.5,bz4,0.04);PAD2(3.5,bz4+0.05,0.04);T2(1.2,bz4,3.5,bz4,0.022);T2(1.2,bz4+0.05,3.5,bz4+0.05,0.022)}
+// Serpentine 1
+var spA=[[-3.5,-1.8],[-2,-1.8],[-1.5,-1.2],[-1.5,0.3],[-2.5,0.3],[-3,-0.2],[-3,-0.8],[-1.5,-0.8],[-1,0],[0.5,0]];
+for(var i=0;i<spA.length-1;i++)T2(spA[i][0],spA[i][1],spA[i+1][0],spA[i+1][1],0.025,0.12);
+PAD2(-3.5,-1.8,0.06);PAD2(0.5,0,0.06);
+// Serpentine 2
+var spB=[[4,-2.5],[2.5,-2.5],[2,-1.8],[2,-0.5],[3,-0.5],[3.5,-1],[3.5,-1.5],[2,-1.5],[1.5,-0.8],[3.5,-0.8]];
+for(var i=0;i<spB.length-1;i++)T2(spB[i][0],spB[i][1],spB[i+1][0],spB[i+1][1],0.025,0.1);
+PAD2(4,-2.5,0.06);PAD2(3.5,-0.8,0.06);
+// Serpentine 3
+var spC=[[-5,-0.5],[-3.8,-0.5],[-3.8,0.5],[-5,0.5],[-5,1.5],[-3.8,1.5],[-3.8,2.5],[-5,2.5]];
+for(var i=0;i<spC.length-1;i++)T2(spC[i][0],spC[i][1],spC[i+1][0],spC[i+1][1],0.025);
+PAD2(-5,-0.5,0.06);PAD2(-5,2.5,0.06);
+// Power distribution (thick)
+for(var i=0;i<6;i++){var pz5=-2.5+i*0.5;PAD2(2.5,pz5,0.15);PAD2(4.5,pz5,0.15);T2(2.5,pz5,4.5,pz5,0.15)}
+// Thick vertical power
+for(var i=0;i<4;i++){var px5=3+i*0.6;PAD2(px5,-2.8,0.15);PAD2(px5,2.5,0.15);T2(px5,-2.8,px5,2.5,0.15)}
+// Dense horizontal grid (covers entire board)
+for(var i=0;i<30;i++){var zz5=-2.8+0.18*i;PAD2(-4.5,zz5,0.04);PAD2(4.5,zz5,0.04);T2(-4.5,zz5,4.5,zz5,0.02)}
+// Dense vertical grid
+for(var i=0;i<20;i++){var x5=-4.5+0.45*i;if(Math.abs(x5-bX2)<1.3)continue;PAD2(x5,-3,x5,0.04);PAD2(x5,2.8,0.04);T2(x5,-3,x5,2.8,0.02)}
+// Diagonal 45° routing (8 banks)
+for(var i=0;i<8;i++){
+  var dx5=-4+Math.random()*8,dz5=-3+Math.random()*1.5;
+  var ex3=dx5+1.5+Math.random()*2,ez3=dz5+1.5+Math.random()*2;
+  T2(dx5,dz5,ex3,ez3,0.022);PAD2(dx5,dz5,0.05);PAD2(ex3,ez3,0.05);
+}
+// Dense random mesh fill (150+ traces to fill ALL gaps)
+for(var i=0;i<150;i++){
+  var sx2=-4.5+Math.random()*9,sz2=-3+Math.random()*5.5;
+  var ex2=sx2+(Math.random()-0.5)*2.5,ez2=sz2+(Math.random()-0.5)*2.5;
+  if(Math.abs(sx2-bX2)<1.4&&Math.abs(sz2-bZ3)<1.4)continue;
+  if(Math.abs(sx2-1.8)<1.2&&Math.abs(sz2+0.3)<1.2)continue;
+  T2(sx2,sz2,ex2,ez2,0.02);PAD2(sx2,sz2,0.045);PAD2(ex2,ez2,0.045);
+}
+// Copper pours filling large empty areas
+for(var i=0;i<8;i++){
+  var cpx=-4+Math.random()*8,cpz=-2.5+Math.random()*5;
+  var cpw=0.6+Math.random()*1.2,cpd=0.4+Math.random()*0.8;
+  if(Math.abs(cpx-bX2)<1.5&&Math.abs(cpz-bZ3)<1.5)continue;
+  var cpG=new THREE.BoxGeometry(cpw,0.002,cpd),cpM=new THREE.Mesh(cpG,matCu2);cpM.position.set(cpx,SY2+0.002,cpz);top2.add(cpM);
+  ALL_T.push({x1:cpx-cpw/2,z1:cpz-cpd/2,x2:cpx+cpw/2,z2:cpz+cpd/2,w:cpd});
+}
+// Gold fingers (50)
+for(var i=0;i<50;i++){var gx2=-BW2+0.4+(i/49)*(BW2*2-0.8);var fg2=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.004,0.35),matAu2);fg2.position.set(gx2,SY2+0.004,-BH2+0.06);top2.add(fg2);ALL_P.push({x:gx2,z:-BH2+0.06,r:0.05,s:'rct',w:0.16,d:0.35})}
+// Vias (120 — dense via farm)
+for(var i=0;i<120;i++){var vx2=-4.2+Math.random()*8.4,vz2=-2.8+Math.random()*5.4;VIA2(vx2,vz2,0.06,0.03)}
+// Additional via rows for density
+for(var i=0;i<5;i++){for(var j=0;j<20;j++){VIA2(-4+0.4*j,-2.5+0.5*i,0.06,0.03)}}
+// Corner mounting holes
+[[-BW2+0.35,-BH2+0.35],[BW2-0.35,-BH2+0.35],[-BW2+0.35,BH2-0.35],[BW2-0.35,BH2-0.35]].forEach(function(h){var rg5=new THREE.TorusGeometry(0.16,0.04,8,20),r4=new THREE.Mesh(rg5,matAu2);r4.rotation.x=-Math.PI/2;r4.position.set(h[0],SY2+0.005,h[1]);top2.add(r4);var hg5=new THREE.CylinderGeometry(0.11,0.11,0.008,12),h4=new THREE.Mesh(hg5,matHole2);h4.position.set(h[0],SY2+0.005,h[1]);top2.add(h4);ALL_P.push({x:h[0],z:h[1],r:0.16,s:'r'})});
+
+// === COMPONENTS (detailed) ===
+// BGA 8×8 chip
+var bgaB3=new THREE.Mesh(new THREE.BoxGeometry(1.5,0.08,1.5),matChip2);bgaB3.position.set(bX2,SY2+0.06,bZ3);bgaB3.castShadow=true;top2.add(bgaB3);
+for(var r=0;r<gN2;r++)for(var c=0;c<gN2;c++){var bl4=new THREE.Mesh(new THREE.SphereGeometry(0.022,6,4),matSolder);bl4.position.set(bX2+(c-3.5)*gP2,SY2+0.02,bZ3+(r-3.5)*gP2);top2.add(bl4)}
+// LQFP-48 main chip
+var lqX=1.8,lqZ=-0.3,lqW=1.8,lqD=1.8,lqN=12;
+var lqB=new THREE.Mesh(new THREE.BoxGeometry(lqW,0.09,lqD),matChip2);lqB.position.set(lqX,SY2+0.065,lqZ);lqB.castShadow=true;top2.add(lqB);
+// Pin 1 dot
+var dot2=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,0.004,8),new THREE.MeshStandardMaterial({color:'#ddd',roughness:0.5,metalness:0}));dot2.position.set(lqX-lqW/2+0.2,SY2+0.11,lqZ-lqD/2+0.2);top2.add(dot2);
+for(var i=0;i<lqN;i++){var o3=(i-lqN/2+0.5)*(lqW/lqN)*0.85,oz3=(i-lqN/2+0.5)*(lqD/lqN)*0.85;
+  // Gull-wing pins with solder fillets
+  [[lqX+o3,lqZ-lqD/2-0.12,'tb'],[lqX+o3,lqZ+lqD/2+0.12,'tb'],[lqX-lqW/2-0.12,lqZ+oz3,'lr'],[lqX+lqW/2+0.12,lqZ+oz3,'lr']].forEach(function(a,i2){
+    // Pin body
+    var pg2=i2<2?new THREE.BoxGeometry(0.04,0.008,0.15):new THREE.BoxGeometry(0.15,0.008,0.04);
+    var pm3=new THREE.Mesh(pg2,matPin3);pm3.position.set(a[0],SY2+0.005,a[1]);top2.add(pm3);
+    // Solder fillet (small blob at pad)
+    var sg=new THREE.SphereGeometry(0.025,6,4);var sm=new THREE.Mesh(sg,matSolder);sm.position.set(a[0],SY2+0.003,a[1]);top2.add(sm);
+  });
+}
+// QFP secondary
+var q2X3=3.5,q2Z3=1.5,q2W2=0.8,q2D2=0.6;
+var q2B3=new THREE.Mesh(new THREE.BoxGeometry(q2W2,0.07,q2D2),matChip2);q2B3.position.set(q2X3,SY2+0.055,q2Z3);q2B3.castShadow=true;top2.add(q2B3);
+for(var i=0;i<8;i++){var o4=(i-3.5)*(q2W2/8)*0.8,oz4=(i-3.5)*(q2D2/8)*0.8;
+  [[q2X3+o4,q2Z3-q2D2/2-0.1],[q2X3+o4,q2Z3+q2D2/2+0.1],[q2X3-q2W2/2-0.1,q2Z3+oz4],[q2X3+q2W2/2+0.1,q2Z3+oz4]].forEach(function(a,i2){var g5=i2<2?new THREE.BoxGeometry(0.03,0.007,0.12):new THREE.BoxGeometry(0.12,0.007,0.03);var m7=new THREE.Mesh(g5,matPin3);m7.position.set(a[0],SY2+0.005,a[1]);top2.add(m7);var sg2=new THREE.SphereGeometry(0.02,5,3);var sm2=new THREE.Mesh(sg2,matSolder);sm2.position.set(a[0],SY2+0.003,a[1]);top2.add(sm2)});
+}
+// SOIC-8
+var soX2=-1.2,soZ2=1.6;
+var soB3=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.07,0.4),matChip2);soB3.position.set(soX2,SY2+0.055,soZ2);soB3.castShadow=true;top2.add(soB3);
+for(var i=0;i<4;i++){var soOff2=(i-1.5)*0.15;[-1,1].forEach(function(s2){var g6=new THREE.BoxGeometry(0.06,0.007,0.1);var m8=new THREE.Mesh(g6,matPin3);m8.position.set(soX2+soOff2,SY2+0.005,soZ2+s2*0.24);top2.add(m8)});}
+// Electrolytic capacitor (5mm dia × 11mm tall → 0.5 × 1.1 units)
+var capX=4.5,capZ=-1.8;
+var capBody=new THREE.Mesh(new THREE.CylinderGeometry(0.25,0.25,1.1,24),new THREE.MeshStandardMaterial({color:'#1a1a20',roughness:0.5,metalness:0}));capBody.position.set(capX,SY2+0.55,capZ);capBody.castShadow=true;top2.add(capBody);
+// "K" vent on top
+var ventGeo=new THREE.TorusGeometry(0.12,0.012,8,12);var vent=new THREE.Mesh(ventGeo,new THREE.MeshStandardMaterial({color:'#333',roughness:0.3,metalness:0.4}));vent.position.set(capX,SY2+1.1,capZ);vent.rotation.x=Math.PI/2;top2.add(vent);
+// Cap label
+var capLabelC=document.createElement('canvas');capLabelC.width=128;capLabelC.height=64;var clCtx=capLabelC.getContext('2d');clCtx.fillStyle='#ddd';clCtx.font='16px monospace';clCtx.fillText('47uF 25V',10,20);var capLabelT=new THREE.CanvasTexture(capLabelC);capLabelT.colorSpace=THREE.SRGBColorSpace;var capLabel=new THREE.Mesh(new THREE.PlaneGeometry(0.4,0.2),new THREE.MeshBasicMaterial({map:capLabelT,transparent:true}));capLabel.position.set(capX+0.26,SY2+0.8,capZ);capLabel.rotation.y=Math.PI/2;top2.add(capLabel);
+// 0603 Passives (80 — fill everywhere)
+for(var i=0;i<80;i++){var px4=-4.5+Math.random()*9,pz4=-2.8+Math.random()*5.4;if(Math.abs(px4-bX2)<1.5&&Math.abs(pz4-bZ3)<1.5)continue;if(Math.abs(px4-lqX)<1.3&&Math.abs(pz4-lqZ)<1.3)continue;if(Math.abs(px4-capX)<0.8&&Math.abs(pz4-capZ)<0.8)continue;var w3=0.16,d3=0.08,h3=0.06;var b3=new THREE.Mesh(new THREE.BoxGeometry(w3,h3,d3),new THREE.MeshStandardMaterial({color:['#9BB7D4','#D4A09B','#B8C9A8','#D4C8A0'][Math.floor(Math.random()*4)],roughness:0.6,metalness:0}));b3.position.set(px4,SY2+h3/2+0.005,pz4);b3.castShadow=true;top2.add(b3);[-1,1].forEach(function(s3){var c3=new THREE.Mesh(new THREE.BoxGeometry(w3*0.22,h3*0.7,d3*1.1),matPin3);c3.position.set(px4+s3*(w3/2-w3*0.11),SY2+h3*0.35+0.005,pz4);top2.add(c3);var sg3=new THREE.SphereGeometry(0.012,4,3);var sm3=new THREE.Mesh(sg3,matSolder);sm3.position.set(px4+s3*(w3/2-w3*0.11),SY2+0.002,pz4);top2.add(sm3)})}
+// Extra SOIC chips
+for(var i=0;i<3;i++){var sx3=-4+Math.random()*8,sz3=-2.5+Math.random()*5;if(Math.abs(sx3-bX2)<1.5||Math.abs(sx3-lqX)<1.3)continue;var soB4=new THREE.Mesh(new THREE.BoxGeometry(0.4,0.06,0.3),matChip2);soB4.position.set(sx3,SY2+0.05,sz3);soB4.castShadow=true;top2.add(soB4);for(var j=0;j<4;j++){var soOff3=(j-1.5)*0.12;[-1,1].forEach(function(s4){var g7=new THREE.BoxGeometry(0.05,0.006,0.08);var m9=new THREE.Mesh(g7,matPin3);m9.position.set(sx3+soOff3,SY2+0.004,sz3+s4*0.18);top2.add(m9)})}}
+// Small QFN chips
+for(var i=0;i<2;i++){var qx4=-3.5+Math.random()*7,qz4=-2+Math.random()*4;if(Math.abs(qx4-bX2)<1.5||Math.abs(qx4-lqX)<1.3)continue;var qnB=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.05,0.5),matChip2);qnB.position.set(qx4,SY2+0.045,qz4);qnB.castShadow=true;top2.add(qnB)}
+
+// === SURFACE TEXTURE (photorealistic — 2048×2048) ===
+var TS2=2048;
+var tc2=document.createElement('canvas');tc2.width=TS2;tc2.height=TS2;var ctx2=tc2.getContext('2d');
+var U2=function(x){return (x+BW2)/(2*BW2)*TS2},V2=function(z){return (z+BH2)/(2*BH2)*TS2},SW3=function(w){return w/(2*BW2)*TS2},SH3=function(d){return d/(2*BH2)*TS2};
+// 1. FR4 base with fiberglass weave
+ctx2.fillStyle='#382818';ctx2.fillRect(0,0,TS2,TS2);
+ctx2.strokeStyle='rgba(200,180,160,0.06)';ctx2.lineWidth=0.6;
+for(var i=0;i<TS2;i+=5){ctx2.beginPath();ctx2.moveTo(i,0);ctx2.lineTo(i,TS2);ctx2.stroke();ctx2.beginPath();ctx2.moveTo(0,i);ctx2.lineTo(TS2,i);ctx2.stroke()}
+ctx2.strokeStyle='rgba(180,160,140,0.03)';ctx2.lineWidth=0.3;
+for(var i=0;i<TS2;i+=10){ctx2.beginPath();ctx2.moveTo(i,0);ctx2.lineTo(i+10,TS2);ctx2.stroke()}
+// 2. Copper traces
+for(var i=0;i<ALL_T.length;i++){var t2=ALL_T[i],u12=U2(t2.x1),v12=V2(t2.z1),u22=U2(t2.x2),v22=V2(t2.z2),dx4=u22-u12,dz4=v22-v12,len4=Math.sqrt(dx4*dx4+dz4*dz4);if(len4<0.5)continue;var ang4=Math.atan2(dz4,dx4),hw3=SW3(t2.w)*0.75;ctx2.save();ctx2.translate((u12+u22)/2,(v12+v22)/2);ctx2.rotate(ang4);ctx2.fillStyle='#e08038';ctx2.fillRect(-len4/2,-hw3,len4,hw3*2);ctx2.restore()}
+// 3. Solder mask
+ctx2.fillStyle='rgba(0,65,16,0.6)';ctx2.fillRect(0,0,TS2,TS2);
+// 4. Pad openings + ENIG gold
+for(var i=0;i<ALL_P.length;i++){var p4=ALL_P[i],pu2=U2(p4.x),pv2=V2(p4.z);if(p4.s==='r'){var or2=SW3(p4.r)*1.3;ctx2.save();ctx2.globalCompositeOperation='destination-out';ctx2.beginPath();ctx2.arc(pu2,pv2,or2,0,Math.PI*2);ctx2.fill();ctx2.restore();ctx2.fillStyle='#f2c838';ctx2.beginPath();ctx2.arc(pu2,pv2,SW3(p4.r),0,Math.PI*2);ctx2.fill();ctx2.fillStyle='rgba(255,252,215,0.6)';ctx2.beginPath();ctx2.arc(pu2-SW3(p4.r)*0.12,pv2-SW3(p4.r)*0.18,SW3(p4.r)*0.3,0,Math.PI*2);ctx2.fill()}else{var ow2=SW3(p4.w)*1.3,oh2=SH3(p4.d)*1.3;ctx2.save();ctx2.globalCompositeOperation='destination-out';ctx2.fillRect(pu2-ow2/2,pv2-oh2/2,ow2,oh2);ctx2.restore();ctx2.fillStyle='#f2c838';ctx2.fillRect(pu2-SW3(p4.w)/2,pv2-SH3(p4.d)/2,SW3(p4.w),SH3(p4.d))}}
+// 5. Silkscreen
+ctx2.strokeStyle='rgba(230,230,210,0.55)';ctx2.lineWidth=1.2;ctx2.strokeRect(U2(-BW2+0.05),V2(-BH2+0.05),U2(BW2-0.05)-U2(-BW2+0.05),V2(BH2-0.05)-V2(-BH2+0.05));
+ctx2.strokeStyle='rgba(230,230,210,0.45)';ctx2.lineWidth=0.8;
+ctx2.strokeRect(U2(bX2-0.75),V2(bZ3-0.75),SW3(1.5),SH3(1.5));
+ctx2.strokeRect(U2(lqX-0.9),V2(lqZ-0.9),SW3(1.8),SH3(1.8));
+ctx2.strokeRect(U2(q2X3-0.4),V2(q2Z3-0.3),SW3(0.8),SH3(0.6));
+ctx2.strokeRect(U2(soX2-0.25),V2(soZ2-0.2),SW3(0.5),SH3(0.4));
+// Pin 1 marks
+ctx2.fillStyle='rgba(230,230,210,0.6)';ctx2.beginPath();ctx2.arc(U2(bX2-0.85),V2(bZ3-0.85),SW3(0.08),0,Math.PI*2);ctx2.fill();
+ctx2.beginPath();ctx2.arc(U2(lqX-1.05),V2(lqZ-1.05),SW3(0.07),0,Math.PI*2);ctx2.fill();
+// Component labels
+ctx2.fillStyle='rgba(230,230,210,0.5)';ctx2.font=Math.round(TS2*0.012)+'px monospace';
+ctx2.fillText('U1',U2(bX2-0.2),V2(bZ3+0.95));ctx2.fillText('U2',U2(lqX-0.2),V2(lqZ+1.1));
+ctx2.fillText('U3',U2(q2X3-0.15),V2(q2Z3+0.45));ctx2.fillText('U4',U2(soX2-0.1),V2(soZ2+0.35));
+ctx2.fillText('C1',U2(capX-0.15),V2(capZ+0.35));
+for(var i=0;i<10;i++){ctx2.fillText('R'+(i+1),U2(-2.6+Math.random()*5.2),V2(-1.8+Math.random()*3.6))}
+// Board info
+ctx2.fillStyle='rgba(230,230,210,0.45)';ctx2.font=Math.round(TS2*0.013)+'px monospace';
+ctx2.fillText('HBS PCB · ENIG · IPC CLASS 2 · UL E200704',TS2*0.05,TS2*0.95);
+ctx2.fillText('SHENZHEN HENGBAOSHI PCB CO.,LTD  |  6-LAYER  |  1OZ CU  |  FR4',TS2*0.05,TS2*0.98);
+
+var tx2=new THREE.CanvasTexture(tc2);tx2.colorSpace=THREE.SRGBColorSpace;bM2.material=new THREE.MeshStandardMaterial({map:tx2,roughness:0.3,metalness:0.02});
+
+// === LIGHTS ===
+var key4=new THREE.DirectionalLight('#fff8ee',14);key4.position.set(5,8,5);key4.castShadow=true;key4.shadow.mapSize.set(2048,2048);key4.shadow.camera.near=0.1;key4.shadow.camera.far=40;key4.shadow.camera.left=-10;key4.shadow.camera.right=10;key4.shadow.camera.top=10;key4.shadow.camera.bottom=-10;key4.shadow.bias=-0.00004;S.add(key4);
+var fl5=new THREE.DirectionalLight('#8899cc',2);fl5.position.set(-5,-2,-3);S.add(fl5);
+var rl5=new THREE.DirectionalLight('#ffffff',2.5);rl5.position.set(0,-1,-8);S.add(rl5);
+S.add(new THREE.AmbientLight('#1a2a3a',1.3));
+var ap5=new THREE.PointLight('#e8d060',18,12,1.5);ap5.position.set(0,3,4);S.add(ap5);
+
+// === PARTICLES ===
+var PC2=300;var pG5=new THREE.BufferGeometry();var pP5=new Float32Array(PC2*3);var pD5=[];
+for(var i=0;i<PC2;i++){var th4=Math.random()*Math.PI*2,ph7=Math.acos(2*Math.random()-1),rr7=6+Math.random()*14;pP5[i*3]=Math.cos(th4)*Math.sin(ph7)*rr7*1.3;pP5[i*3+1]=Math.sin(ph7)*rr7*0.5+2;pP5[i*3+2]=Math.cos(ph7)*rr7;pD5.push({th:th4,ph:ph7,r:rr7,s:0.15+Math.random()*0.5,ph2:Math.random()*Math.PI*2,life:Math.random(),ls:0.002+Math.random()*0.005})}
+pG5.setAttribute('position',new THREE.BufferAttribute(pP5,3));
+var pS5=new THREE.Points(pG5,new THREE.PointsMaterial({color:'#f0d880',size:0.04,blending:THREE.AdditiveBlending,depthWrite:false,transparent:true,opacity:0.4,sizeAttenuation:true}));S.add(pS5);
+
+P2.rotation.set(-0.15,0.08,0);
+
+// === SCROLL ===
+var prog2=0,targ2=0;
+document.addEventListener('wheel',function(e){e.preventDefault();targ2=Math.max(0,Math.min(1,targ2+e.deltaY*0.00035));prog2=targ2;upd4(targ2)},{passive:false,capture:true});
+var tsY4=0,tsP4=0;
+document.addEventListener('touchstart',function(e){tsY4=e.touches[0].clientY;tsP4=targ2},{passive:true});
+document.addEventListener('touchmove',function(e){targ2=Math.max(0,Math.min(1,tsP4+(tsY4-e.touches[0].clientY)*0.0015));prog2=targ2;upd4(targ2)},{passive:true});
+document.addEventListener('keydown',function(e){var k=e.key;if(k==='ArrowDown'||k==='j'){targ2=Math.min(1,targ2+0.025);prog2=targ2;upd4(targ2)}if(k==='ArrowUp'||k==='k'){targ2=Math.max(0,targ2-0.025);prog2=targ2;upd4(targ2)}if(k>='0'&&k<='6'){var pp4=parseInt(k)/6;targ2=pp4;prog2=pp4;upd4(pp4)}});
+
+function ez4(t){return t<0.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2}
+function upd4(t){
+  var cx2,cy2,cz2,ly2;
+  if(t<0.12){var ct2=ez4(t/0.12);cx2=Math.sin(ct2*0.3)*2;cy2=4.5-ct2*1.2;cz2=11-ct2*3;ly2=0.1}
+  else if(t<0.28){var ct2=ez4((t-0.12)/0.16);cx2=2+ct2*3;cy2=3.3-ct2*0.8;cz2=8-ct2*2;ly2=-0.3-ct2}
+  else if(t<0.48){var ct2=ez4((t-0.28)/0.20);cx2=5-ct2*6;cy2=2.5+ct2*6;cz2=6-ct2*1;ly2=-1-ct2}
+  else if(t<0.62){var ct2=ez4((t-0.48)/0.14);cx2=-2+ct2*2;cy2=8.5-ct2*7.5;cz2=5-ct2*4;ly2=0.12}
+  else if(t<0.76){var ct2=ez4((t-0.62)/0.14);cx2=-3+ct2*4;cy2=1+ct2*3.5;cz2=1+ct2*6;ly2=0.05}
+  else if(t<0.90){var ct2=ez4((t-0.76)/0.14);cx2=1-ct2;cy2=4.5+ct2*5;cz2=7+ct2*8;ly2=-1-ct2}
+  else{var ct2=ez4((t-0.90)/0.10);cx2=(1-ct2)*0;cy2=9.5-ct2*4.5;cz2=15-ct2*6;ly2=0}
+  C.position.set(cx2,cy2,cz2);C.lookAt(0,ly2,0);
+  P2.rotation.y=t<0.12?Math.sin(t*12)*0.06+0.08:t<0.28?0.08+(t-0.12)/0.16*0.4:t<0.48?0.48-(t-0.28)/0.20*0.5:t<0.62?-(t-0.48)/0.14*0.2:t<0.76?-0.2-(t-0.62)/0.14*0.35:t<0.90?-0.55+(t-0.76)/0.14*0.6:0.05+Math.sin((t-0.90)/0.10*Math.PI*3)*0.04;
+  P2.rotation.x=t<0.12?-0.15+Math.sin(t*6)*0.02:t<0.28?-0.15-(t-0.12)/0.16*0.5:t<0.48?-0.65+(t-0.28)/0.20*0.8:t<0.62?(t-0.48)/0.14*0.04:t<0.76?0.04+(t-0.62)/0.14*0.12:t<0.90?0.16-(t-0.76)/0.14*0.4:-0.2+(t-0.90)/0.10*0.2;
+  var now4=performance.now()*0.001,arr4=pS5.geometry.attributes.position.array;
+  for(var i=0;i<PC2;i++){var pd4=pD5[i],i3=i*3;pd4.life+=pd4.ls;if(pd4.life>1){pd4.life=0;pd4.th=Math.random()*Math.PI*2;pd4.ph=Math.acos(2*Math.random()-1);pd4.r=4+Math.random()*10}var lf2=pd4.life,ang5=pd4.th+now4*pd4.s*0.5+lf2*Math.PI*2,rr8=pd4.r*(1+Math.sin(now4*pd4.s+pd4.ph2)*0.2),ph8=pd4.ph+Math.sin(now4*pd4.s*0.5+pd4.ph2)*0.2;arr4[i3]=Math.cos(ang5)*Math.sin(ph8)*rr8;arr4[i3+1]=Math.sin(ph8)*rr8*0.5+(2-lf2*3);arr4[i3+2]=Math.cos(ph8)*rr8}
+  pS5.geometry.attributes.position.needsUpdate=true;ap5.intensity=16+Math.sin(now4*2.5)*4;
+}
+
+var clk4=new THREE.Clock(),frm4=0;
+function anim4(){requestAnimationFrame(anim4);var dt2=Math.min(clk4.getDelta(),0.1);if(Math.abs(targ2-prog2)>0.0001){prog2+=(targ2-prog2)*Math.min(dt2*10,1);if(Math.abs(targ2-prog2)<0.0004)prog2=targ2;upd4(prog2)}if(Math.abs(targ2)<0.001)pS5.rotation.y+=dt2*0.15;R.render(S,C);frm4++;if(frm4===2)L.style.display='none'}
+anim4();
+window.addEventListener('resize',function(){R.setSize(window.innerWidth,window.innerHeight);C.aspect=window.innerWidth/window.innerHeight;C.updateProjectionMatrix()});
+})();
+</script>
+</body>
+</html>

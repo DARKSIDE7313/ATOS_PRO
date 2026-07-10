@@ -146,7 +146,7 @@ def batch_quality_factors(symbols: list[str]) -> dict:
                 logger.info(f"Serenity信号偏弱(std={s_std:.4f})，权重降至{blend:.0%}")
     for sym in symbols:
         if sym in results:
-            q_comp = results[sym].get("composite", 0.5)
+            q_comp = results[sym].get("composite", 0.0)  # Fix: 默认0.0替代0.5避免假性中性分
             s_comp = serenity_scores.get(sym, {}).get("composite", 0.3)
             blended = (1 - blend) * q_comp + blend * s_comp
             results[sym]["composite"] = round(blended, 4)

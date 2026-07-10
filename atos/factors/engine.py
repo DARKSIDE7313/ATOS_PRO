@@ -23,12 +23,12 @@ logger = get_logger("factors.engine")
 # 调降 momentum（0.32→0.20），调升 value（0.05→0.15）和技术（0.25→0.28）
 # MA200 偏离过滤会筛掉过热股票，技术分主要用于识别趋势健康者
 DEFAULT_WEIGHTS = {
-    "value":      0.15,   # 基金级：价值因子权重翻3倍，当前市场价值股优于动量股
-    "momentum":   0.20,   # 降低动量权重（回调市场动量普遍负值）
-    "quality":    0.10,   # 提升质量权重（防御性）
-    "technical":  0.28,   # 技术指标在当前震荡市更有效
-    "multiframe": 0.12,   # 多时间框架信号辅助
-    "mean_rev":   0.15,   # 均值回归（RSI低的超卖反弹）
+    "value":      0.18,   # v10: 价值因子权重提高
+    "momentum":   0.25,   # v10: 动量权重提回（不要过度惩罚）
+    "quality":    0.10,   # 质量权重保持
+    "technical":  0.25,   # v10: 技术指标回调正常水平
+    "multiframe": 0.08,   # v10: 多时间框架降低
+    "mean_rev":   0.14,   # 均值回归保持
 }
 
 # IC 历史记录
@@ -45,9 +45,9 @@ _ic_history_window: dict[str, list[float]] = {}  # {regime: [ic1, ic2, ...]}
 #   - IC_WINDOW 从 20 → 12（更快适应真实 IC）
 #   - IC_MIN_OBS 从 8 → 4（4 个真实周期后即可生效）
 #   - Bootstrap 值中心化在 0.0，含正负混合（避免正偏压）
-IC_WINDOW = 12
-IC_MIN_OBS = 4
-DYNAMIC_IC_ALPHA = 0.6  # 动态权重占 60%，固定权重占 40%
+IC_WINDOW = 10
+IC_MIN_OBS = 3          # 从 4 降到 3 — 更快适应真实 IC
+DYNAMIC_IC_ALPHA = 0.35  # v10: 从 0.5 降到 0.35 — 更信任固定权重，减少IC波动影响
 
 
 def _bootstrap_ic_window():
@@ -59,28 +59,29 @@ def _bootstrap_ic_window():
     2026-06-24 修复：同时预填充 _ic_history（单值存储），
     避免 adjust_weights_from_ic 在首次调用时因 _ic_history[regime] 为空而短路。
     """
-    bootstrap_ics = [0.02, -0.01, 0.03, 0.01]  # 中心化中性值（无正偏压）
+    # 2026-06-25 深度修复：完全中性化 bootstrap
+    # 旧值 [0.02, -0.01, 0.03, 0.01] 均值=+0.0125（正偏压→动态权重上调过度）
+    # 新值 均值=0.0，完全中性，让真实数据主导方向
+    bootstrap_ics = [0.005, -0.005, 0.008, -0.008]
     for regime in REGIME_WEIGHTS.keys():
         if regime not in _ic_history_window:
             _ic_history_window[regime] = list(bootstrap_ics)
-        # 预填充 _ic_history 防止 adjust_weights_from_ic 首次短路
         if regime not in _ic_history:
-            _ic_history[regime] = {"last_ic": bootstrap_ics[-1], "weight_adjustments": {}}
-        # 预填充空 per-factor IC 字典（中性值，避免正偏压）
+            _ic_history[regime] = {"last_ic": 0.0, "weight_adjustments": {}}
         if regime not in _per_factor_ic:
-            _per_factor_ic[regime] = {f: 0.01 for f in DEFAULT_WEIGHTS}
-    logger.info(f"[IC Bootstrap] 已预填充 {len(REGIME_WEIGHTS)} 个市场状态的 IC 窗口 + _ic_history")
+            _per_factor_ic[regime] = {f: 0.0 for f in DEFAULT_WEIGHTS}
+    logger.info(f"[IC Bootstrap] 预填充 {len(REGIME_WEIGHTS)} 个市场状态 (完全中性化)")
 
 
 # v5: BEAR模式下动量大幅降低、质量大幅提升（真正切换防守）
 # HIGH_VOL下降低动量+均值回归，提升趋势+突破（避免高波动抄底）
 REGIME_WEIGHTS = {
-    "BULL_STRONG": {"momentum": 0.32, "technical": 0.25, "value": 0.10, "quality": 0.08, "multiframe": 0.12, "mean_rev": 0.13},
-    "BULL_WEAK":   {"momentum": 0.18, "technical": 0.28, "value": 0.15, "quality": 0.12, "multiframe": 0.10, "mean_rev": 0.17},
+    "BULL_STRONG": {"momentum": 0.35, "technical": 0.22, "value": 0.10, "quality": 0.06, "multiframe": 0.12, "mean_rev": 0.15},
+    "BULL_WEAK":   {"momentum": 0.22, "technical": 0.25, "value": 0.18, "quality": 0.10, "multiframe": 0.08, "mean_rev": 0.17},
     "HIGH_VOL":    {"momentum": 0.10, "technical": 0.22, "value": 0.15, "quality": 0.18, "multiframe": 0.15, "mean_rev": 0.20},
     "BEAR":        {"momentum": 0.05, "technical": 0.18, "value": 0.18, "quality": 0.32, "multiframe": 0.12, "mean_rev": 0.15},
-    "SIDEWAYS":    {"momentum": 0.15, "technical": 0.28, "value": 0.15, "quality": 0.12, "multiframe": 0.10, "mean_rev": 0.20},
-    "UNKNOWN":     {"momentum": 0.18, "technical": 0.28, "value": 0.15, "quality": 0.12, "multiframe": 0.12, "mean_rev": 0.15},
+    "SIDEWAYS":    {"momentum": 0.18, "technical": 0.25, "value": 0.15, "quality": 0.12, "multiframe": 0.10, "mean_rev": 0.20},
+    "UNKNOWN":     {"momentum": 0.20, "technical": 0.25, "value": 0.18, "quality": 0.12, "multiframe": 0.10, "mean_rev": 0.15},
 }
 
 # 模块加载时自动填充 bootstrap IC（必须在 REGIME_WEIGHTS 定义之后调用）
@@ -88,45 +89,84 @@ _bootstrap_ic_window()
 
 
 def _tech_score(signal: dict) -> float:
-    """将技术信号转为 0-1 得分。v7 基金级校准：UP趋势奖励加倍，更好区分趋势质量。"""
+    """技术信号评分 v11 — 增加评分区分度。
+
+    v8 的问题: 中性趋势=0, RSI 60-70=0, 再加缩量惩罚后大部分股票得分<0.15, 没有区分度。
+    v11: 扩充分数范围, 让好股票得 0.40+, 中性股票 0.12-0.25, 只对极差的扣分。
+    """
     if not signal:
         return 0.0
-    score = 0.0
+
     trend = signal.get("trend", "NEUTRAL")
     rsi = signal.get("rsi", 50)
     vol_r = signal.get("volume_ratio", 1.0)
     bb = signal.get("bollinger", {})
+    price = signal.get("price", 0)
+    ma50 = signal.get("ma50", price)
 
-    # 趋势加分 — v7 基金级：UP 趋势奖励从0.25升到0.35，更好地区分信号
-    trend_map = {"UP": 0.35, "WEAK_UP": 0.20, "NEUTRAL": 0.0, "WEAK_DOWN": -0.10, "DOWN": -0.20}
-    score += trend_map.get(trend, 0)
+    # 🔴 趋势DOWN → 立刻返回最低分（不允许逆势买入）
+    if trend == "DOWN":
+        return 0.0
 
-    # RSI: 40-70 健康
-    if 40 <= rsi <= 70:
-        score += 0.10
-    elif rsi < 30:
-        score -= 0.10
-    elif rsi > 80:
-        score -= 0.20
+    score = 0.0
 
-    # 放量加分（正常交易量确认）
-    if 1.0 <= vol_r <= 3.0:
-        score += 0.10
-    elif vol_r < 0.5:
-        score -= 0.05
+    # 趋势加分 (v11: 扩大区分)
+    trend_map = {"UP": 0.40, "WEAK_UP": 0.25, "NEUTRAL": 0.10, "WEAK_DOWN": -0.05}
+    score += trend_map.get(trend, 0.05)
 
-    # 布林带中位健康
+    # RSI (v11: 更细的区分, 减少极端惩罚)
+    if 40 <= rsi <= 60:
+        score += 0.18       # 最佳买入区间
+    elif 30 <= rsi < 40:
+        score += 0.14       # 超卖区域（好）
+    elif 60 < rsi <= 70:
+        score += 0.08       # 中性偏高 → 给正分而非0
+    elif 20 <= rsi < 30:
+        score += 0.05       # 极端超卖 → 小正分
+    elif rsi > 75:
+        score -= 0.25       # 🔴 强超买
+    elif rsi > 70:
+        score -= 0.12       # 🟠 超买 → 从-0.25减到-0.12
+
+    # 放量确认
+    if 1.2 <= vol_r <= 3.0:
+        score += 0.15       # 放量确认
+    elif 0.8 <= vol_r < 1.2:
+        score += 0.06       # 正常量
+    elif 0.5 <= vol_r < 0.8:
+        score += 0.02       # 略缩量, 中性
+    elif vol_r < 0.3:
+        score -= 0.10       # 严重缩量
+
+    # 价格 vs MA50
+    if ma50 > 0 and price > 0:
+        dev = (price - ma50) / ma50
+        if -0.05 <= dev <= 0.05:
+            score += 0.05   # 贴近MA50 → 好买点
+        elif dev > 0.12:
+            score -= 0.06   # 偏离MA50 12%以上
+        elif dev < -0.12:
+            score += 0.08   # 低于MA50 → 可能有反弹机会
+
+    # 布林带位置
     pct_b = bb.get("pct_b", 0.5)
     if 0.2 <= pct_b <= 0.8:
-        score += 0.05
-    elif pct_b < 0.1 or pct_b > 0.9:
-        score -= 0.10
+        score += 0.06
+    elif pct_b < 0.2:
+        score += 0.03       # 下轨区域 → 可能是机会
+    elif pct_b > 0.9:
+        score -= 0.12       # 上轨 — 超买
 
     return max(0.0, min(1.0, score))
 
 
 def _mean_rev_score(signal: dict) -> float:
-    """均值回归评分 — v5: 只用 RSI + BB，不再重复评判趋势（趋势由 _tech_score 负责）。"""
+    """均值回归评分 v11 — 修复 RSI 40-65 死区。
+
+    之前的 bug: RSI 在 40-65 的正常区间完全没有分支，rsi_score 永远为 0.0。
+    Bollinger %B 在 0.30-0.70 也没有分支。结果大多数正常股票从 mean_rev 得到 0 分。
+    v11: 加入正常区间的中性正分，确保所有股票都有贡献。
+    """
     if not signal:
         return 0.0
 
@@ -134,40 +174,41 @@ def _mean_rev_score(signal: dict) -> float:
     bb = signal.get("bollinger", {})
     pct_b = bb.get("pct_b", 0.5)
 
-    rsi_score = 0.0  # 计算 RSI 部分的总分
-    bb_score = 0.0   # 计算 BB 部分的总分
-
-    # RSI 均值回归信号
-    if rsi < 25:
-        rsi_score = 0.35
+    # RSI 评分 — v11: 补全所有区间
+    if rsi < 20:
+        rsi_score = 0.40   # 极端超卖 → 强反弹信号
     elif rsi < 30:
-        rsi_score = 0.25
-    elif rsi < 35:
-        rsi_score = 0.15
+        rsi_score = 0.25   # 超卖
     elif rsi < 40:
-        rsi_score = 0.08
+        rsi_score = 0.12   # 偏超卖
+    elif rsi <= 60:
+        rsi_score = 0.06   # v11: 正常区间 → 轻微正分
+    elif rsi <= 70:
+        rsi_score = -0.05  # 偏超买
+    elif rsi > 80:
+        rsi_score = -0.30  # 极端超买
     elif rsi > 75:
-        rsi_score = -0.25
-    elif rsi > 70:
-        rsi_score = -0.15
-    elif rsi > 65:
-        rsi_score = -0.08
+        rsi_score = -0.20
+    else:  # 70 < rsi <= 75
+        rsi_score = -0.12
 
-    # Bollinger %B 位置
+    # Bollinger %B 评分 — v11: 补全所有区间
     if pct_b < 0.10:
-        bb_score = 0.25
+        bb_score = 0.30   # 布林下轨 → 强反弹
     elif pct_b < 0.20:
-        bb_score = 0.15
+        bb_score = 0.18
     elif pct_b < 0.30:
         bb_score = 0.08
+    elif pct_b <= 0.70:
+        bb_score = 0.04   # v11: 布林中轨 → 轻微正分
     elif pct_b > 0.90:
-        bb_score = -0.25
+        bb_score = -0.25  # 布林上轨 → 超买
     elif pct_b > 0.80:
-        bb_score = -0.15
-    elif pct_b > 0.70:
-        bb_score = -0.08
+        bb_score = -0.12
+    else:  # 0.70 < pct_b <= 0.80
+        bb_score = -0.04
 
-    # 核心创新: RSI 和 BB 信号取最强者（不叠加）
+    # v11: 取两者中绝对值更大者（保留原有逻辑）
     if abs(rsi_score) >= abs(bb_score):
         score = rsi_score
     else:
@@ -290,6 +331,10 @@ def combine(signals: dict, value_factors: dict, momentum_factors: dict,
         t_score = _tech_score(signals[sym])
         f_score = multiframe_factors.get(sym, {}).get("composite", 0.0)
         r_score = _mean_rev_score(signals[sym])
+        # Fix: 检测全默认分 — 如果多个因子在 0.45-0.55 区间（未计算/占位），跳过该标的
+        near_default_count = sum(1 for s in [v_score, m_score, q_score, f_score] if 0.45 <= s <= 0.55)
+        if near_default_count >= 3:  # 至少3个因子是默认值 → 数据不足
+            continue
         smc_score_raw = signals[sym].get("smc_score", {}).get("smc_score", 0.0)
 
         smc_normalized = smc_score_raw  # SMC 直接从 0 起步，缺失数据得 0 分
@@ -404,8 +449,8 @@ def ic_analysis(prev_scores: dict, current_returns: dict, regime: str = "UNKNOWN
 
 
 def get_top_picks(combine_result: dict, n: int = 10,
-                  min_score: float = 0.20) -> list[dict]:
-    """从综合结果中提取 Top N 推荐标的。v7 基金级校准：阈值 0.20（匹配新评分体系）。"""
+                  min_score: float = 0.15) -> list[dict]:
+    """从综合结果中提取 Top N 推荐标的。v10：阈值 0.15（从 0.20 放宽）。"""
     rankings = combine_result["rankings"]
     breakdown = combine_result["breakdown"]
     picks = []

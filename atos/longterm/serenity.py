@@ -387,7 +387,7 @@ Output valid JSON ONLY with these fields:
                 "model": "deepseek-chat",
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.7,
-                "response_format": {"type": "json_object"},
+                # DeepSeek 不支持 response_format，改用 prompt 指令
             },
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             timeout=30,

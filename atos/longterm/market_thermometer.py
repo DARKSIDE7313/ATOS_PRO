@@ -13,6 +13,13 @@ from atos.core.logging import get_logger
 
 logger = get_logger("phoenix.market_thermometer")
 
+# Futu 数据源（优先使用）
+try:
+    from atos.data.futu_provider import get_futu
+    _futu = get_futu()
+except Exception:
+    _futu = None
+
 
 class MarketThermometer:
     """
@@ -39,27 +46,34 @@ class MarketThermometer:
         return val
 
     def get_sp500_pe(self) -> float:
-        """获取标普 500 整体 PE"""
+        """获取标普 500 整体 PE（Futu优先，yfinance后备）"""
         def _fetch():
+            if _futu:
+                pe = _futu.get_sp500_pe()
+                if pe > 0:
+                    return pe
             spy = yf.Ticker("SPY")
             info = spy.info or {}
             pe = info.get("trailingPE", 0) or info.get("forwardPE", 0) or 0
             if pe > 0:
                 return float(pe)
-            # 备用：用 VOO
             voo = yf.Ticker("VOO")
             info2 = voo.info or {}
             return float(info2.get("trailingPE", 20) or 20)
         return self._get_cached_or_fetch("sp500_pe", _fetch, 24)
 
     def get_vix(self) -> float:
-        """获取 VIX 恐慌指数"""
+        """获取 VIX 恐慌指数（Futu优先，yfinance后备）"""
         def _fetch():
+            if _futu:
+                v = _futu.get_vix()
+                if 5 < v < 100:
+                    return v
             vix = yf.Ticker("^VIX")
             hist = vix.history(period="5d", interval="1d")
             if hist is not None and not hist.empty:
                 return float(hist["Close"].iloc[-1])
-            return 20.0  # 默认
+            return 20.0
         return self._get_cached_or_fetch("vix", _fetch, 2)
 
     def get_yield_curve(self) -> float:
@@ -86,8 +100,12 @@ class MarketThermometer:
         return self._get_cached_or_fetch("yield_curve", _fetch, 6)
 
     def get_sp500_sma200_pct(self) -> float:
-        """标普 500 当前价格相对 200 日均线的位置百分比"""
+        """标普 500 当前价格相对 200 日均线的位置百分比（Futu K线优先）"""
         def _fetch():
+            if _futu:
+                pct = _futu.get_sp500_ma200_pct()
+                if abs(pct) < 0.5:  # 合理范围
+                    return pct
             spy = yf.Ticker("SPY")
             hist = spy.history(period="1y", interval="1d")
             if hist is None or hist.empty:
@@ -166,20 +184,23 @@ class MarketThermometer:
             return mom_1m * 0.5 + mom_3m * 0.3 + mom_6m * 0.2
         return self._get_cached_or_fetch("momentum", _fetch, 6)
 
-    def comprehensive_score(self) -> dict:
+    def comprehensive_score(self, fast: bool = False) -> dict:
         """
         综合市场温度评分。
-        
+
+        Args:
+            fast: True=只用Futu快速指标（<3秒），False=完整7维度（~60秒）
+
         返回：
             score: -100~+100
             -100 = 极度悲观（最佳买入区）
             +100 = 极度乐观（最佳卖出区）
-            
-            正常范围：-30~+30
-            极端范围: < -50 或 > +50
         """
+        if fast:
+            return self._fast_score()
+
         logger.info("计算市场温度综合评分...")
-        
+
         pe = self.get_sp500_pe()
         vix = self.get_vix()
         sma200 = self.get_sp500_sma200_pct()
@@ -187,62 +208,78 @@ class MarketThermometer:
         sentiment = self.get_investor_sentiment()
         buffett = self.get_buffett_indicator()
         momentum = self.get_momentum_score()
-        
+
+        return self._compute_score(pe, vix, sma200, yield_curve, sentiment, buffett, momentum)
+
+    def _fast_score(self) -> dict:
+        """
+        快速评分（仅用Futu能瞬间获取的3个核心指标）。
+        PE(30%) + VIX(30%) + SMA200(40%)
+        """
+        pe = self.get_sp500_pe()
+        vix = self.get_vix()
+        sma200 = self.get_sp500_sma200_pct()
+
+        return self._compute_score(pe, vix, sma200,
+                                    yield_curve=0, sentiment=0,
+                                    buffett=0, momentum=0,
+                                    fast=True)
+
+    def _compute_score(self, pe, vix, sma200, yield_curve, sentiment, buffett, momentum,
+                       fast: bool = False) -> dict:
+        """计算综合评分（内部方法）"""
         scores = {}
-        
-        # 1. PE 评分（历史均值 ~20，<20=低估 >20=高估）
+
+        # 1. PE 评分
         if pe > 0:
             pe_score = max(-100, min(100, (20 - pe) * 4))
         else:
             pe_score = 0
         scores["pe"] = pe_score
-        
-        # 2. VIX 评分（均值 ~18）
+
+        # 2. VIX 评分
         vix_score = max(-100, min(100, (30 - vix) * 3))
         scores["vix"] = vix_score
-        
+
         # 3. 相对 200日均线评分
         sma_score = max(-100, min(100, -sma200 * 200))
         scores["sma200"] = sma_score
-        
-        # 4. 收益率曲线评分（负利差 = 衰退担忧 = 恐慌）
-        curve_score = max(-100, min(100, yield_curve * 20))
-        scores["yield_curve"] = curve_score
-        
-        # 5. 投资者情绪
-        sent_score = max(-100, min(100, -sentiment * 5))
-        scores["sentiment"] = sent_score
-        
-        # 6. 巴菲特指标
-        buffett_score = max(-100, min(100, -buffett * 30))
-        scores["buffett"] = buffett_score
-        
-        # 7. 动量评分（上涨 = 乐观 = 应谨慎）
-        mom_score = max(-100, min(100, -momentum * 200))
-        scores["momentum"] = mom_score
-        
-        # 综合（等权重）
-        weights = {"pe": 0.20, "vix": 0.20, "sma200": 0.15,
-                   "yield_curve": 0.15, "sentiment": 0.10,
-                   "buffett": 0.10, "momentum": 0.10}
-        
-        total = sum(scores[k] * weights[k] for k in weights)
-        
+
+        # 4-7. 慢速指标（fast模式跳过）
+        if not fast:
+            curve_score = max(-100, min(100, yield_curve * 20))
+            scores["yield_curve"] = curve_score
+            sent_score = max(-100, min(100, -sentiment * 5))
+            scores["sentiment"] = sent_score
+            buffett_score = max(-100, min(100, -buffett * 30))
+            scores["buffett"] = buffett_score
+            mom_score = max(-100, min(100, -momentum * 200))
+            scores["momentum"] = mom_score
+
+        # 综合权重
+        if fast:
+            weights = {"pe": 0.30, "vix": 0.30, "sma200": 0.40}
+        else:
+            weights = {"pe": 0.20, "vix": 0.20, "sma200": 0.15,
+                       "yield_curve": 0.15, "sentiment": 0.10,
+                       "buffett": 0.10, "momentum": 0.10}
+
+        total = sum(scores[k] * weights[k] for k in weights if k in scores)
         market_phase = self._classify_phase(total)
-        
+
         result = {
             "score": round(total, 1),
             "phase": market_phase,
             "sub_scores": {k: round(v, 1) for k, v in scores.items()},
+            "fast_mode": fast,
             "raw_data": {
                 "sp500_pe": round(pe, 1) if pe else None,
                 "vix": round(vix, 1) if vix else None,
                 "sma200_pct": round(sma200 * 100, 1),
-                "yield_curve_bps": round(yield_curve * 100, 1) if yield_curve else 0,
             }
         }
-        
-        logger.info(f"市场温度: {result['score']} — {market_phase}")
+
+        logger.info(f"市场温度: {result['score']} — {market_phase}" + (" [快速]" if fast else ""))
         return result
 
     def _classify_phase(self, score: float) -> str:

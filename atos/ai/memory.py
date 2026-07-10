@@ -92,11 +92,23 @@ def record_decision(symbol: str, action: str, confidence: float,
                     factor_score: float, reasons: dict,
                     debate_summary: str, market_regime: str,
                     snapshot: dict = None) -> int:
-    """记录一次 AI 决策，返回 decision_id"""
+    """记录一次 AI 决策，返回 decision_id。快照自动裁剪以节省存储。"""
     init_db()
     with _db_lock:
         conn = _get_db()
         try:
+            # Fix: 裁剪快照 — 只保留关键字段，节省 90% 存储
+            trimmed_snapshot = None
+            if snapshot:
+                trimmed_snapshot = {
+                    "positions": snapshot.get("positions", [])[:5],
+                    "market_regime": snapshot.get("market_regime", {}),
+                    "factor_rankings": [
+                        {"symbol": r.get("symbol", "?"), "score": r.get("score", 0)}
+                        for r in snapshot.get("factor_rankings", [])[:5]
+                    ],
+                    "vix": snapshot.get("vix"),
+                }
             cursor = conn.execute(
                 """INSERT INTO decisions (timestamp, market_regime, symbol, action,
                    confidence, factor_score, reasons, debate_summary, snapshot_json)
@@ -110,7 +122,7 @@ def record_decision(symbol: str, action: str, confidence: float,
                     round(factor_score, 4),
                     json.dumps(reasons, ensure_ascii=False),
                     debate_summary,
-                    json.dumps(snapshot, ensure_ascii=False) if snapshot else None,
+                    json.dumps(trimmed_snapshot, ensure_ascii=False) if trimmed_snapshot else None,
                 )
             )
             conn.commit()

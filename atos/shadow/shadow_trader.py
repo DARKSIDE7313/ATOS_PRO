@@ -1064,10 +1064,15 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
     trend_max_pos = {"BULL": 18, "CAUTIOUS": 12, "BEAR": 3}.get(spy_trend, 18)  # Fix: BULL加仓至18只
     effective_max_pos = min(account.max_positions, trend_max_pos)
 
-    # 行业分散 (v9: 放宽 ETF 上限 35%→45%, Healthcare 25%→30%)
-    SECTOR_LIMITS = {"Tech": 0.35, "Financial": 0.30, "Healthcare": 0.35,
-                     "Consumer": 0.30, "Industrial": 0.30, "Energy": 0.25,
-                     "ETF": 0.50, "Bond": 0.25, "Commodity": 0.20}
+    # 行业分散 — 牛市放宽50% (集中火力在最強行业)
+    if spy_trend == "BULL":
+        SECTOR_LIMITS = {"Tech": 0.50, "Financial": 0.45, "Healthcare": 0.50,
+                         "Consumer": 0.45, "Industrial": 0.45, "Energy": 0.35,
+                         "ETF": 0.60, "Bond": 0.35, "Commodity": 0.30}
+    else:
+        SECTOR_LIMITS = {"Tech": 0.35, "Financial": 0.30, "Healthcare": 0.35,
+                         "Consumer": 0.30, "Industrial": 0.30, "Energy": 0.25,
+                         "ETF": 0.50, "Bond": 0.25, "Commodity": 0.20}
     sector_exposure = {}
     if account.positions:
         try:

@@ -18,9 +18,9 @@ class PerformanceReporter:
 
     def generate_report(self):
         if not self.trades:
-            return "
+            return """\
 [报告] 本次运行无完整交易（需要金叉信号触发）
-"
+"""
 
         df = pd.DataFrame(self.trades)
         eq = pd.DataFrame(self.equity_curve)

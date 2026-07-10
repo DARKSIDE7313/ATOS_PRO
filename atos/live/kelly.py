@@ -22,12 +22,12 @@ STATS_PATH = os.path.join(
     "data", "trade_stats.json"
 )
 
-DEFAULT_WIN_RATE   = 0.48   # 生存配置：真实市场 bootstrap
-DEFAULT_WIN_LOSS_R = 1.35   # 生存配置：真实市场 bootstrap
+DEFAULT_WIN_RATE   = 0.42   # 生存配置：保守 bootstrap（从 0.48 下调）
+DEFAULT_WIN_LOSS_R = 1.20   # 生存配置：保守 bootstrap（从 1.35 下调）
 MIN_TRADES_FOR_LIVE_STATS = 20
-MIN_TRADES_FOR_PARTIAL = 5   # 5-19笔交易：部分学习（混合 bootstrap + 实盘）
+MIN_TRADES_FOR_PARTIAL = 5
 HALF_KELLY = 0.5
-MAX_KELLY_PCT = 0.15
+MAX_KELLY_PCT = 0.12        # 从 0.15 降到 0.12 — 单仓硬上限 12%
 MAX_SAVE_RETRIES = 3
 
 
@@ -91,44 +91,52 @@ def save_trade(pnl_pct: float) -> dict:
 
 
 def crouching_allocation(score: float, drawdown: float,
-                          has_news_catalyst: bool = False) -> float:
-    """Crouching Method allocation（v7 评分体系校准版）
-    
-    2026-06-24 深度审计：因子引擎 0 基准评分体系下，实测最高分约 0.45。
-    旧阈值 0.55/0.70/0.80 在旧宇宙，导致候选标的 100% 返回 0.0。
-    修复：新增 0.45/0.40/0.35/0.30 四档阈值，匹配实测分数范围。
-    每个档次都缩小（更保守），因为低分标的需要分散更多只来管理风险。
-    """
-    if score >= 0.80:
-        base_pct = 0.035    # 7% 基础（极少达到）
-    elif score >= 0.70:
-        base_pct = 0.028    # 5.6%
-    elif score >= 0.55:
-        base_pct = 0.022    # 4.4%
-    elif score >= 0.45:
-        base_pct = 0.018    # 3.6% — MARA 级别（当前最高分）
-    elif score >= 0.40:
-        base_pct = 0.014    # 2.8% — GS/MU 级别
-    elif score >= 0.35:
-        base_pct = 0.010    # 2.0% — 候选区间
-    elif score >= 0.30:
-        base_pct = 0.006    # 1.2% — 边缘选入
-    else:
-        return 0.0
+                          has_news_catalyst: bool = False,
+                          win_rate: float = None) -> float:
+    """Crouching Method allocation v8 — win-rate 感知版
 
-    # 生存配置：DD 惩罚（更平滑）
-    if drawdown <= 0.02:
-        dd_penalty = 1.0
-    elif drawdown <= 0.05:
-        dd_penalty = 1.0 - (drawdown - 0.02) / 0.03 * 0.30  # 3% DD → 70%
+    2026-06-25 深度修复:
+      - 新增 win_rate 参数：低胜率时自动缩小仓位
+      - WR<0.35 → 仓位×0.5 (生存模式)
+      - WR<0.25 → 仓位×0.3 (极保守)
+      - 评分阈值收紧到 0.35 以上才有仓位（旧版 0.30 太松）
+    """
+    # 评分 → 基础仓位 (v10: 翻倍 — 提高资金利用率)
+    if score >= 0.70:
+        base_pct = 0.070
+    elif score >= 0.50:
+        base_pct = 0.055
+    elif score >= 0.40:
+        base_pct = 0.040
+    elif score >= 0.35:
+        base_pct = 0.025
+    elif score >= 0.28:
+        base_pct = 0.015
     else:
-        dd_penalty = max(0.40, 1.0 - (drawdown - 0.02) / 0.03 * 0.30)  # floor 40%
+        return 0.0     # <0.28 → 不开仓
+
+    # 回撤惩罚 (v10: 回撤<5%不惩罚)
+    if drawdown <= 0.05:
+        dd_penalty = 1.0
+    elif drawdown <= 0.10:
+        dd_penalty = 1.0 - (drawdown - 0.05) / 0.05 * 0.30
+    else:
+        dd_penalty = max(0.50, 1.0 - (drawdown - 0.05) / 0.05 * 0.30)
     after_dd = base_pct * dd_penalty
 
+    # 新闻催化剂加成
     if has_news_catalyst:
-        after_dd *= 1.10   # 新闻加成
+        after_dd *= 1.10
 
-    final = min(after_dd, 0.08)  # 单仓硬上限 8%
+    # Win-rate 感知 (v10: 轻惩罚 — 只对极低胜率做保护)
+    if win_rate is not None:
+        if win_rate < 0.20:
+            after_dd *= 0.55      # 极低 → 半仓
+        elif win_rate < 0.30:
+            after_dd *= 0.75      # 低 → 75%
+        # WR>0.30 不惩罚 (让系统正常运转积累数据)
+
+    final = min(after_dd, 0.12)   # v10: 硬上限 12% (旧: 10%)
     return final
 
 

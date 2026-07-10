@@ -111,25 +111,74 @@ def _apply_suggestions(adjustments: list):
             "adjustment_history": []
         }
     BOUNDS = {
-        "stop_loss_pct":    (0.02, 0.10),
-        "take_profit_pct":  (0.08, 0.30),
-        "max_single_pct":   (0.10, 0.30),
+        "stop_loss_pct":    (0.02, 0.12),
+        "take_profit_pct":  (0.05, 0.30),
+        "max_single_pct":   (0.05, 0.30),
         "rsi_overbought":   (65,   85),
-        "rsi_oversold":     (20,   40),
-        "kelly_win_rate":   (0.40, 0.85),
-        "kelly_win_loss_r": (1.5,  6.0),
+        "rsi_oversold":     (15,   40),
+        "kelly_win_rate":   (0.35, 0.85),
+        "kelly_win_loss_r": (1.0,  6.0),
     }
+    # v10: 防振荡机制
+    # 1. 计算每个参数距离上次调整的天数
+    history = config.get("adjustment_history", [])
+    param_last_adjusted = {}
+    for h in history:
+        p = h.get("parameter")
+        d = h.get("date", "")
+        if p and d:
+            param_last_adjusted[p] = d  # 记录最后一次
+
+    # 2. 检查哪些参数在上次调整后导致了更好/更坏的结果
+    #    如果调整后仍然 0 交易 → 回滚
+    param_directions = {}  # {param: [(date, old, new, direction)]}
+    for h in history:
+        p = h.get("parameter")
+        if p:
+            old = h.get("old", 0)
+            new = h.get("new", 0)
+            param_directions.setdefault(p, []).append((h.get("date",""), old, new))
+
     for adj in adjustments:
         param   = adj.get("parameter")
         suggest = adj.get("suggested")
         if param not in BOUNDS or suggest is None:
             continue
+
+        # v10: 7天冷却 — 同参数7天内不重复调整
+        today = datetime.date.today().isoformat()
+        last_date = param_last_adjusted.get(param, "")
+        if last_date:
+            try:
+                last_dt = datetime.date.fromisoformat(last_date)
+                days_since = (datetime.date.today() - last_dt).days
+                if days_since < 7:
+                    print(f"[reviewer] ⏭ {param}: 7天冷却中 (上次调整于 {last_date}, {days_since}天前)")
+                    continue
+            except Exception:
+                pass
+
+        # v10: 如果这个参数最近被调过，检查方向是否在振荡
+        recent = param_directions.get(param, [])
+        if len(recent) >= 2:
+            # 检查最近两次是否方向相反
+            prev_dir = recent[-1][2] - recent[-1][1]  # 上一次的 new - old
+            this_dir = float(suggest) - config.get(param, 0)
+            if prev_dir * this_dir < 0:  # 方向相反 → 振荡!
+                print(f"[reviewer] 🔄 {param}: 检测到振荡! 上次{prev_dir:+.3f} 本次{this_dir:+.3f} — 减半幅度")
+                # 减半调整幅度
+                suggest = config[param] + this_dir * 0.25  # 只取25%的建议幅度
+
         lo, hi  = BOUNDS[param]
         clamped = max(lo, min(hi, float(suggest)))
         old_val = config.get(param)
+        # v10: 最小调整阈值 — 变化小于1%则跳过
+        if old_val and abs(clamped - old_val) / old_val < 0.01:
+            print(f"[reviewer] ⏭ {param}: 变化太小 ({old_val}→{clamped})")
+            continue
         config[param] = clamped
         config["adjustment_history"].append({
-            "date": datetime.date.today().isoformat(),
+            "date": today,
             "parameter": param, "old": old_val,
             "new": clamped, "reason": adj.get("reason", ""),
         })

@@ -267,9 +267,9 @@ def main():
                 fixed_something = True
             
             if not health["futu"]:
-                log("🔄 FutuOpenD 丢失 → 重启", "FIX")
-                restart_futuopend()
-                fixed_something = True
+                log("🟡 FutuOpenD 端口不通 → 交给 futu_watchdog.py 处理", "INFO")
+                # v5: 不再自己重启 FutuOpenD — 交给 futu_watchdog.py 统一管理
+                # 多个脚本同时重启是导致反复登出的根因
             
             if not health["dash"]:
                 log("🔄 Dashboard 无响应 → 重启", "FIX")

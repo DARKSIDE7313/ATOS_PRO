@@ -2,7 +2,7 @@
 """
 ATOS 价格更新器 — 同时更新短线/长线 state 中的 last_price
 每 5 分钟运行一次。通过 yfinance 获取最新价格。"""
-import json, os, sys, time
+import json, os, sys, time, math
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from atos.core.logging import get_logger
 
@@ -15,7 +15,7 @@ LONG_FILE = os.path.join(DATA_DIR, "longterm_state.json")
 def safe_price(v):
     try:
         v = float(v)
-        if str(v) == "nan": return 0.0
+        if isinstance(v, float) and math.isnan(v): return 0.0
         return v
     except Exception: return 0.0
 
@@ -48,7 +48,7 @@ def update_prices(state_file, pos_key, price_key, equity_key):
             t = yf.Ticker(sym)
             info = t.info or {}
             px = info.get("currentPrice") or info.get("regularMarketPrice") or info.get("previousClose") or 0
-            if not px or str(px) == "nan":
+            if not px or (isinstance(px, float) and math.isnan(px)):
                 continue
             px = float(px)
             if px <= 0:

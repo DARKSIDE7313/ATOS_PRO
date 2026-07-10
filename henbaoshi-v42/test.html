@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"></head>
+<body style="background:#03050a;color:#fff;font:16px monospace;padding:40px">
+<h1>Test</h1>
+<div id="s1">Step 1: HTML OK</div>
+<div id="s2">Step 2: loading Three.js...</div>
+<div id="s3">Step 3: ...</div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+document.getElementById('s2').textContent='Step 2: THREE loaded r'+THREE.REVISION;
+try{
+  var r=new THREE.WebGLRenderer({antialias:true});
+  r.setSize(200,200);
+  document.body.appendChild(r.domElement);
+  var s=new THREE.Scene();s.background=new THREE.Color('#03050a');
+  var c=new THREE.PerspectiveCamera(50,1,0.1,10);c.position.z=5;
+  var g=new THREE.BoxGeometry(2,2,2);
+  var m=new THREE.MeshStandardMaterial({color:'#ff6600',roughness:0.3,metalness:0.5});
+  var b=new THREE.Mesh(g,m);s.add(b);
+  var l=new THREE.DirectionalLight('#ffffff',3);l.position.set(3,5,2);s.add(l);
+  s.add(new THREE.AmbientLight('#333333',1));
+  r.render(s,c);
+  document.getElementById('s3').textContent='Step 3: WebGL RENDER OK! ✅';
+  document.getElementById('s3').style.color='#0f0';
+}catch(e){
+  document.getElementById('s3').textContent='Step 3: ERROR - '+e.message;
+  document.getElementById('s3').style.color='#f44';
+}
+</script>
+</body></html>

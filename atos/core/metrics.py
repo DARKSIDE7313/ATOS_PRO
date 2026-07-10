@@ -40,7 +40,7 @@ def sortino_ratio(returns: List[float], risk_free_rate: float = 0.05,
     ann_return = avg_return * periods_per_year
     downside = [r for r in returns if r < 0]
     if not downside:
-        return float('inf') if ann_return > risk_free_rate else 0.0
+        return 999.99 if ann_return > risk_free_rate else 0.0
     down_std = _stddev(downside) * math.sqrt(periods_per_year)
     if down_std == 0:
         return 0.0
@@ -77,7 +77,7 @@ def calmar_ratio(returns: List[float], equity_curve: List[float],
     ann_return = avg_return * periods_per_year
     mdd = max_drawdown(equity_curve)
     if mdd == 0:
-        return float('inf') if ann_return > 0 else 0.0
+        return 999.99 if ann_return > 0 else 0.0
     return ann_return / mdd
 
 
@@ -94,7 +94,7 @@ def profit_factor(trades: List[float]) -> float:
     wins = sum(t for t in trades if t > 0)
     losses = abs(sum(t for t in trades if t < 0))
     if losses == 0:
-        return float('inf') if wins > 0 else 0.0
+        return 999.99 if wins > 0 else 0.0
     return wins / losses
 
 

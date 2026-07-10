@@ -18,7 +18,41 @@ import datetime
 from atos.core.logging import get_logger
 from atos.longterm.config import LAYER3, CAPITAL
 
+try:
+    from atos.data.futu_provider import get_stock_info as _futu_info
+except ImportError:
+    _futu_info = None
+
 logger = get_logger("phoenix.layer3")
+
+
+def _get_info(symbol: str) -> dict:
+    if _futu_info:
+        data = _futu_info(symbol)
+        if data.get("_valid"):
+            return data
+    try:
+        return (yf.Ticker(symbol).info or {})
+    except Exception:
+        return {}
+
+def _get_price(symbol: str) -> float:
+    """v11: 从 OHLCV 获取可靠价格"""
+    try:
+        ticker = yf.Ticker(symbol)
+        if hasattr(ticker, 'fast_info'):
+            price = getattr(ticker.fast_info, 'lastPrice', 0) or getattr(ticker.fast_info, 'regularMarketPrice', 0)
+            if price and price > 0:
+                return float(price)
+    except Exception:
+        pass
+    try:
+        df = yf.download(symbol, period="5d", interval="1d", progress=False, auto_adjust=True)
+        if not df.empty and len(df) > 0:
+            return float(df["Close"].squeeze().iloc[-1])
+    except Exception:
+        pass
+    return 0.0
 
 
 class Layer3Tactical:
@@ -153,50 +187,86 @@ class Layer3Tactical:
     def fetch_insider_buys(self) -> list[dict]:
         """
         获取最近的内部人大额买入信号。
-        用简化方法：追踪近期被内部人买入的股票。
-        
-        真实实现需要 SEC EDGAR API 或 whalewisdom.com 数据。
-        此处简化为从公开源获取。
+        使用 yfinance 的 insider_transactions 数据。
+
+        返回: [{symbol, insider_name, shares, value, transaction_date, score}, ...]
         """
-        # 简化版：关注大额内幕交易的常见股票
-        # 真实实现应该：
-        # 1. 爬取 SEC Form 4 数据
-        # 2. 筛选内幕买入
-        # 3. 按买入金额和人数排名
-        
-        logger.info("检查内部人交易信号（简化版）...")
-        
-        # 检查是否有新闻
-        try:
-            import requests
-            # 尝试获取 Yahoo Finance 内幕交易数据
-            # 这个端点不稳定，作为尝试验证
-            insider_scores = {}
-            
-            # 用做空比例作为代理信号（高做空 = 可能有轧空）
-            # 这是间接替代，后续可以升级
-            return insider_scores
-        except Exception:
-            pass
-        
-        logger.info("内部人追踪：暂无可用数据（需要 SEC API 接入）")
-        return []
+        logger.info("检查内部人交易信号...")
+        insider_picks = []
+
+        # 扫描已知的高质量标的池
+        scan_symbols = [
+            "AAPL", "MSFT", "NVDA", "GOOGL", "META", "AMZN", "TSLA",
+            "JPM", "BAC", "GS", "V", "MA", "JNJ", "UNH", "COST",
+            "AMD", "AVGO", "CRM", "ADBE", "NFLX", "DIS", "CAT",
+        ]
+
+        for sym in scan_symbols[:20]:  # 限制扫描量
+            try:
+                stock = yf.Ticker(sym)
+                # yfinance 提供 insider_transactions 属性
+                if hasattr(stock, 'insider_transactions') and stock.insider_transactions is not None:
+                    df = stock.insider_transactions
+                    if df is None or (hasattr(df, 'empty') and df.empty):
+                        continue
+
+                    # 过滤买入交易
+                    for _, row in df.iterrows():
+                        try:
+                            transaction = str(row.get("transactionText", row.get("Transaction", ""))).lower()
+                            shares = row.get("shares", row.get("Shares", 0))
+                            value = row.get("value", row.get("Value", 0))
+                            insider = str(row.get("insider", row.get("Insider", "")))
+
+                            # 只关注买入
+                            if any(kw in transaction for kw in ["buy", "purchase", "acquisition", "acquire"]):
+                                if shares and float(shares) > 0:
+                                    insider_picks.append({
+                                        "symbol": sym,
+                                        "insider": insider,
+                                        "shares": float(shares),
+                                        "value": float(value) if value else 0,
+                                        "transaction": transaction,
+                                        "score": min(100, float(shares) / 1000),
+                                    })
+                        except Exception:
+                            continue
+
+            except Exception as e:
+                logger.debug(f"内部人扫描 {sym}: {e}")
+                continue
+
+        # 按买入股数排序
+        insider_picks.sort(key=lambda x: -x["shares"])
+        top = insider_picks[:LAYER3.get("insider_top_n", 3)]
+
+        if top:
+            logger.info(f"内部人追踪: 发现 {len(insider_picks)} 笔买入, Top3: {[(p['symbol'], p['insider']) for p in top]}")
+            # 缓存供后续使用
+            self._cached_insider_picks = top
+        else:
+            logger.info("内部人追踪: 本期无符合条件的买入信号")
+
+        return top
 
     def run_insider_tracking(self) -> dict:
         """执行内部人追踪"""
         insiders = self.fetch_insider_buys()
-        
+
         result = {
             "type": "insider_tracking",
             "total_capital": self.capital * LAYER3.get("insider_pct", 0.20),
             "picks": [],
-            "note": "需要 SEC EDGAR API 接入才能获取实时数据",
         }
-        
-        if insiders:
-            for sym, score in list(insiders.items())[:LAYER3.get("insider_top_n", 3)]:
-                result["picks"].append({"symbol": sym, "score": score})
-        
+
+        for pick in insiders:
+            result["picks"].append({
+                "symbol": pick["symbol"],
+                "insider": pick.get("insider", ""),
+                "shares": pick.get("shares", 0),
+                "score": pick.get("score", 0),
+            })
+
         return result
 
     # ── 4. 回撤买入 ──
@@ -241,59 +311,169 @@ class Layer3Tactical:
         logger.info("═══════ Layer 3: 战术层完成 ═══════")
         return result
 
-    def get_orders(self) -> list[dict]:
-        """生成需要执行的订单"""
+    def get_buy_orders(self, existing_positions: dict = None) -> list[dict]:
+        """生成买入订单，跳过已持有的标的"""
+        if existing_positions is None:
+            existing_positions = {}
+
         orders = []
-        
+        existing_symbols = set(existing_positions.keys())
+
         # 因子 ETF 轮动
         factor = self.run_factor_rotation()
         etf_capital = factor["total_capital"]
         if factor["picks"]:
-            per_etf = etf_capital / len(factor["picks"])
-            for pick in factor["picks"]:
-                try:
-                    stock = yf.Ticker(pick["symbol"])
-                    price = float(stock.info.get("currentPrice", 0) or
-                                 stock.history(period="1d")["Close"].iloc[-1])
-                    if price > 0:
-                        shares = max(1, int(per_etf / price))
-                        orders.append({
-                            "layer": "tactical",
-                            "sub": "factor_rotation",
-                            "symbol": pick["symbol"],
-                            "action": "BUY",
-                            "quantity": shares,
-                            "price": round(price, 2),
-                            "reason": f"因子轮动 {pick['description']} "
-                                     f"动量 {pick['momentum_3m']}%",
-                        })
-                except Exception as e:
-                    logger.warning(f"因子订单 {pick['symbol']}: {e}")
-        
+            new_factor = [p for p in factor["picks"] if p["symbol"] not in existing_symbols]
+            if new_factor:
+                per_etf = etf_capital / len(new_factor)
+                for pick in new_factor:
+                    try:
+                        price = _get_price(pick["symbol"])  # v11
+                        if price > 0:
+                            shares = max(1, int(per_etf / price))
+                            orders.append({
+                                "layer": "tactical",
+                                "sub": "factor_rotation",
+                                "symbol": pick["symbol"],
+                                "action": "BUY",
+                                "quantity": shares,
+                                "price": round(price, 2),
+                                "reason": f"因子轮动 {pick['description']} "
+                                         f"动量 {pick['momentum_3m']}%",
+                            })
+                    except Exception as e:
+                        logger.warning(f"因子订单 {pick['symbol']}: {e}")
+
         # 行业轮动
         sector = self.run_sector_rotation()
         sec_capital = sector["total_capital"]
         if sector["picks"]:
-            per_sec = sec_capital / len(sector["picks"])
-            for pick in sector["picks"]:
-                try:
-                    stock = yf.Ticker(pick["symbol"])
-                    price = float(stock.info.get("currentPrice", 0) or
-                                 stock.history(period="1d")["Close"].iloc[-1])
-                    if price > 0:
-                        shares = max(1, int(per_sec / price))
-                        orders.append({
-                            "layer": "tactical",
-                            "sub": "sector_rotation",
-                            "symbol": pick["symbol"],
-                            "action": "BUY",
-                            "quantity": shares,
-                            "price": round(price, 2),
-                            "reason": f"行业轮动 {pick['description']}",
-                        })
-                except Exception as e:
-                    logger.warning(f"行业订单 {pick['symbol']}: {e}")
-        
+            new_sector = [p for p in sector["picks"] if p["symbol"] not in existing_symbols]
+            if new_sector:
+                per_sec = sec_capital / len(new_sector)
+                for pick in new_sector:
+                    try:
+                        price = _get_price(pick["symbol"])  # v11
+                        if price > 0:
+                            shares = max(1, int(per_sec / price))
+                            orders.append({
+                                "layer": "tactical",
+                                "sub": "sector_rotation",
+                                "symbol": pick["symbol"],
+                                "action": "BUY",
+                                "quantity": shares,
+                                "price": round(price, 2),
+                                "reason": f"行业轮动 {pick['description']}",
+                            })
+                    except Exception as e:
+                        logger.warning(f"行业订单 {pick['symbol']}: {e}")
+
+        # 内部人追踪
+        insider_result = self.run_insider_tracking()
+        if insider_result.get("picks"):
+            insider_capital = insider_result["total_capital"]
+            new_insider = [p for p in insider_result["picks"] if p["symbol"] not in existing_symbols]
+            if new_insider:
+                per_insider = insider_capital / len(new_insider)
+                for pick in new_insider:
+                    try:
+                        price = _get_price(pick["symbol"])  # v11
+                        if price > 0:
+                            shares = max(1, int(per_insider / price))
+                            orders.append({
+                                "layer": "tactical",
+                                "sub": "insider_tracking",
+                                "symbol": pick["symbol"],
+                                "action": "BUY",
+                                "quantity": shares,
+                                "price": round(price, 2),
+                                "reason": f"内部人买入: {pick.get('insider', '高管')}",
+                            })
+                    except Exception as e:
+                        logger.warning(f"内部人订单 {pick['symbol']}: {e}")
+
+        return orders
+
+    # Legacy alias
+    def get_orders(self) -> list[dict]:
+        return self.get_buy_orders()
+
+    # ── 卖出检查 ──
+
+    def get_sell_orders(self, positions: dict) -> list[dict]:
+        """
+        检查 Layer 3 持仓，生成卖出订单。
+
+        卖出触发：
+          1. 因子 ETF: 不再在 Top N 动量排名中
+          2. 行业 ETF: 不再在 Top N 动量排名中
+          3. 内部人: 持有超过 180 天
+          4. 止损: 亏损超过 15%
+        """
+        orders = []
+
+        # 获取当前最优排名（用于对比）
+        current_factor_picks = {p["symbol"] for p in self.run_factor_rotation().get("picks", [])}
+        current_sector_picks = {p["symbol"] for p in self.run_sector_rotation().get("picks", [])}
+
+        for symbol, pos in positions.items():
+            if pos.get("layer") != "tactical":
+                continue
+
+            sub = pos.get("sub", "")
+            try:
+                stock = yf.Ticker(symbol)
+                info = stock.info or {}
+                current_price = float(info.get("currentPrice", 0) or info.get("regularMarketPrice", 0) or pos.get("avg_cost", 0))
+            except Exception:
+                current_price = pos.get("avg_cost", 0)
+
+            avg_cost = pos.get("avg_cost", 0)
+            pnl_pct = (current_price - avg_cost) / avg_cost if avg_cost > 0 else 0
+
+            sell_reason = None
+            sell_shares = pos.get("shares", 0)
+
+            # 1. 止损检查（所有子策略通用）
+            if pnl_pct < -0.15:
+                sell_reason = f"止损: 亏损 {pnl_pct*100:.1f}%"
+
+            # 2. 因子 ETF: 检查是否还在 Top 排名中
+            elif sub == "factor_rotation":
+                if symbol not in current_factor_picks:
+                    sell_reason = f"因子动量排名下降，退出轮动"
+
+            # 3. 行业 ETF: 检查是否还在 Top 排名中
+            elif sub == "sector_rotation":
+                if symbol not in current_sector_picks:
+                    sell_reason = f"行业动量排名下降，退出轮动"
+
+            # 4. 内部人追踪: 持有时间超限
+            elif sub == "insider_tracking":
+                buy_date_str = pos.get("buy_date", "")
+                if buy_date_str:
+                    try:
+                        buy_date = datetime.date.fromisoformat(buy_date_str)
+                        days_held = (datetime.date.today() - buy_date).days
+                        if days_held > LAYER3.get("insider_max_hold", 180):
+                            sell_reason = f"内部人追踪持有 {days_held} 天，超过 {LAYER3.get('insider_max_hold', 180)} 天上限"
+                    except Exception:
+                        pass
+
+            if sell_reason:
+                orders.append({
+                    "layer": "tactical",
+                    "sub": sub,
+                    "symbol": symbol,
+                    "action": "SELL",
+                    "quantity": sell_shares,
+                    "price": round(current_price, 2) if current_price > 0 else 0,
+                    "reason": sell_reason,
+                })
+                logger.warning(f"🔴 L3 卖出: {symbol} — {sell_reason}")
+
+        if orders:
+            logger.info(f"Layer3 生成 {len(orders)} 个卖出订单")
         return orders
 
 
