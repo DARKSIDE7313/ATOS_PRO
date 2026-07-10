@@ -673,6 +673,10 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
             sym: sig.get("price", 0)
             for sym, sig in signals.items() if sig.get("price", 0) > 0
         }
+        run_shadow_cycle._prev_rsi = {
+            sym: sig.get("rsi", 50)
+            for sym, sig in signals.items()
+        }
     except Exception as ic_err:
         logger.debug(f"IC反馈环跳过: {ic_err}")
 
@@ -1249,6 +1253,19 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
             if current_val >= max_single_val:
                 logger.info(f"⏭ {sym} 已达单仓上限")
                 continue
+
+        # ── v13: 入场质量过滤 — 防止买在高点 ──
+        # 1. RSI动量: 只买RSI在上升的 (避免追跌)
+        prev_rsi = run_shadow_cycle._prev_rsi.get(sym, rsi) if hasattr(run_shadow_cycle, '_prev_rsi') else rsi
+        if rsi < prev_rsi - 2 and not is_add:  # RSI下降>2点且非加仓 → 动能减弱
+            logger.info(f"⏭ {sym} RSI下降({prev_rsi:.0f}→{rsi:.0f}) — 等待动能恢复")
+            continue
+
+        # 2. 日内动量: 价格必须在开盘价上方 (正日内动量)
+        open_price = signals.get(sym, {}).get("open", 0)
+        if open_price > 0 and price < open_price * 0.998 and not is_add:
+            logger.info(f"⏭ {sym} 日内下跌 {(price/open_price-1)*100:.1f}% — 等企稳")
+            continue
 
         # ── v11: 基金标准仓位计算 (Integrated Position Sizing) ──
         # 融合三个维度: 波动率倒数(30%) + 半凯利(30%) + 因子分数(40%)
