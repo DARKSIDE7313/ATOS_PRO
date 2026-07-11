@@ -1,10 +1,10 @@
 {
   "date": "2026-07-11",
   "start_equity": 297020.05,
-  "end_equity": 296869.51,
-  "daily_pnl": -150.54,
-  "daily_return_pct": -0.0507,
-  "trades_today": 59,
-  "positions_end": 10,
-  "last_update": "2026-07-11T00:42:40.919140"
+  "end_equity": 295635.36,
+  "daily_pnl": -1384.69,
+  "daily_return_pct": -0.4662,
+  "trades_today": 76,
+  "positions_end": 2,
+  "last_update": "2026-07-11T16:49:23.534212"
 }

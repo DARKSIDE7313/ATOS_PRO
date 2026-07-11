@@ -945,8 +945,9 @@ def get_advice_v5(snapshot: dict, use_ensemble: bool = True,
         result["debate_results"] = debate_results
         result["guru_opinions"] = guru_opinions
 
-        # Fix: 置信度阈值 — 低置信度BUY降级为WAIT
-        MIN_CONFIDENCE_FOR_BUY = 0.55
+        # v15 Fix: 置信度阈值 — 低置信度BUY降级为WAIT
+        # AI v5 胜率仅6.4%，大幅提高阈值以减少错误买入
+        MIN_CONFIDENCE_FOR_BUY = 0.70
         for d in debate_results:
             if d.get("final_verdict") == "BUY" and d.get("confidence", 0) < MIN_CONFIDENCE_FOR_BUY:
                 d["final_verdict"] = "WAIT"

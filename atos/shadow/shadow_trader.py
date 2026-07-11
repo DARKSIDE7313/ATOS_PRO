@@ -704,46 +704,24 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
         logger.critical(f"🚨 相关性崩盘: {stp_count}只持仓触发止损 — 本周期暂停新开仓")
         is_market_hours = False  # 强制跳过新开仓
 
-    # ── v12: 主动组合轮动 — 卖弱买强 ──
-    # 每 ~30 周期 (约2.5小时) 评估一次持仓, 卖出最弱的
-    ROTATION_INTERVAL = 15
-    if account.cycle_count % ROTATION_INTERVAL == 0 and account.positions:
-        # 计算每个持仓的综合分数
-        pos_scores = {}
-        for sym, pos in account.positions.items():
-            sig = signals.get(sym, {})
-            bd = factor_result.get("breakdown", {}).get(sym, {}) if factor_result else {}
-            price = sig.get("price", pos.get("avg_price", 0))
-            pnl = (price - pos["avg_price"]) / pos["avg_price"] if pos["avg_price"] > 0 else 0
-            # 综合分 = 因子分 * 0.5 + 动量分 * 0.3 - 跌幅惩罚
-            factor_score = bd.get("value", 0.5) * 0.3 + bd.get("momentum", 0.5) * 0.4 + bd.get("quality", 0.5) * 0.3
-            pos_scores[sym] = factor_score - max(0, -pnl) * 0.5  # 亏损惩罚
+    # ── 组合轮动已禁用 — 历史数据显示此逻辑是最大亏损来源 ──
+    # 文艺复兴/AQR等顶级基金的核心原则: 让赢家跑, 让止损负责退出
+    # 频繁轮动 = 手续费 + 滑点 + 追涨杀跌 = 稳定亏损
+    # 仅保留止损(-5%)和止盈(+15%)作为退出机制
+    ROTATION_DISABLED = True
 
-        if pos_scores:
-            # 找出最弱的 25% 持仓
-            sorted_pos = sorted(pos_scores.items(), key=lambda x: x[1])
-            weak_count = max(1, len(sorted_pos) // 4)
-            for sym, score in sorted_pos[:weak_count]:
-                pos = account.positions[sym]
-                pnl = (signals.get(sym, {}).get("price", pos["avg_price"]) - pos["avg_price"]) / pos["avg_price"] if pos["avg_price"] > 0 else 0
-                if pnl < 0.02:  # 只在亏损或微利时轮换
-                    px = signals.get(sym, {}).get("price", 0)
-                    if px > 0:
-                        account.execute(sym, "SELL", pos["qty"], px,
-                                      reason=f"组合轮动 (因子分{score:.2f}, PnL{pnl:.1%})")
-                        logger.info(f"🔄 轮动卖出: {sym} {pos['qty']}股 (因子分{score:.3f}, PnL{pnl:.1%})")
-
-    # ── v13: 部分止盈 (涨5%卖1/2，比1/3更快锁定利润) ──
+    # ── v15: 部分止盈 (涨8%卖1/3，让利润奔跑) ──
+    # 之前 +5%卖1/2 太激进 → 赢家被过早砍掉，导致胜率低
     for sym, pos in list(account.positions.items()):
         qty_now = pos.get("shares", pos.get("qty", 0))
         px = signals.get(sym, {}).get("price", pos.get("avg_price", 0))
         if px <= 0: continue
         pnl = (px - pos["avg_price"]) / pos["avg_price"] if pos["avg_price"] > 0 else 0
-        if pnl >= 0.05 and qty_now >= 2:
-            sell_qty = max(1, qty_now // 2)
+        if pnl >= 0.08 and qty_now >= 3:
+            sell_qty = max(1, qty_now // 3)
             if sell_qty > 0:
                 account.execute(sym, "SELL", sell_qty, px,
-                              reason=f"部分止盈 +{pnl:.1%} (卖1/2锁定利润)")
+                              reason=f"部分止盈 +{pnl:.1%} (卖1/3锁利)")
                 logger.info(f"💰 部分止盈: {sym} {sell_qty}/{qty_now}股 +{pnl:.1%}")
 
     # 4b. 追踪止损（每个标的独立判断）
@@ -788,9 +766,9 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
             continue
         pnl_pct = (price - pos["avg_price"]) / pos["avg_price"] if pos["avg_price"] > 0 else 0
 
-        # ── v14: 利润保护 — 让赢家跑, 截断亏损 ──
-        # 1. +5%: 卖1/3锁定利润 + 止损提到成本价
-        if pnl_pct >= 0.05 and pos["qty"] >= 6:
+        # ── v15: 利润保护 — 让赢家跑, 截断亏损 ──
+        # 1. +10%: 卖1/3锁定利润 + 止损提到成本价 (从+5%提高，让利润奔跑)
+        if pnl_pct >= 0.10 and pos["qty"] >= 6:
             sell_qty = pos["qty"] // 3
             if sell_qty > 0:
                 account.execute(sym, "SELL", sell_qty, price, reason=f"部分止盈+{pnl_pct:.1%}(锁利1/3)")
@@ -798,18 +776,18 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
                 # 剩余仓位止损提到成本价
                 if sym in account.trailing_stops:
                     account.trailing_stops[sym].activation_price = pos["avg_price"] * 1.005
-        # 2. +3%: 止损提到成本价 (保本)
-        elif pnl_pct >= 0.03 and sym in account.trailing_stops:
+        # 2. +5%: 止损提到成本价 (保本) — 从+3%提高
+        elif pnl_pct >= 0.05 and sym in account.trailing_stops:
             ts = account.trailing_stops[sym]
             if ts.activation_price is None or ts.activation_price < pos["avg_price"] * 1.001:
                 ts.activation_price = pos["avg_price"] * 1.001
-        # 3. +10%: 全卖 (之前12%, 降到10%更快锁定)
-        if pnl_pct >= 0.10:
+        # 3. +18%: 全卖 (从10%大幅提高，让大赢家充分奔跑)
+        if pnl_pct >= 0.18:
             account.execute(sym, "SELL", pos["qty"], price, reason=f"硬止盈 +{pnl_pct:.1%}")
             logger.info(f"💰 止盈: {sym} +{pnl_pct:.1%}")
             continue
-        # 4. -5%: 硬止损 (TIGHTEN from -8%)
-        if pnl_pct <= -0.05:
+        # 4. -7%: 硬止损 (从-5%放宽，减少被正常波动扫出)
+        if pnl_pct <= -0.07:
             account.execute(sym, "SELL", pos["qty"], price, reason=f"硬止损 {pnl_pct:.1%}")
             logger.info(f"🛑 止损: {sym} {pnl_pct:.1%}")
             continue
@@ -858,8 +836,8 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
         return
 
     # ---- 5. 智能质量门控（替代低胜率 AI 辩论：基于因子质量+动量+RSI） ----
-    # 每6周期过滤一次，多维度打分 ≥50 才通过
-    QUALITY_GATE_INTERVAL = 6
+    # v15: 每4周期过滤一次（原6周期），更频繁地过滤低质量信号
+    QUALITY_GATE_INTERVAL = 4
     ai_veto_map = {}
     if account.cycle_count % QUALITY_GATE_INTERVAL == 0 and is_market_hours:
         try:
@@ -883,7 +861,7 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
                     (25 if factor_score < 0.35 else 0)
                 )
 
-                if quality_score < 50:
+                if quality_score < 60:
                     ai_veto_map[sym] = True
                     logger.info(f"🚫 否决 {sym}: Q={quality_score}/100 (因子{quality_factors}/4 macd={macd_ok} trend={trend_ok} rsi={rsi_ok})")
                 else:
@@ -895,10 +873,10 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
     else:
         ai_veto_map = {}
 
-    # ── 5b. AI 全火力分析 (每12周期≈1小时) ──
-    # 这才是真正的 v5 引擎：4大师+牛熊辩论+反思代理+提示词集成
-    # 跟 veto 不同，这次给 AI 喂的是完整的真实因子数据和市场上下文
-    AI_FULL_CYCLE_INTERVAL = 12
+    # ── 5b. AI 全火力分析 (每24周期≈2小时，从12周期降频) ──
+    # v15: AI v5 胜率仅6.4%，降频以减少其负面影响
+    # 只在数据质量高时运行，其余时间依赖质量门控
+    AI_FULL_CYCLE_INTERVAL = 24
     if account.cycle_count % AI_FULL_CYCLE_INTERVAL == 0:
         try:
             from atos.ai.engine_v5 import get_advice_v5
@@ -1174,8 +1152,9 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
 
     # 按增强后的评分排序
     enhanced_candidates.sort(key=lambda x: -x["score"])
-    # v7: 趋势自适应阈值 — CAUTIOUS市场放宽门槛，允许更多试探性仓位
-    base_score_threshold = 0.18 if spy_trend == "CAUTIOUS" else 0.22  # v10: 从 0.25/0.30 大幅放宽
+    # v15: 趋势自适应阈值 — 显著提高以过滤垃圾信号
+    # 0.18/0.22 导致太多低质量信号通过 → 19.7%胜率
+    base_score_threshold = 0.28 if spy_trend == "CAUTIOUS" else 0.32  # v15: 从 0.18/0.22 大幅提高
     candidates = [c for c in enhanced_candidates if c["score"] > base_score_threshold]
     if spy_trend == "CAUTIOUS":
         logger.info(f"🟡 CAUTIOUS趋势: 因子阈值={base_score_threshold}, "
@@ -1228,13 +1207,13 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
             logger.info(f"⏭ {sym} score={pick['score']:.2f}<{base_score_threshold} 跳过，分数太低")
             continue
 
-        # RSI过滤 — v11 放宽: 85上限/15下限 (原 75/20, 牛市中大把RSI>70的好票)
+        # RSI过滤 — v15 收紧: 30-75 (原 15-85 太宽，牛市中追高买入后立即回调)
         rsi = signals.get(sym, {}).get("rsi", 50)
-        if rsi > 85:
-            logger.info(f"⏭ {sym} RSI={rsi:.0f}>85 超买，跳过")
+        if rsi > 75:
+            logger.info(f"⏭ {sym} RSI={rsi:.0f}>75 超买，跳过")
             continue
-        if rsi < 15:
-            logger.info(f"⏭ {sym} RSI={rsi:.0f}<15 极端超卖，等企稳")
+        if rsi < 30:
+            logger.info(f"⏭ {sym} RSI={rsi:.0f}<30 弱势，等企稳")
             continue
 
         # 缩量过滤 — v11 放宽: 0.25→0.10 (盘初常有缩量)
@@ -1243,16 +1222,29 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
             logger.info(f"⏭ {sym} 极度缩量 vol_r={vol_r:.2f}<0.10")
             continue
 
-        # 🆕 v8: MACD确认 — 回调市MACD必须>0
+        # 🆕 v15: MACD确认 — 任何趋势下MACD都必须>0（之前只在CAUTIOUS/BEAR时检查）
         macd_hist = signals.get(sym, {}).get("macd_hist", 0)
-        if spy_trend in ("CAUTIOUS", "BEAR") and macd_hist < 0:
-            logger.info(f"⏭ {sym} MACD负({macd_hist:.4f}) 回调市禁开")
+        if macd_hist < 0:
+            logger.info(f"⏭ {sym} MACD负({macd_hist:.4f}) 动量不足")
             continue
 
-        # MA200偏离过滤 — v11 放宽: 20%→50% (牛市趋势股常大幅偏离)
+        # 🆕 v15: 价格必须高于MA50（只买上升趋势的票）
+        ma50 = signals.get(sym, {}).get("ma50", 0)
+        if ma50 > 0 and price < ma50:
+            logger.info(f"⏭ {sym} 价格${price:.0f} < MA50${ma50:.0f} — 下降趋势")
+            continue
+
+        # v15: 布林带位置过滤 — 不在上轨附近买入（追高风险大）
+        boll = signals.get(sym, {}).get("bollinger", {})
+        pct_b = boll.get("pct_b", 0.5) if isinstance(boll, dict) else 0.5
+        if pct_b > 0.85:
+            logger.info(f"⏭ {sym} 布林带上轨 pct_b={pct_b:.2f}>0.85 — 追高风险")
+            continue
+
+        # MA200偏离过滤 — v15 收紧: 50%→35% (防止极端偏离)
         ma200 = signals.get(sym, {}).get("ma200", 0)
-        if ma200 > 0 and price > ma200 * 1.50:
-            logger.info(f"⏭ {sym} 价格偏离MA200>{((price/ma200-1)*100):.0f}%>50%")
+        if ma200 > 0 and price > ma200 * 1.35:
+            logger.info(f"⏭ {sym} 价格偏离MA200>{((price/ma200-1)*100):.0f}%>35%")
             continue
 
         # v9: 允许加仓 — 包括小幅浮亏 (<5%)
@@ -1291,9 +1283,9 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
         # 文艺复兴/AQR/桥水 的共同方法论
         enhanced_score = pick["score"]
 
-        # 获取当前胜率/盈亏比
-        current_wr = 0.42
-        current_wlr = 1.20
+        # 获取当前胜率/盈亏比 — v15: 默认值反映实际情况
+        current_wr = 0.35  # 从0.42下调，更保守的默认值
+        current_wlr = 1.50  # 从1.20上调（止损放宽到-7%，止盈提高到+18%）
         try:
             from atos.live.kelly import _load_stats
             stats = _load_stats()
