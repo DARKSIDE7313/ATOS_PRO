@@ -216,6 +216,12 @@ class PhoenixDaemon:
             self.runner.state["last_full_run"] = datetime.datetime.now().isoformat()
             self.runner.save_state()
 
+            # 6b. 保存报告（Phoenix daemon 原本遗漏此步骤，导致报告文件停滞）
+            try:
+                self.runner.save_report(result)
+            except Exception as e:
+                logger.debug(f"保存报告失败（非致命）: {e}")
+
             # 7. 打印组合摘要
             pnl = self.runner.get_pnl()
             logger.info(
