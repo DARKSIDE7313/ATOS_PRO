@@ -34,39 +34,26 @@ def _live_price(sym):
     return 0
 
 
-# ── v5.1: Futu OpenD 批量获取日内涨跌 ──
-_futu_day_data = {}
-_futu_day_ts = 0
+# ── v5.1: 从文件读取日内涨跌（shadow_trader 每周期写入）──
+_day_change_cache = {}
+_day_change_ts = 0
 
-def _futu_day_changes(symbols: list) -> dict:
-    """从 Futu OpenD 批量获取所有持仓的日内涨跌幅和昨收价"""
-    global _futu_day_data, _futu_day_ts
+def _load_day_changes() -> dict:
+    """从 shadow_trader 写入的 day_changes.json 读取日内涨跌"""
+    global _day_change_cache, _day_change_ts
     now = time.time()
-    if _futu_day_data and (now - _futu_day_ts) < 30:  # 30秒缓存
-        return _futu_day_data
+    if _day_change_cache and (now - _day_change_ts) < 60:
+        return _day_change_cache
     
-    result = {}
-    try:
-        from futu import OpenQuoteContext, RET_OK
-        ctx = OpenQuoteContext('127.0.0.1', 11111)
-        time.sleep(0.3)
-        futures_syms = [f'US.{s}' for s in symbols]
-        ret, data = ctx.get_market_snapshot(futures_syms)
-        ctx.close()
-        if ret == RET_OK:
-            for _, row in data.iterrows():
-                sym = row['code'].replace('US.', '')
-                result[sym] = {
-                    'prev_close': float(row.get('prev_close_price', 0) or 0),
-                    'day_chg': float(row.get('change_val', 0) or 0),
-                    'day_pct': float(row.get('change_rate', 0) or 0),
-                }
-    except Exception:
-        pass
-    
-    _futu_day_data = result
-    _futu_day_ts = now
-    return result
+    fp = os.path.join(BASE, 'data', 'day_changes.json')
+    if os.path.exists(fp):
+        try:
+            with open(fp) as f:
+                _day_change_cache = json.load(f)
+            _day_change_ts = now
+        except Exception:
+            pass
+    return _day_change_cache
 
 def _fetch_price(sym):
     global _price_cache,_price_ts
@@ -152,10 +139,8 @@ def read_state():
             with open(fpn) as f: raw=json.load(f)
             init=raw.get('initial_cash',1_000_000); cash=raw.get('cash',0)
             pv=cash; pl_total=0; plist=[]
-            # v5.1: 批量获取 Futu OpenD 日内涨跌数据
-            all_syms = [s for s, dt in (raw.get('positions',{}) or {}).items() 
-                       if isinstance(dt, dict) and dt.get('qty', 0) > 0]
-            futu_data = _futu_day_changes(all_syms) if all_syms else {}
+            # v5.1: 读取 shadow_trader 写入的日内涨跌数据
+            futu_data = _load_day_changes()
             
             for sym,dt in (raw.get('positions',{}) or {}).items():
                 if not isinstance(dt,dict): continue

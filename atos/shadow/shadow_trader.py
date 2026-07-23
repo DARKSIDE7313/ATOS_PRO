@@ -1569,6 +1569,26 @@ def _finalize_cycle(account, cycle, regime, current_vix, signals, top_picks,
     os.makedirs(os.path.dirname(state_file), exist_ok=True)
     atomic_write(state_file, json.dumps(state, indent=2))
 
+    # v5.1: 写日内涨跌数据供 Dashboard 读取
+    try:
+        dc_file = os.path.join(os.path.dirname(state_file), "day_changes.json")
+        day_data = {}
+        for sym, pos in account.positions.items():
+            if not isinstance(pos, dict): continue
+            px = pos.get('last_price', 0) or 0
+            if px <= 0: continue
+            # 用昨收价作为基准（从信号数据获取，若无则用当前价）
+            prev = signals.get(sym, {}).get('prev_close', px) if signals else px
+            day_data[sym] = {
+                'prev_close': round(prev, 2),
+                'day_chg': round(px - prev, 2),
+                'day_pct': round((px - prev) / prev * 100, 2) if prev > 0 else 0,
+            }
+        with open(dc_file, 'w') as f:
+            json.dump(day_data, f)
+    except Exception:
+        pass
+
     # 生成透明报告
     try:
         generate_report(
