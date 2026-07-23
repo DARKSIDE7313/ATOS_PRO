@@ -31,11 +31,42 @@ def _live_price(sym):
                 lp = pos[sym].get('last_price', 0) or 0
                 if lp > 0: return lp
         except: pass
-    # fallback 到缓存
-    if sym in _price_cache:
-        cached = _price_cache[sym]
-        if cached > 0: return cached
     return 0
+
+
+# ── v5.1: Futu OpenD 批量获取日内涨跌 ──
+_futu_day_data = {}
+_futu_day_ts = 0
+
+def _futu_day_changes(symbols: list) -> dict:
+    """从 Futu OpenD 批量获取所有持仓的日内涨跌幅和昨收价"""
+    global _futu_day_data, _futu_day_ts
+    now = time.time()
+    if _futu_day_data and (now - _futu_day_ts) < 30:  # 30秒缓存
+        return _futu_day_data
+    
+    result = {}
+    try:
+        from futu import OpenQuoteContext, RET_OK
+        ctx = OpenQuoteContext('127.0.0.1', 11111)
+        time.sleep(0.3)
+        futures_syms = [f'US.{s}' for s in symbols]
+        ret, data = ctx.get_market_snapshot(futures_syms)
+        ctx.close()
+        if ret == RET_OK:
+            for _, row in data.iterrows():
+                sym = row['code'].replace('US.', '')
+                result[sym] = {
+                    'prev_close': float(row.get('prev_close_price', 0) or 0),
+                    'day_chg': float(row.get('change_val', 0) or 0),
+                    'day_pct': float(row.get('change_rate', 0) or 0),
+                }
+    except Exception:
+        pass
+    
+    _futu_day_data = result
+    _futu_day_ts = now
+    return result
 
 def _fetch_price(sym):
     global _price_cache,_price_ts
@@ -121,6 +152,11 @@ def read_state():
             with open(fpn) as f: raw=json.load(f)
             init=raw.get('initial_cash',1_000_000); cash=raw.get('cash',0)
             pv=cash; pl_total=0; plist=[]
+            # v5.1: 批量获取 Futu OpenD 日内涨跌数据
+            all_syms = [s for s, dt in (raw.get('positions',{}) or {}).items() 
+                       if isinstance(dt, dict) and dt.get('qty', 0) > 0]
+            futu_data = _futu_day_changes(all_syms) if all_syms else {}
+            
             for sym,dt in (raw.get('positions',{}) or {}).items():
                 if not isinstance(dt,dict): continue
                 sh=dt.get('qty',0) or 0; avg=dt.get('avg_price',0) or 0
@@ -129,12 +165,16 @@ def read_state():
                 live=_live_price(sym)
                 price=live if live>0 else (last_close if last_close>0 else avg)
                 val=sh*price; pl=(price-avg)*sh; pl_total+=pl; pv+=val
-                day_chg=price-last_close if last_close>0 else 0
+                # v5.1: 优先使用 Futu OpenD 实时日内涨跌
+                fd = futu_data.get(sym, {})
+                day_chg = fd.get('day_chg', price - last_close if last_close > 0 else 0)
+                day_pct = fd.get('day_pct', round(day_chg/last_close*100, 2) if last_close > 0 else 0)
+                prev_close = fd.get('prev_close', last_close)
                 plist.append({'sym':sym,'shares':sh,'avg':round(avg,2),'price':round(price,2),
                     'val':round(val,2),'pl':round(pl,2),
                     'pl_pct':round((price-avg)/avg*100,2) if avg>0 else 0,
-                    'last_close':round(last_close,2),'day_chg':round(day_chg,2),
-                    'day_pct':round(day_chg/last_close*100,2) if last_close>0 else 0})
+                    'last_close':round(prev_close,2),'day_chg':round(day_chg,2),
+                    'day_pct':round(day_pct,2)})
             tv=sum(x['val'] for x in plist) or 1
             for x in plist: x['wt']=round(x['val']/tv*100,1)
             chg=(pv-init)/init*100 if init>0 else 0
@@ -390,14 +430,20 @@ class H(http.server.BaseHTTPRequestHandler):
         else:
             self.send_response(200); self.send_header('Content-Type','text/html; charset=utf-8'); self.send_header('Cache-Control','no-cache, no-store, must-revalidate'); self.send_header('Pragma','no-cache'); self.send_header('Expires','0'); self.end_headers()
             with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'index.html')) as f:
-                self.wfile.write(f.read().encode())
+                try:
+                    self.wfile.write(f.read().encode())
+                except (BrokenPipeError, ConnectionResetError, OSError):
+                    pass
     def _j(self,d):
         self.send_response(200)
         self.send_header('Access-Control-Allow-Origin','*')
         self.send_header('Access-Control-Allow-Methods','GET, OPTIONS')
         self.send_header('Access-Control-Allow-Headers','Content-Type')
         self.send_header('Content-Type','application/json'); self.send_header('Cache-Control','no-cache'); self.end_headers()
-        self.wfile.write(json.dumps(d,ensure_ascii=False,default=str).encode())
+        try:
+            self.wfile.write(json.dumps(d,ensure_ascii=False,default=str).encode())
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            pass  # Client disconnected, ignore
     def do_OPTIONS(self):
         self.send_response(200)
         self.send_header('Access-Control-Allow-Origin','*')
