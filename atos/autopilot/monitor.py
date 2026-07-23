@@ -382,8 +382,10 @@ class LogMonitor:
 
             # 确认 pgrep 能找到至少一个 shadow_trader 进程（排除自身假阳性）
             import subprocess
+            # LaunchAgent 环境下 pgrep 可能不在 PATH，使用绝对路径
+            pgrep_bin = "/usr/bin/pgrep"
             result = subprocess.run(
-                ["pgrep", "-f", "shadow_trader"],
+                [pgrep_bin, "-f", "shadow_trader"],
                 capture_output=True, text=True, timeout=5
             )
             pids = [int(p) for p in result.stdout.strip().split("\n") if p.strip().isdigit()]
