@@ -373,35 +373,19 @@ class LogMonitor:
         except Exception:
             pass
 
-        # 检查 Shadow Trader 进程（注意：monitor 运行在 shadow_trader 内部，
-        # 所以 pgrep 必定命中自身。此检查仅用于确认 PID 文件一致性。）
+        # 检查 Shadow Trader 进程
+        # monitor 运行在 shadow_trader 内部——如果这段代码在运行，shadow_trader 就在运行。
+        # 唯一需要检查的是：是否有第二个 shadow_trader 实例（通过 PID 文件验证）
         try:
-            import os as _os
-            my_pid = _os.getpid()
-            shadow_alive = True  # monitor 自身就在这里运行
-
-            # 确认 pgrep 能找到至少一个 shadow_trader 进程（排除自身假阳性）
-            import subprocess
-            # LaunchAgent 环境下 pgrep 可能不在 PATH，使用绝对路径
-            pgrep_bin = "/usr/bin/pgrep"
-            result = subprocess.run(
-                [pgrep_bin, "-f", "shadow_trader"],
-                capture_output=True, text=True, timeout=5
-            )
-            pids = [int(p) for p in result.stdout.strip().split("\n") if p.strip().isdigit()]
-            other_pids = [p for p in pids if p != my_pid]
-
-            if not pids:
-                # 完全找不到进程 → 严重问题
-                shadow_alive = False
-                logger.critical("⚠️ pgrep 找不到任何 shadow_trader 进程!")
-            elif not other_pids and not result.stdout.strip():
-                shadow_alive = False
-                logger.critical("⚠️ pgrep 返回空!")
-            # 如果只有自身 PID 且端口19999正常（lock port仅绑定不accept），仍算存活
-        except Exception as e:
-            logger.debug(f"Health check 子进程异常（非致命）: {e}")
-            # monitor 自身在运行，不应误报死亡
+            pid_file = os.path.join(BASE_DIR, "data", ".shadow_trader.lock")
+            if os.path.exists(pid_file):
+                with open(pid_file) as f:
+                    file_pid = int(f.read().strip())
+                my_pid = os.getpid()
+                if file_pid != my_pid:
+                    logger.warning(f"⚠️ PID 文件不一致: 文件={file_pid}, 实际={my_pid} (可能有两个实例)")
+        except Exception:
+            pass  # PID 文件不存在不影响运行
 
     def _record_event(self, event_type: str, data: dict):
         """记录事件"""
