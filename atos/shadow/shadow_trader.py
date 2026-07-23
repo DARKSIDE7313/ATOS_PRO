@@ -1569,21 +1569,37 @@ def _finalize_cycle(account, cycle, regime, current_vix, signals, top_picks,
     os.makedirs(os.path.dirname(state_file), exist_ok=True)
     atomic_write(state_file, json.dumps(state, indent=2))
 
-    # v5.1: 写日内涨跌数据供 Dashboard 读取
+    # v5.1: 写日内涨跌数据供 Dashboard 读取（从 Futu OpenD 获取 prev_close）
     try:
         dc_file = os.path.join(os.path.dirname(state_file), "day_changes.json")
         day_data = {}
+        # 尝试从 Futu OpenD 批量获取日内涨跌
+        try:
+            from futu import OpenQuoteContext, RET_OK
+            pos_syms = [s for s in account.positions if isinstance(account.positions.get(s), dict)]
+            if pos_syms:
+                ctx = OpenQuoteContext('127.0.0.1', 11111)
+                ret, data = ctx.get_market_snapshot([f'US.{s}' for s in pos_syms])
+                ctx.close()
+                if ret == RET_OK:
+                    for _, row in data.iterrows():
+                        sym = row['code'].replace('US.', '')
+                        day_data[sym] = {
+                            'prev_close': round(float(row.get('prev_close_price', 0) or 0), 2),
+                            'day_chg': round(float(row.get('change_val', 0) or 0), 2),
+                            'day_pct': round(float(row.get('change_rate', 0) or 0), 2),
+                        }
+        except Exception:
+            pass  # Futu 不可用时 fallback 到零值
+        
+        # Fallback: 对 Futu 没覆盖的持仓用 current price
         for sym, pos in account.positions.items():
+            if sym in day_data: continue
             if not isinstance(pos, dict): continue
             px = pos.get('last_price', 0) or 0
-            if px <= 0: continue
-            # 用昨收价作为基准（从信号数据获取，若无则用当前价）
-            prev = signals.get(sym, {}).get('prev_close', px) if signals else px
-            day_data[sym] = {
-                'prev_close': round(prev, 2),
-                'day_chg': round(px - prev, 2),
-                'day_pct': round((px - prev) / prev * 100, 2) if prev > 0 else 0,
-            }
+            if px > 0:
+                day_data[sym] = {'prev_close': round(px,2), 'day_chg': 0.0, 'day_pct': 0.0}
+        
         with open(dc_file, 'w') as f:
             json.dump(day_data, f)
     except Exception:
