@@ -230,14 +230,15 @@ def minimum_correlation_portfolio(candidates: list[dict],
 # 公式: f = W - (1-W)/R, half_f = f * 0.5
 
 def half_kelly_weight(win_rate: float, win_loss_ratio: float,
-                       max_weight: float = 0.10) -> float:
+                       max_weight: float = 0.10, trades: int = 0) -> float:
     """
-    半凯利仓位计算。
+    半凯利仓位计算（含样本量折扣）。
 
     Args:
         win_rate: 胜率 (0-1)
         win_loss_ratio: 盈亏比 (avg_win / avg_loss)
         max_weight: 单仓上限
+        trades: 实盘交易笔数（<30笔时向保守先验回归）
 
     Returns:
         建议仓位权重
@@ -245,7 +246,20 @@ def half_kelly_weight(win_rate: float, win_loss_ratio: float,
     if win_rate <= 0 or win_loss_ratio <= 0:
         return 0.005  # 无数据时最小试探仓位
 
-    full_kelly = win_rate - (1 - win_rate) / win_loss_ratio
+    # v19: 样本量折扣 — 小样本时向保守先验回归
+    # 先验: WR=48%, R=1.2 (市场中性，假设无真实优势)
+    # 当 trades<30 时，blend = trades/30 线性混合
+    if trades > 0 and trades < 30:
+        blend = trades / 30.0
+        prior_wr = 0.48
+        prior_r = 1.20
+        wr = prior_wr * (1 - blend) + win_rate * blend
+        r = prior_r * (1 - blend) + win_loss_ratio * blend
+    else:
+        wr = win_rate
+        r = win_loss_ratio
+
+    full_kelly = wr - (1 - wr) / r
     full_kelly = max(0.0, full_kelly)
     half_kelly = full_kelly * 0.5  # 业界标准: 半凯利
     # 再加一道缩水保护 (drawdown buffer)
@@ -266,7 +280,8 @@ def integrated_position_size(symbol: str, factor_score: float, price: float,
                               win_rate: float = 0.42,
                               win_loss_ratio: float = 1.20,
                               current_drawdown: float = 0.0,
-                              max_weight: float = 0.10) -> float:
+                              max_weight: float = 0.10,
+                              trades: int = 0) -> float:
     """
     综合三种方法计算最终仓位。
 
@@ -282,29 +297,35 @@ def integrated_position_size(symbol: str, factor_score: float, price: float,
         vol_weight = 0.02  # 无法计算时给最小权重
 
     # 维度2: 半凯利 (30%)
-    kelly_w = half_kelly_weight(win_rate, win_loss_ratio, max_weight)
+    kelly_w = half_kelly_weight(win_rate, win_loss_ratio, max_weight, trades=trades)
 
-    # 维度3: 因子分数映射 (40%)
-    # 分数 → 仓位的平滑映射 (S曲线)
+    # 维度3: 因子分数映射 (40%) — v18 提高仓位权重
+    # 分数 → 仓位的平滑映射
     if factor_score >= 0.70:
-        score_weight = 0.08
-    elif factor_score >= 0.50:
-        score_weight = 0.05
+        score_weight = 0.12
+    elif factor_score >= 0.55:
+        score_weight = 0.10
+    elif factor_score >= 0.45:
+        score_weight = 0.07
     elif factor_score >= 0.35:
-        score_weight = 0.03
+        score_weight = 0.05
     elif factor_score >= 0.25:
         score_weight = 0.015
     else:
         score_weight = 0.005
 
     # 三维融合 (等权平均 — 每个维度提供独立信息)
-    blended = vol_weight * 0.30 + kelly_w * 0.30 + score_weight * 0.40
+    blended = vol_weight * 0.20 + kelly_w * 0.30 + score_weight * 0.50
 
     # 回撤折扣
     if current_drawdown > 0.10:
         blended *= 0.60   # 回撤>10% → 仓位打6折
     elif current_drawdown > 0.05:
         blended *= 0.80   # 回撤>5% → 仓位打8折
+
+    # v18: 最小仓位地板 — 确保资金效率
+    if blended < 0.04 and factor_score >= 0.40:
+        blended = 0.04  # 至少4%仓位给过得去的标的
 
     return min(blended, max_weight)
 

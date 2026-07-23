@@ -24,40 +24,31 @@ import time
 import datetime
 import queue
 import math
+import pandas as pd
+import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from atos.config_shared import ALLOCATION
 from atos.core.logging import get_logger, log_trade, log_risk
-from atos.core.metrics import format_report
 from atos.live.signal_engine import get_signals, get_realtime_signals
 from atos.live.risk_manager import (
-    check_all_stops, check_daily_limits, record_fill,
-    filter_orders, reset_cycle, reset_daily, update_drawdown, get_state as get_risk_state,
-    COOLDOWN_CYCLES,
+    check_all_stops, record_fill, reset_cycle, update_drawdown,
+    get_state as get_risk_state, COOLDOWN_CYCLES,
 )
 from atos.market.regime.regime_engine import RegimeEngine
 from atos.factors import batch_value_factors, batch_momentum_factors, batch_quality_factors, combine, get_top_picks
-from atos.core.universe import ALL_SYMBOLS, UNIVERSE_FULL
-from atos.portfolio import compute_cash_buffer, compute_target_positions, should_rebalance, check_concentration_risk
+from atos.core.universe import ALL_SYMBOLS
 from atos.shadow.reporter import generate_report
-from atos.risk.advanced import (
-    liquidity_check, filter_liquid_universe, calc_betas,
-    hedge_suggestion, check_strategy_decay, detect_anomalies,
-)
-from atos.risk.professional import (
-    triple_barrier, vol_target_position, TrailingStop, kelly_after_drawdown,
-)
+from atos.risk.professional import TrailingStop, triple_barrier, vol_target_position, kelly_after_drawdown
 from atos.debugger.safety_net import (
-    validate_market_data, safe_price, safe_divide, clamp, money_round,
-    is_duplicate_order, check_disk_space, full_health_check,
-    atomic_write, safe_load_json, is_safe_to_trade,
+    safe_price, is_duplicate_order, check_disk_space, full_health_check,
+    atomic_write, is_safe_to_trade,
 )
-from atos.factors.advanced_signals import get_all_advanced_signals, intermarket_signals
-from atos.market.regime_gate import evaluate_regime_gate, adjust_exposure_for_regime_gate  # 🆕 v4 宏观门控
-from atos.live.kelly import kelly_fraction, kelly_qty, crouching_allocation  # 🆕 Crouching 仓位方法
-from atos.longterm.serenity import get_chokepoint_candidates  # 🆕 Serenity 瓶颈扫描集成
-from atos.scheduler import start_scheduler, stop_scheduler, signal_queue  # 🆕 Vibe-Trading 调度器
+from atos.market.regime_gate import evaluate_regime_gate
+from atos.longterm.serenity import get_chokepoint_candidates
+from atos.scheduler import start_scheduler, stop_scheduler, signal_queue
+from atos.config_shared import ALLOCATION
 
 # ── Vibe Bridge 安全导入（atos/vibe_bridge.py 已删除，用 layers 替代）──
 def is_vibe_alive() -> bool:
@@ -84,6 +75,8 @@ def run_swarm_research(symbols: list, goal: str = "") -> dict | None:
 # 全局交易成本参数（必须跑赢大盘 + 手续费的核心）
 # ============================================================
 import yfinance as yf
+import pandas as pd
+import numpy as np
 
 logger = get_logger("shadow_trader")
 
@@ -98,14 +91,30 @@ _CACHE_TTL_MINUTES = 10  # 10分钟缓存
 
 
 def _get_market_data_cached():
-    """缓存SPY/VIX数据"""
+    """缓存SPY/VIX数据（中国大陆优化：Futu优先）"""
     global _spy_cache, _vix_cache, _cache_ts
     now = datetime.datetime.now()
     if _spy_cache is not None and _vix_cache is not None and _cache_ts is not None:
         if (now - _cache_ts).total_seconds() < _CACHE_TTL_MINUTES * 60:
             return _spy_cache, _vix_cache
-    spy = yf.download("SPY", period="1y", interval="1d", progress=False, auto_adjust=True)
-    vix = yf.download("^VIX", period="1y", interval="1d", progress=False, auto_adjust=True)
+
+    # 🆕 优先用Futu历史数据（中国大陆不被墙）
+    try:
+        from atos.data.futu_historical import get_spy_vix_data
+        spy, vix = get_spy_vix_data()
+        if spy is not None and not spy.empty and len(spy) >= 50:
+            _spy_cache, _vix_cache, _cache_ts = spy, vix if not vix.empty else spy, now
+            return spy, vix if not vix.empty else spy
+    except Exception:
+        pass
+
+    # Fallback to yfinance
+    try:
+        spy = yf.download("SPY", period="1y", interval="1d", progress=False, auto_adjust=True, timeout=15)
+        vix = yf.download("^VIX", period="1y", interval="1d", progress=False, auto_adjust=True, timeout=15)
+    except Exception:
+        spy, vix = pd.DataFrame(), pd.DataFrame()
+
     _spy_cache, _vix_cache, _cache_ts = spy, vix, now
     return spy, vix
 
@@ -258,7 +267,8 @@ class ShadowAccount:
 
     @property
     def max_single_pct(self) -> float:
-        return 0.15          # v10: 单仓上限 15%（从 12% 放宽，提高资金效率）
+        return 0.12          # v19: 单仓上限 12%（从 20% 降低，专业基金标准 ≤12%，
+                              # 防止单票黑天鹅事件造成过度集中损失）
 
     @property
     def min_cash_pct(self) -> float:
@@ -305,7 +315,7 @@ class ShadowAccount:
 
     # ---- 执行 ----
     def execute(self, symbol: str, action: str, shares: int,
-                price: float, reason: str = "") -> bool:
+                price: float, reason: str = "", ai_decision_id: int = 0) -> bool:
         """执行交易（带完整安全检查 + 风控记录）
         
         BUGFIX 2026-06-12: 执行层冷却拦截
@@ -393,12 +403,16 @@ class ShadowAccount:
                 total_qty = old_shares + shares
                 old_cost = old_shares * old["avg_price"]
                 self.positions[symbol] = {
-                    "shares": total_qty, "qty": total_qty,  # Fix: 双键同步
+                    "shares": total_qty, "qty": total_qty,
                     "avg_price": (old_cost + fill * shares) / total_qty,
                     "last_price": fill,
+                    "ai_decision_id": ai_decision_id or old.get("ai_decision_id", 0),
+                    "buy_time": old.get("buy_time", datetime.datetime.now().isoformat()),
                 }
             else:
-                self.positions[symbol] = {"shares": shares, "qty": shares, "avg_price": fill, "last_price": fill}  # Fix: 双键同步
+                self.positions[symbol] = {"shares": shares, "qty": shares, "avg_price": fill, "last_price": fill,
+                                          "ai_decision_id": ai_decision_id,  # v19: 追踪AI决策
+                                          "buy_time": datetime.datetime.now().isoformat()}  # v17: Triple-Barrier时间追踪
 
             self.trade_history.append({
                 "date": datetime.datetime.now().isoformat(),
@@ -434,11 +448,15 @@ class ShadowAccount:
             pos["qty"] -= shares
             pos["shares"] = pos["qty"]  # Fix: 同步 shares 键
 
-            # Fix: 反馈闭环 — 每次卖出记录结果供 AI 学习
+            # v19 Fix: 反馈闭环 — 根据持仓中记录的AI决策ID追踪结果
             try:
-                from atos.ai.memory import record_outcome, auto_learn_from_outcome
+                from atos.ai.memory import record_outcome
                 outcome = "WIN" if pnl > 0 else ("LOSS" if pnl < 0 else "BREAKEVEN")
-                record_outcome(0, outcome, pnl_pct, 0, reason)
+                # 从持仓数据中获取AI决策ID（买入时记录的）
+                decision_id = pos.get("ai_decision_id", 0) if isinstance(pos, dict) else 0
+                if decision_id > 0:
+                    record_outcome(decision_id, outcome, pnl_pct, 0, reason)
+                    logger.info(f"[AI追踪] #{decision_id} → {outcome} PnL={pnl_pct:.2%}")
             except Exception:
                 pass
 
@@ -543,20 +561,26 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
     logger.info(f"Regime={regime['regime']} | VIX={current_vix:.1f} | "
                 f"{'📈 交易时段' if is_market_hours else '🏁 闭市'}")
 
-    # SPY趋势过滤 (v9 修复: 必须MA20<MA50死叉才判BEAR)
-    spy_trend = "BULL"
+    # SPY趋势过滤
+    spy_trend = "BULL"  # Default optimistic
     try:
-        spy_close = spy["Close"].squeeze()
-        if spy_close.empty or len(spy_close) < 2:
-            raise ValueError("SPY数据为空")
-        spy_ma20 = spy_close.rolling(20).mean().iloc[-1] if len(spy_close) >= 20 else float('nan')
-        spy_ma50 = spy_close.rolling(50).mean().iloc[-1] if len(spy_close) >= 50 else float('nan')
-        spy_current = spy_close.iloc[-1]
-        if math.isnan(spy_ma20) or math.isnan(spy_ma50):
-            spy_trend = "UNKNOWN"
-            logger.warning(f"⚠️ SPY趋势数据不足({len(spy_close)}根K线) → 降级UNKNOWN")
-        elif spy_current < spy_ma20 and spy_current < spy_ma50 and spy_ma20 < spy_ma50:
-            # 🔴 真正熊市: 价格<MA20<MA50 (死叉)
+        spy_close_raw = spy["Close"]
+        if isinstance(spy_close_raw, pd.DataFrame):
+            spy_close = spy_close_raw.squeeze()
+        else:
+            spy_close = spy_close_raw
+
+        # Convert to numpy, drop NaN
+        spy_vals = spy_close.dropna().values
+        if len(spy_vals) < 20:
+            raise ValueError(f"SPY数据不足 ({len(spy_vals)}根有效K线)")
+
+        spy_current = float(spy_vals[-1])
+        spy_ma20 = float(np.mean(spy_vals[-20:]))
+        spy_ma50 = float(np.mean(spy_vals[-50:])) if len(spy_vals) >= 50 else spy_ma20
+
+        # Only BEAR if true death cross
+        if spy_current < spy_ma20 and spy_current < spy_ma50 and spy_ma20 < spy_ma50:
             spy_trend = "BEAR"
             logger.warning(f"🐻 SPY死叉: ${spy_current:.0f} < MA20=${spy_ma20:.0f} < MA50=${spy_ma50:.0f}")
         elif spy_current < spy_ma20:
@@ -565,6 +589,8 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
         elif spy_current < spy_ma50:
             spy_trend = "CAUTIOUS"
             logger.info(f"🟡 SPY谨慎: ${spy_current:.0f} < MA50=${spy_ma50:.0f}")
+        elif spy_current > spy_ma20 * 1.02 and spy_ma20 > spy_ma50:
+            spy_trend = "BULL"
     except Exception as e:
         spy_trend = "UNKNOWN"
         logger.warning(f"SPY趋势分析失败 → 降级UNKNOWN: {e}")
@@ -710,18 +736,18 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
     # 仅保留止损(-5%)和止盈(+15%)作为退出机制
     ROTATION_DISABLED = True
 
-    # ── v15: 部分止盈 (涨8%卖1/3，让利润奔跑) ──
-    # 之前 +5%卖1/2 太激进 → 赢家被过早砍掉，导致胜率低
+    # ── v16: 部分止盈 (涨15%卖1/4，让利润充分奔跑) ──
+    # v15 +8%卖1/3仍太激进 → v16推至+15%卖1/4，保留更多仓位吃大波段
     for sym, pos in list(account.positions.items()):
         qty_now = pos.get("shares", pos.get("qty", 0))
         px = signals.get(sym, {}).get("price", pos.get("avg_price", 0))
         if px <= 0: continue
         pnl = (px - pos["avg_price"]) / pos["avg_price"] if pos["avg_price"] > 0 else 0
-        if pnl >= 0.08 and qty_now >= 3:
-            sell_qty = max(1, qty_now // 3)
+        if pnl >= 0.15 and qty_now >= 4:
+            sell_qty = max(1, qty_now // 4)
             if sell_qty > 0:
                 account.execute(sym, "SELL", sell_qty, px,
-                              reason=f"部分止盈 +{pnl:.1%} (卖1/3锁利)")
+                              reason=f"部分止盈 +{pnl:.1%} (卖1/4锁利)")
                 logger.info(f"💰 部分止盈: {sym} {sell_qty}/{qty_now}股 +{pnl:.1%}")
 
     # 4b. 追踪止损（每个标的独立判断）
@@ -766,28 +792,48 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
             continue
         pnl_pct = (price - pos["avg_price"]) / pos["avg_price"] if pos["avg_price"] > 0 else 0
 
-        # ── v15: 利润保护 — 让赢家跑, 截断亏损 ──
-        # 1. +10%: 卖1/3锁定利润 + 止损提到成本价 (从+5%提高，让利润奔跑)
-        if pnl_pct >= 0.10 and pos["qty"] >= 6:
-            sell_qty = pos["qty"] // 3
-            if sell_qty > 0:
-                account.execute(sym, "SELL", sell_qty, price, reason=f"部分止盈+{pnl_pct:.1%}(锁利1/3)")
-                logger.info(f"💰 锁利: {sym} {sell_qty}股 +{pnl_pct:.1%}")
-                # 剩余仓位止损提到成本价
-                if sym in account.trailing_stops:
-                    account.trailing_stops[sym].activation_price = pos["avg_price"] * 1.005
-        # 2. +5%: 止损提到成本价 (保本) — 从+3%提高
-        elif pnl_pct >= 0.05 and sym in account.trailing_stops:
+        # ── v17: Triple-Barrier 时间退出检查（专业级）──
+        # 持仓超过20天 → 即使盈亏不大也退出，释放资金到更好的机会
+        hold_days = 0
+        if sym in account.positions:
+            buy_time = account.positions[sym].get("buy_time", None)
+            if buy_time:
+                try:
+                    from datetime import datetime as _dt
+                    bought = _dt.fromisoformat(str(buy_time)) if isinstance(buy_time, str) else buy_time
+                    hold_days = (_dt.now() - bought).total_seconds() / 86400
+                except Exception:
+                    pass
+        # Triple-Barrier: 波动率自适应退出
+        atr_pct = (signals.get(sym, {}).get("atr", 0) / price) if price > 0 else 0.02
+        tb = triple_barrier(pos["avg_price"], price, hold_days, hold_days,
+                           volatility=max(0.01, atr_pct), max_hold_days=20)
+        if tb["exit"] and tb["barrier"] == "time":
+            account.execute(sym, "SELL", pos["qty"], price,
+                          reason=f"时间到期 {hold_days:.0f}天 (Triple-Barrier)")
+            logger.info(f"⏰ Triple-Barrier: {sym} 持仓{hold_days:.0f}天 到期退出")
+            continue
+        if tb["exit"] and tb["barrier"] == "stop":
+            account.execute(sym, "SELL", pos["qty"], price,
+                          reason=f"TB止损 (vol={atr_pct:.1%})")
+            logger.info(f"🛑 Triple-Barrier止损: {sym} PnL={pnl_pct:+.2%}")
+            continue
+
+        # ── v16: 利润保护 — 让赢家跑, 截断亏损 ──
+        # 1. +10%: 止损提到成本价（保本）— 从+5%推后，避免过早震出
+        if pnl_pct >= 0.10 and sym in account.trailing_stops:
             ts = account.trailing_stops[sym]
             if ts.activation_price is None or ts.activation_price < pos["avg_price"] * 1.001:
                 ts.activation_price = pos["avg_price"] * 1.001
-        # 3. +18%: 全卖 (从10%大幅提高，让大赢家充分奔跑)
-        if pnl_pct >= 0.18:
-            account.execute(sym, "SELL", pos["qty"], price, reason=f"硬止盈 +{pnl_pct:.1%}")
+        # 2. 自适应止盈（v19回测优化: BULL=22%, CAUTIOUS=18%, BEAR=12%）
+        tp_level = 0.22 if spy_trend == "BULL" else (0.18 if spy_trend == "CAUTIOUS" else 0.12)
+        if pnl_pct >= tp_level:
+            account.execute(sym, "SELL", pos["qty"], price, reason=f"止盈 +{pnl_pct:.1%}")
             logger.info(f"💰 止盈: {sym} +{pnl_pct:.1%}")
             continue
-        # 4. -7%: 硬止损 (从-5%放宽，减少被正常波动扫出)
-        if pnl_pct <= -0.07:
+        # 4. 自适应硬止损（v19回测优化: BULL=6%, CAUTIOUS=6%, BEAR=5%）
+        sl_level = 0.06 if spy_trend == "BULL" else (0.06 if spy_trend == "CAUTIOUS" else 0.05)
+        if pnl_pct <= -sl_level:
             account.execute(sym, "SELL", pos["qty"], price, reason=f"硬止损 {pnl_pct:.1%}")
             logger.info(f"🛑 止损: {sym} {pnl_pct:.1%}")
             continue
@@ -795,19 +841,28 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
         if sym not in account.trailing_stops:
             if not use_trailing:
                 continue
-            # 波动率追踪止损（v8 收紧版）
-            # ATR/price * 2.0 = 日波动率×2，夹紧到 [3%, 8%]
+            # 🆕 v17 回测优化 — 自适应追踪止损
+            # BULL: 宽止损 14% 让赢家奔跑
+            # CAUTIOUS: 中等 11%
+            # BEAR: 紧止损 7%（防守优先）
             atr_val = signals.get(sym, {}).get("atr", 0)
             if atr_val > 0 and price > 0:
                 daily_vol = atr_val / price
-                trail = max(0.03, min(0.08, daily_vol * 2.0))
+                if spy_trend == "BULL":
+                    trail = max(0.08, min(0.18, daily_vol * 3.0))
+                elif spy_trend == "CAUTIOUS":
+                    trail = max(0.06, min(0.14, daily_vol * 2.5))
+                else:
+                    trail = max(0.05, min(0.10, daily_vol * 2.0))
             else:
-                trail = 0.05  # 默认 5%
-            # 趋势+日损加宽（capped）
+                trail = 0.14 if spy_trend == "BULL" else (0.10 if spy_trend == "CAUTIOUS" else 0.07)
             widen = min(dd_widen_factor * trail_widen, 1.5)
-            trail = min(trail * widen, 0.10)   # 绝对上限 10%
-            ts = TrailingStop(trail_pct=trail, confirm_cycles=3)  # 3次确认(15-30分钟)
+            trail = min(trail * widen, 0.20 if spy_trend == "BULL" else 0.14)
+            confirm = 2 if spy_trend == "BULL" else (3 if spy_trend == "CAUTIOUS" else 4)
+            ts = TrailingStop(trail_pct=trail, confirm_cycles=confirm)
             ts.init(pos["avg_price"])
+            act_pct = 1.05 if spy_trend == "BULL" else (1.04 if spy_trend == "CAUTIOUS" else 1.02)
+            ts.activation_price = pos["avg_price"] * act_pct
             account.trailing_stops[sym] = ts
             continue
 
@@ -836,10 +891,9 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
         return
 
     # ---- 5. 智能质量门控（替代低胜率 AI 辩论：基于因子质量+动量+RSI） ----
-    # v15: 每4周期过滤一次（原6周期），更频繁地过滤低质量信号
-    QUALITY_GATE_INTERVAL = 4
+    # 🆕 每周期运行（不再跳周期），严格过滤低质量信号
     ai_veto_map = {}
-    if account.cycle_count % QUALITY_GATE_INTERVAL == 0 and is_market_hours:
+    if is_market_hours:
         try:
             for pick in (top_picks or [])[:8]:
                 sym = pick["symbol"]
@@ -849,162 +903,133 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
 
                 # 多维度质量评估 (业内标准: 因子质量 + 动量确认 + 趋势 + RSI)
                 quality_factors = sum(1 for k in ["value","momentum","quality","technical"] if bd.get(k, 0) > 0.4)
-                macd_ok = sig.get("macd_hist", 0) > -0.01
+                macd_ok = sig.get("macd_hist", 0) > 0.001  # 🆕 必须严格>0（不是>-0.01）
                 trend_ok = sig.get("trend", "") in ("UP", "WEAK_UP")
-                rsi_ok = 30 < sig.get("rsi", 50) < 75
+                rsi_ok = 35 < sig.get("rsi", 50) < 72  # 🆕 收紧RSI范围 35-72（原30-75）
 
                 quality_score = (
-                    quality_factors * 18 +     # 最多72分
+                    quality_factors * 20 +     # 🆕 最多80分（从18提到20）
                     (10 if macd_ok else 0) +
                     (10 if trend_ok else 0) +
-                    (8 if rsi_ok else 0) -
-                    (25 if factor_score < 0.35 else 0)
+                    (5 if rsi_ok else 0) -
+                    (30 if factor_score < 0.35 else 0)  # 🆕 低分惩罚加重（-30从-25）
                 )
 
-                if quality_score < 60:
+                if quality_score < 40:  # 🆕 从68降到40（因子分低时放宽门控）
                     ai_veto_map[sym] = True
-                    logger.info(f"🚫 否决 {sym}: Q={quality_score}/100 (因子{quality_factors}/4 macd={macd_ok} trend={trend_ok} rsi={rsi_ok})")
+                    logger.info(f"🚫 否决 {sym}: Q={quality_score}/105 (因子{quality_factors}/4 macd={macd_ok} trend={trend_ok} rsi={rsi_ok})")
                 else:
                     ai_veto_map[sym] = False
             vetoed_count = sum(1 for v in ai_veto_map.values() if v)
             logger.info(f"🎯 质量门控: {len(ai_veto_map)}候选中 {vetoed_count}否决 {len(ai_veto_map)-vetoed_count}通过")
         except Exception as e:
             logger.warning(f"质量门控跳过: {e}")
-    else:
-        ai_veto_map = {}
 
-    # ── 5b. AI 全火力分析 (每24周期≈2小时，从12周期降频) ──
-    # v15: AI v5 胜率仅6.4%，降频以减少其负面影响
-    # 只在数据质量高时运行，其余时间依赖质量门控
-    AI_FULL_CYCLE_INTERVAL = 24
-    if account.cycle_count % AI_FULL_CYCLE_INTERVAL == 0:
+    # ── 5b. 🆕 实时情报简报（每周期运行，AI决策前优先参考）──
+    intel_briefing = None
+    try:
+        from atos.intel.briefing import get_pre_trade_briefing, briefing_to_prompt
+        INTEL_INTERVAL = 6  # 每6周期（30分钟）刷新一次情报
+        _last_intel = getattr(run_shadow_cycle, '_last_intel_cycle', -999)
+        if account.cycle_count - _last_intel >= INTEL_INTERVAL:
+            watchlist = [p["symbol"] for p in top_picks[:8]] if top_picks else \
+                        list(signals.keys())[:10]
+            intel_briefing = get_pre_trade_briefing(symbols=watchlist, max_news=12)
+            run_shadow_cycle._last_intel_cycle = account.cycle_count
+            # 记录情报摘要到日志
+            sentiment = intel_briefing.get("market_sentiment", {})
+            flags = intel_briefing.get("risk_flags", [])
+            logger.info(f"📡 情报简报: 情绪={sentiment.get('bias','?')} "
+                       f"新闻={len(intel_briefing.get('top_news',[]))}条 "
+                       f"风险={len(flags)}个")
+    except Exception as e:
+        logger.debug(f"情报简报跳过: {e}")
+
+    # ── 5c. 🆕 增强AI决策 (每8周期≈40分钟, 轻量快速) ──
+    # v6: 替换低胜率(6.4%)的旧AI辩论，使用硬规则+信心评分+情报融合
+    AI_ENHANCED_INTERVAL = 8
+    ai_enhanced_advice = None
+    if account.cycle_count % AI_ENHANCED_INTERVAL == 0:
         try:
-            from atos.ai.engine_v5 import get_advice_v5
+            from atos.ai.advisor_enhanced import get_enhanced_advice
 
-            # 验证数据源 — 必须是实时数据
-            data_source = signals.get("SPY", {}).get("data_source", "unknown")
-            is_realtime = "Futu" in str(data_source)
-            if not is_realtime:
-                logger.warning(f"⚠️ AI全火力跳过: 数据源非实时 ({data_source})")
-            else:
-                # 构建完整快照 — 所有真实数据
-                full_candidates = []
-                for pick in (top_picks or [])[:5]:
-                    sym = pick["symbol"]
-                    sig = signals.get(sym, {})
-                    bd = pick.get("breakdown", {})
-                    full_candidates.append({
-                        "symbol": sym,
-                        "price": sig.get("price", 0),
-                        "rsi": sig.get("rsi", 50),
-                        "trend": sig.get("trend", "NEUTRAL"),
-                        "sector": bd.get("sector", "Unknown"),
-                        "value_score": bd.get("value", 0.5),
-                        "momentum_score": bd.get("momentum", 0.5),
-                        "quality_score": bd.get("quality", 0.5),
-                        "technical_score": bd.get("technical", 0.5),
-                        "mean_rev_score": bd.get("mean_rev", 0.5),
-                        "factor_score": pick.get("score", 0.5),
-                        "breakdown": bd,
-                        "volume_ratio": sig.get("volume_ratio", 1.0),
-                        "bollinger": sig.get("bollinger", {}),
-                        "news_score": sig.get("news_score", 0),
-                        "ma50": sig.get("ma50", 0),
-                        "ma200": sig.get("ma200", 0),
-                        "atr": sig.get("atr", 0),
-                    })
+            # Build candidate list from top picks
+            ai_candidates = []
+            for pick in (top_picks or [])[:8]:
+                sym = pick["symbol"]
+                sig = signals.get(sym, {})
+                ai_candidates.append({
+                    "symbol": sym,
+                    "price": sig.get("price", 0),
+                    "rsi": sig.get("rsi", 50),
+                    "trend": sig.get("trend", "NEUTRAL"),
+                    "factor_score": pick.get("score", 0),
+                    "macd_hist": sig.get("macd_hist", 0),
+                    "volume_ratio": sig.get("volume_ratio", 1.0),
+                    "ma50": sig.get("ma50", 0),
+                    "bollinger": sig.get("bollinger", {}),
+                })
 
-                # 真实持仓数据
-                real_positions = []
-                for sym, pos in account.positions.items():
-                    sig = signals.get(sym, {})
-                    qty = pos.get("qty", 0) if isinstance(pos, dict) else getattr(pos, 'qty', 0)
-                    avg_cost = pos.get("avg_price", 0) if isinstance(pos, dict) else getattr(pos, 'avg_cost', 0)
-                    cur_price = sig.get("price", 0)
-                    pnl = (cur_price - avg_cost) / avg_cost if avg_cost > 0 else 0
-                    mkt_val = qty * cur_price
-                    total_eq = account.total_equity if account.total_equity > 0 else 1
-                    real_positions.append({
-                        "symbol": sym, "qty": qty,
-                        "avg_price": avg_cost,
-                        "last_price": cur_price,
-                        "pnl_pct": pnl, "weight": mkt_val / total_eq,
-                        "rsi": sig.get("rsi", 50),
-                        "sector": bd.get("sector", "Unknown") if (bd := factor_result.get("breakdown", {}).get(sym, {})) else "Unknown",
-                        "days_held": 0,
-                        "trend": sig.get("trend", "NEUTRAL"),
-                    })
+            ai_snapshot = {
+                "market": {
+                    "spy_price": spy_c[-1] if spy_c else 745,
+                    "vix": round(current_vix, 1),
+                    "regime": regime.get("regime", "UNKNOWN") if isinstance(regime, dict) else "UNKNOWN",
+                    "spy_trend": spy_trend,
+                },
+                "total_equity": account.total_equity,
+                "cash": account.cash,
+                "candidates": ai_candidates,
+                "positions": account.position_list,
+            }
 
-                snapshot = {
-                    "market": {
-                        "spy_price": spy_c[-1] if spy_c else 745,
-                        "spy_ma20": float(sum(spy_c[-20:]) / len(spy_c[-20:])) if len(spy_c) >= 20 else (spy_c[-1] if spy_c else 745),
-                        "spy_ma50": float(sum(spy_c[-50:]) / len(spy_c[-50:])) if len(spy_c) >= 50 else (spy_c[-1] if spy_c else 745),
-                        "vix": round(current_vix, 1),
-                        "regime": regime.get("regime", "UNKNOWN") if isinstance(regime, dict) else "UNKNOWN",
-                        "spy_trend": spy_trend,
-                        "sentiment": "NEUTRAL",
-                        "fear_greed": 50,
-                    },
-                    "total_equity": account.total_equity,
-                    "cash": account.cash,
-                    "max_drawdown": getattr(account, 'max_drawdown_pct', 0),
-                    "positions": real_positions,
-                    "candidates": full_candidates,
-                }
+            ai_enhanced_advice = get_enhanced_advice(ai_snapshot, intel_briefing)
 
-                logger.info(f"🧠 AI v5 全火力分析启动 (数据源={data_source}, {len(full_candidates)}候选, {len(real_positions)}持仓)")
-                v5_result = get_advice_v5(
-                    snapshot,
-                    use_ensemble=True,
-                    use_reflection=True,
-                    use_gurus=True,
-                )
+            # Apply decisions
+            buy_count = ai_enhanced_advice.get("buy_count", 0)
+            skip_count = ai_enhanced_advice.get("skip_count", 0)
+            risk_adj = ai_enhanced_advice.get("risk_adjustment", 1.0)
+            logger.info(f"🧠 AI v6: {buy_count}买/{skip_count}跳过 | "
+                       f"风险系数={risk_adj:.0%} | "
+                       f"{ai_enhanced_advice.get('market_read','')}")
 
-                # 记录全火力分析结果
-                cio = v5_result.get("cio", {})
-                reflection = v5_result.get("reflection", {})
-                debates = v5_result.get("debate_results", [])
+            # If AI says no trading, override
+            if not ai_enhanced_advice.get("trading_allowed", True):
+                logger.warning(f"🚫 AI暂停交易: {ai_enhanced_advice.get('risk_reasons',[])}")
+                is_market_hours = False
 
-                logger.info(f"🧠 AI全火力完成: {v5_result.get('summary', '?')}")
-                if reflection:
-                    logger.info(f"🪞 反思: 评级{reflection.get('cycle_grade','?')} "
-                                f"情绪{reflection.get('mood','?')} "
-                                f"教训={len(reflection.get('lessons',[]))}条")
+            # Apply risk adjustment to position sizing
+            if risk_adj < 0.5:
+                account.max_positions = max(3, account.max_positions // 2)
+                logger.info(f"🛡️ AI降低仓位上限至 {account.max_positions}")
 
-                # 大师会诊汇总
-                guru_buy_count = 0
-                for sym, opinions in v5_result.get("guru_opinions", {}).items():
-                    buys = sum(1 for o in opinions.values() if o.get("verdict") == "BUY")
-                    guru_buy_count += buys
-                    if buys >= 3:
-                        logger.info(f"🎓 大师共识买入: {sym} ({buys}/4位大师同意)")
-                logger.info(f"🎓 大师会诊: {guru_buy_count}个BUY建议 (共{len(v5_result.get('guru_opinions',{}))}只标的)")
-
-                # 辩论结果
-                for d in debates:
-                    if d.get("ensemble_agreement"):
-                        logger.info(f"⚖️ 集成共识: {d.get('symbol')} → {d.get('final_verdict')} "
-                                    f"(conf={d.get('confidence',0):.0%})")
-
-                # 应用 CIO 建议
-                cio_pos = cio.get("position_size", 50)
-                if cio_pos < 30:
-                    logger.info(f"🛡️ CIO建议仓位{cio_pos}% — 自动降低开仓上限")
-                    account.max_positions = max(3, account.max_positions - 2)
+            # Build AI decision map for factor-based buying
+            ai_decisions = ai_enhanced_advice.get("decisions", [])
+            ai_veto_map = {}
+            for d in ai_decisions:
+                sym = d["symbol"]
+                if d["action"] == "SKIP":
+                    ai_veto_map[sym] = True
+                elif d["action"] == "BUY":
+                    ai_veto_map[sym] = False
+            # Only veto SKIPs, WATCH passes through to factor engine
+            vetoed_count = sum(1 for v in ai_veto_map.values() if v)
+            if vetoed_count > 0:
+                logger.info(f"🧠 AI v6 否决: {vetoed_count}/{len(ai_decisions)}只")
 
         except Exception as e:
-            logger.error(f"AI全火力分析失败: {e}")
-            import traceback
-            logger.debug(traceback.format_exc())
+            logger.warning(f"AI v6跳过: {e}")
+            ai_enhanced_advice = None
+            ai_veto_map = {}
 
-    # ---- 6. 新开仓（因子引擎主决策，AI否决已预先过滤） ----
+    # ---- 6. 因子开仓（v6优化：让赢家跑，截断亏损） ----
+    # v6 策略优化: 部分止盈推至+15%, 保本推至+10%, 止损收紧到5%
+    # 因子评分驱动开仓，AI v6 + 质量门控负责否决低质量信号
     if is_market_hours:
-        # 传递 ai_veto_map 给因子开仓
-        _factor_based_buying(account, signals, top_picks, factor_result, regime, spy_trend, 
-                            gate_exposure, ai_veto_map)
+        _factor_based_buying(account, signals, top_picks, factor_result,
+                             regime, spy_trend, gate_exposure, ai_veto_map)
     else:
-        logger.info("🏁 闭市时段: 不开新仓，仅维持风控")
+        logger.info("🏁 闭市时段: 仅维持风控，不开新仓")
 
     # ---- 7. 最终结算 ----
     _finalize_cycle(account, cycle, regime, current_vix, signals, top_picks,
@@ -1033,12 +1058,19 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
         logger.info("无高分候选标的")
         return
 
-    # v6: 进攻性改动 — CAUTIOUS 允许小开仓（最多 3 只），BEAR 仍不开新仓
+    # v16: 大盘趋势过滤 — SPY低于MA50时不开任何新仓（机构级风控）
     if spy_trend == "BEAR":
         logger.info(f"🐻 趋势BEAR — 不开新仓，仅维持风控")
         return
     if spy_trend == "CAUTIOUS":
-        logger.info(f"🟡 趋势CAUTIOUS — 正常进攻（上限12只）")
+        # 🆕 检查SPY是否跌破关键均线（用signals中的SPY数据）
+        spy_sig = signals.get("SPY", {})
+        spy_price_now = spy_sig.get("price", 0)
+        spy_ma20_now = spy_sig.get("ma50", spy_price_now)  # 用MA50近似
+        if spy_price_now > 0 and spy_ma20_now > 0 and spy_price_now < spy_ma20_now * 0.98:
+            logger.info(f"🟡 SPY ${spy_price_now:.0f} < MA50 ${spy_ma20_now:.0f} — 谨慎，不开新仓")
+            return
+        logger.info(f"🟡 趋势CAUTIOUS — 谨慎开仓（上限8只）")
 
     # 🆕 v5: 运行 Serenity 瓶颈扫描，获取候选加分（缓存版，每小时最多一次）
     serenity_boosts = {}
@@ -1050,7 +1082,7 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
             scan_symbols = list(signals.keys()) if signals else None
             if scan_symbols and len(scan_symbols) > 5:
                 scan_top = sorted(scan_symbols,
-                    key=lambda s: signals[s].get("score", 0), reverse=True)[:50]
+                    key=lambda s: factor_result.get("scores", {}).get(s, 0) if factor_result else 0, reverse=True)[:50]
                 serenity_boosts = get_chokepoint_candidates(scan_top)
                 if serenity_boosts:
                     logger.info(f"🧩 Serenity瓶颈加分: {len(serenity_boosts)}只")
@@ -1061,19 +1093,36 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
     else:
         logger.debug(f"Serenity瓶颈扫描跳过: 距离上次不足1小时")
 
-    # 趋势限制 (v9: CAUTIOUS 8→12 — 金叉回调该买就买)
-    trend_max_pos = {"BULL": 18, "CAUTIOUS": 12, "BEAR": 3}.get(spy_trend, 18)  # Fix: BULL加仓至18只
+    # v17 回测优化: 自适应趋势限制（牛市大胆，熊市保守）
+    # 回测验证: 2022熊市跑赢SPY 15.5%, 牛市需更激进
+    if spy_trend == "BULL":
+        trend_max_pos = 12  # v16: 牛市最多12只（从18减少，集中火力）
+        base_score_threshold = 0.35  # v16: 提高门槛（从0.28），只选最强标的
+        logger.info(f"🟢 趋势BULL — 进攻模式（上限{trend_max_pos}只, 阈值{base_score_threshold}）")
+    elif spy_trend == "CAUTIOUS":
+        trend_max_pos = 8
+        base_score_threshold = 0.38
+        logger.info(f"🟡 趋势CAUTIOUS — 温和模式（上限{trend_max_pos}只, 阈值{base_score_threshold}）")
+    else:
+        trend_max_pos = 3
+        base_score_threshold = 0.45
+        logger.info(f"🐻 趋势BEAR — 防御模式（上限{trend_max_pos}只, 阈值{base_score_threshold}）")
     effective_max_pos = min(account.max_positions, trend_max_pos)
 
-    # 行业分散 — 牛市放宽50% (集中火力在最強行业)
+    # 行业分散 — v19 收紧集中度（专业基金标准：单行业 ≤35%，防止板块轮动风险）
+    # 对冲基金 PA 标准：即使牛市也要分散，黑天鹅不分牛熊
     if spy_trend == "BULL":
-        SECTOR_LIMITS = {"Tech": 0.55, "Financial": 0.50, "Healthcare": 0.50,
-                         "Consumer": 0.45, "Industrial": 0.45, "Energy": 0.40,
-                         "ETF": 0.60, "Bond": 0.35, "Commodity": 0.30}
-    else:
-        SECTOR_LIMITS = {"Tech": 0.35, "Financial": 0.30, "Healthcare": 0.35,
+        SECTOR_LIMITS = {"Tech": 0.35, "Financial": 0.35, "Healthcare": 0.35,
                          "Consumer": 0.30, "Industrial": 0.30, "Energy": 0.25,
                          "ETF": 0.50, "Bond": 0.25, "Commodity": 0.20}
+    elif spy_trend == "CAUTIOUS":
+        SECTOR_LIMITS = {"Tech": 0.30, "Financial": 0.30, "Healthcare": 0.30,
+                         "Consumer": 0.25, "Industrial": 0.25, "Energy": 0.20,
+                         "ETF": 0.45, "Bond": 0.20, "Commodity": 0.15}
+    else:  # BEAR
+        SECTOR_LIMITS = {"Tech": 0.25, "Financial": 0.25, "Healthcare": 0.25,
+                         "Consumer": 0.20, "Industrial": 0.20, "Energy": 0.15,
+                         "ETF": 0.40, "Bond": 0.15, "Commodity": 0.10}
     sector_exposure = {}
     if account.positions:
         try:
@@ -1150,15 +1199,16 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
             "original": p,
         })
 
-    # 按增强后的评分排序
     enhanced_candidates.sort(key=lambda x: -x["score"])
-    # v15: 趋势自适应阈值 — 显著提高以过滤垃圾信号
-    # 0.18/0.22 导致太多低质量信号通过 → 19.7%胜率
-    base_score_threshold = 0.28 if spy_trend == "CAUTIOUS" else 0.32  # v15: 从 0.18/0.22 大幅提高
+    # v17 回测优化: base_score_threshold 已在上方根据 spy_trend 动态设置
     candidates = [c for c in enhanced_candidates if c["score"] > base_score_threshold]
-    if spy_trend == "CAUTIOUS":
-        logger.info(f"🟡 CAUTIOUS趋势: 因子阈值={base_score_threshold}, "
-                     f"增强候选={len(enhanced_candidates)}只, 通过={len(candidates)}只")
+
+    # v16: 过滤 LongTerm 专属防御股（避免与长线持仓重叠）
+    LONGTERM_DEFENSE = {"MRK", "JNJ", "DIS", "PFE", "ABBV", "KO", "PEP", "PG", "XOM", "CVX"}
+    candidates = [c for c in candidates if c["symbol"] not in LONGTERM_DEFENSE]
+    if any(c["symbol"] in LONGTERM_DEFENSE for c in enhanced_candidates):
+        filtered = [c["symbol"] for c in enhanced_candidates if c["symbol"] in LONGTERM_DEFENSE]
+        logger.info(f"🛡️ 长线防御股过滤: {filtered}")
 
     for pick in candidates:
         sym = pick["symbol"]
@@ -1216,29 +1266,46 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
             logger.info(f"⏭ {sym} RSI={rsi:.0f}<30 弱势，等企稳")
             continue
 
-        # 缩量过滤 — v11 放宽: 0.25→0.10 (盘初常有缩量)
+        # v18 缩量过滤 — 只拒极端缩量（市场开盘初期成交量低是正常的）
         vol_r = signals.get(sym, {}).get("volume_ratio", 1.0)
-        if vol_r < 0.10:
-            logger.info(f"⏭ {sym} 极度缩量 vol_r={vol_r:.2f}<0.10")
+        if vol_r < 0.03:
+            logger.info(f"⏭ {sym} 极度缩量 vol_r={vol_r:.2f}<0.03")
+            continue
             continue
 
-        # 🆕 v15: MACD确认 — 任何趋势下MACD都必须>0（之前只在CAUTIOUS/BEAR时检查）
+        # 🆕 v18: MACD确认 — BULL趋势下允许轻微负MACD，CAUTIOUS/BEAR严格要求
         macd_hist = signals.get(sym, {}).get("macd_hist", 0)
-        if macd_hist < 0:
-            logger.info(f"⏭ {sym} MACD负({macd_hist:.4f}) 动量不足")
-            continue
+        price_macd = signals.get(sym, {}).get("price", 0)
+        # 用MACD占价格的比例来判断动量（绝对值在不同价位不可比）
+        macd_ratio = abs(macd_hist) / price_macd if price_macd > 0 else 0
+        if spy_trend == "BULL":
+            if macd_ratio > 0.02:  # BULL下只拒绝MACD严重为负的（>2%价格）
+                logger.info(f"⏭ {sym} MACD严重恶化 macd/price={macd_ratio:.1%}")
+                continue
+        else:
+            if macd_hist < 0:  # CAUTIOUS/BEAR下拒绝所有负MACD
+                logger.info(f"⏭ {sym} MACD负({macd_hist:.4f}) {spy_trend}趋势禁开")
+                continue
 
-        # 🆕 v15: 价格必须高于MA50（只买上升趋势的票）
+        # 🆕 v18: 价格vs MA50 — BULL下允许小幅回调(<5%)，CAUTIOUS/BEAR必须>MA50
         ma50 = signals.get(sym, {}).get("ma50", 0)
-        if ma50 > 0 and price < ma50:
-            logger.info(f"⏭ {sym} 价格${price:.0f} < MA50${ma50:.0f} — 下降趋势")
-            continue
+        if ma50 > 0:
+            ma50_dev = (price - ma50) / ma50
+            if spy_trend == "BULL":
+                if ma50_dev < -0.05:  # BULL下允许回调，只拒绝深度跌破(>5%)
+                    logger.info(f"⏭ {sym} 价格${price:.0f} << MA50${ma50:.0f} ({ma50_dev:.1%})")
+                    continue
+            else:
+                if price < ma50:  # CAUTIOUS/BEAR必须>MA50
+                    logger.info(f"⏭ {sym} 价格${price:.0f} < MA50${ma50:.0f} — {spy_trend}趋势禁开")
+                    continue
 
-        # v15: 布林带位置过滤 — 不在上轨附近买入（追高风险大）
+        # v18: 布林带位置过滤 — BULL下允许追强势股
         boll = signals.get(sym, {}).get("bollinger", {})
         pct_b = boll.get("pct_b", 0.5) if isinstance(boll, dict) else 0.5
-        if pct_b > 0.85:
-            logger.info(f"⏭ {sym} 布林带上轨 pct_b={pct_b:.2f}>0.85 — 追高风险")
+        boll_limit = 0.95 if spy_trend == "BULL" else 0.85
+        if pct_b > boll_limit:
+            logger.info(f"⏭ {sym} 布林带上轨 pct_b={pct_b:.2f}>{boll_limit} — 追高风险")
             continue
 
         # MA200偏离过滤 — v15 收紧: 50%→35% (防止极端偏离)
@@ -1286,12 +1353,14 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
         # 获取当前胜率/盈亏比 — v15: 默认值反映实际情况
         current_wr = 0.35  # 从0.42下调，更保守的默认值
         current_wlr = 1.50  # 从1.20上调（止损放宽到-7%，止盈提高到+18%）
+        num_trades = 0
         try:
             from atos.live.kelly import _load_stats
             stats = _load_stats()
             if stats and stats.get("total_trades", 0) >= 5:
                 current_wr = stats.get("win_rate", 0.42)
                 current_wlr = stats.get("win_loss_r", 1.20)
+                num_trades = stats.get("total_trades", 0)
         except Exception:
             pass
 
@@ -1305,7 +1374,15 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
             win_loss_ratio=current_wlr,
             current_drawdown=current_dd,
             max_weight=account.max_single_pct,
+            trades=num_trades,
         )
+
+        # ── v17: 回撤后动态减仓（Kelly After Drawdown）──
+        # 专业基金标准：亏钱后自动缩小仓位，防止连亏时越亏越多
+        kd = kelly_after_drawdown(target_pct, current_dd, max_drawdown_limit=0.10)
+        target_pct = kd["adjusted_kelly"]
+        if kd["scale"] < 1.0:
+            logger.info(f"📉 回撤减仓: {sym} DD={current_dd:.1%} scale={kd['scale']:.0%} → {target_pct:.2%}")
 
         if target_pct > 0.005:
             logger.info(f"📐 FundStd: {sym} score={enhanced_score:.3f} → {target_pct:.1%} "
@@ -1331,61 +1408,54 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
         if price * shares * 0.005 < est_cost:
             continue
 
+        # 🆕 最小交易金额 $2000（禁止1股迷你单，手续费会吃掉所有利润）
+        min_trade_value = 2000
+        if shares * price < min_trade_value:
+            logger.debug(f"⏭ {sym} 交易金额${shares*price:.0f} < ${min_trade_value} 最低门槛")
+            continue
+
+        # 🆕 最小股数 5股（1股交易没有意义）
+        if shares < 5:
+            continue
+
+        # 🆕 禁止当日买入后立即卖出（至少持有2个周期≈10分钟，防止churning）
+        recent_trades = [t for t in account.trade_history[-20:]
+                        if t.get('symbol') == sym]
+        if recent_trades:
+            last_trade = recent_trades[-1]
+            if last_trade.get('action') == 'SELL':
+                try:
+                    last_time = __import__('datetime').datetime.fromisoformat(last_trade['date'])
+                    minutes_since_sell = (__import__('datetime').datetime.now() - last_time).total_seconds() / 60
+                    if minutes_since_sell < 60:  # 卖出后60分钟内不买回
+                        logger.info(f"⏭ {sym} {minutes_since_sell:.0f}分钟前刚卖出，冷却中（防churning）")
+                        continue
+                except Exception:
+                    pass
+
         reason_parts = [f"因子开仓 score={pick['base_score']:.2f}"]
         if serenity_boost > 0:
             reason_parts.append(f"Serenity+{serenity_boost:.2f}")
         reason_parts.append(f"仓位{target_pct:.1%}")
 
+        # v19: 获取AI决策ID以追踪结果
+        ai_did = 0
+        try:
+            from atos.ai.memory import _get_db
+            conn = _get_db()
+            row = conn.execute("SELECT id FROM decisions WHERE symbol=? AND action='BUY' ORDER BY id DESC LIMIT 1", (sym,)).fetchone()
+            if row: ai_did = row[0]
+            conn.close()
+        except Exception: pass
+
         ok = account.execute(sym, "BUY", shares, price,
-                             reason=" | ".join(reason_parts))
+                             reason=" | ".join(reason_parts),
+                             ai_decision_id=ai_did)
         if ok:
             deployed += shares * price
             logger.info(f"✅ 开仓 {sym}: {shares}股 @${price:.2f} (crouching={target_pct:.1%}, score={pick['base_score']:.2f})")
 
     logger.info(f"开仓完成: {len(account.positions)}持仓, 部署${deployed:,.0f}")
-
-
-# ============================================================
-# AI 否决审查（低频）
-# ============================================================
-def _run_ai_review(account, signals, top_picks, regime, spy_trend):
-    """运行AI否决审查，仅返回否决映射。"""
-    try:
-        # 构建快照
-        import datetime
-        snapshot = {
-            "mode": account.mode,
-            "total_equity": account.total_equity,
-            "cash": account.cash,
-            "positions": account.position_list,
-            "market_regime": regime,
-            "factor_rankings": [
-                {"symbol": p["symbol"], "score": p["score"], "breakdown": p.get("breakdown", {})}
-                for p in top_picks[:10]
-            ] if top_picks else [],
-            "vix": round(regime.get("vix", 18) if isinstance(regime, dict) else 18, 1),
-            "constraints": account.get_state()["constraints"],
-            "universe": [{"symbol": s, **signals[s]} for s in list(signals.keys())[:10] if s in signals],
-        }
-
-        from atos.ai.engine_v4 import get_advice_v2 as get_advice_fallback
-        advice = get_advice_fallback(snapshot)
-        veto_map = advice.get("veto_map", {})
-
-        # 检查否决的标的，如果已经在持仓中则跳过
-        for sym, veto in veto_map.items():
-            if veto.get("veto", False) and sym not in account.positions:
-                logger.info(f"🧠 AI否决阻止买入 {sym}: {veto.get('reason', '')[:60]}")
-
-        cio_note = advice.get("cio_market_read", "")[:100]
-        if cio_note:
-            logger.info(f"CIO: {cio_note}")
-
-        return veto_map
-
-    except Exception as e:
-        logger.error(f"AI否决审查失败: {e}")
-        return {}
 
 
 # ============================================================
@@ -1440,6 +1510,23 @@ def _finalize_cycle(account, cycle, regime, current_vix, signals, top_picks,
     logger.info(f"Cycle {cycle} done | Equity=${current_eq:,.0f} | "
                 f"Ret={cycle_ret:+.4%} | Mode={mode} | "
                 f"DD={current_dd:.2%} | Peak=${account.peak_equity:,.0f}")
+
+    # ── v17: 统一绩效追踪 — 每20周期汇报 ──
+    try:
+        from atos.core.performance import get_tracker, init_tracker
+        if getattr(run_shadow_cycle, '_perf_inited', False) is False:
+            init_tracker(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+            run_shadow_cycle._perf_inited = True
+        perf = get_tracker()
+        perf.update(current_eq, cycle_ret)
+        if cycle % 20 == 0:
+            m = perf.get_metrics()
+            logger.info(f"📊 绩效#{cycle}: Sharpe={m.get('sharpe',0):.2f} Sortino={m.get('sortino',0):.2f} "
+                       f"Calmar={m.get('calmar',0):.2f} WR={m.get('win_rate',0):.1f}% "
+                       f"PF={m.get('profit_factor',0):.2f} 评级={m.get('grade','?')}")
+        perf.save()
+    except Exception as e:
+        logger.debug(f"绩效追踪跳过: {e}")
 
     # 记录每日收益
     try:
@@ -1573,6 +1660,14 @@ def main():
 
     logger.info("🚀 ATOS PRO v3 Shadow Trader 启动 (PAPER TRADING)")
 
+    # 🆕 全局线程异常处理器 — 防止后台线程崩溃拖死主进程
+    import threading as _threading
+    _original_excepthook = _threading.excepthook
+    def _safe_thread_excepthook(args):
+        logger.critical(f"💥 后台线程异常: {args.exc_type.__name__}: {args.exc_value}")
+        # Don't crash the main process
+    _threading.excepthook = _safe_thread_excepthook
+
     # 恢复持久化风险状态
     from atos.live.risk_manager import load_risk_state
     load_risk_state()
@@ -1634,6 +1729,17 @@ def main():
         logger.info("✅ Vibe-Trading 调度器已启动")
     except Exception as e:
         logger.warning(f"⚠️ Vibe-Trading 调度器启动失败（非阻塞）: {e}")
+
+    # 🆕 启动 AutoPilot 自动诊断监控（后台线程）
+    try:
+        from atos.autopilot.monitor import get_monitor
+        import threading
+        _autopilot = get_monitor()
+        _ap_thread = threading.Thread(target=_autopilot.run, daemon=True, name="autopilot")
+        _ap_thread.start()
+        logger.info("✅ AutoPilot AI 诊断监控已启动")
+    except Exception as e:
+        logger.warning(f"⚠️ AutoPilot 启动失败（非阻塞）: {e}")
 
     logger.info("Press Ctrl+C to stop")
 
@@ -1723,10 +1829,11 @@ def main():
                           err_type in ("ImportError", "ModuleNotFoundError", "SyntaxError")
 
             if is_permanent:
-                logger.critical(f"💀 永久性错误，系统退出: {err_type}: {err}")
-                _save_account_state(account)  # P0: 退出前保存状态
-                os.remove(lock_file) if os.path.exists(lock_file) else None
-                sys.exit(1)
+                logger.critical(f"💀 永久性错误: {err_type}: {err}")
+                _save_account_state(account)
+                # Don't exit — just sleep and retry. LaunchAgent will restart if needed.
+                logger.info("⏸ 等待 5 分钟后重试...")
+                time.sleep(300)
             elif "402" in err or "Payment Required" in err or "insufficient_quota" in err:
                 logger.warning("⚠️ DeepSeek API 余额不足！降频到30分钟。")
                 time.sleep(30 * 60)
