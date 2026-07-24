@@ -447,28 +447,52 @@ def read_ai_insights():
     
     return result
 
-def chat_with_ai(message: str) -> str:
-    """Call DeepSeek API for chat responses."""
-    import requests
-    api_key = os.environ.get('DEEPSEEK_API_KEY','')
-    if not api_key:
-        # Try reading from .env
-        try:
-            with open(os.path.join(BASE,'.env')) as f:
-                for line in f:
-                    if line.startswith('DEEPSEEK_API_KEY='):
-                        api_key = line.split('=',1)[1].strip().strip('"').strip("'")
-                        break
-        except: pass
-    if not api_key:
-        return '未配置 DeepSeek API Key。请在 .env 中设置 DEEPSEEK_API_KEY。'
+def _get_api_key(key_name: str) -> str:
+    """从环境变量或 .env 文件读取 API key"""
+    key = os.environ.get(key_name, '')
+    if key:
+        return key
     try:
-        resp = requests.post('https://api.deepseek.com/chat/completions',
-            headers={'Authorization':f'Bearer {api_key}','Content-Type':'application/json'},
-            json={'model':'deepseek-chat','messages':[
-                {'role':'system','content':'你是 ATOS PRO 交易系统的 AI 助手。用中文回答，简洁专业。可以讨论交易策略、技术分析、风险管理、持仓建议等。'},
-                {'role':'user','content':message}
-            ],'max_tokens':800,'temperature':0.7},
+        with open(os.path.join(BASE, '.env')) as f:
+            for line in f:
+                if line.startswith(f'{key_name}='):
+                    return line.split('=', 1)[1].strip().strip('"').strip("'")
+    except:
+        pass
+    return ''
+
+def chat_with_ai(message: str, provider: str = "kimi") -> str:
+    """Call Kimi (primary) or DeepSeek API for chat responses.
+    Kimi = 月之暗面 Moonshot, better at Chinese financial analysis."""
+    import requests
+    
+    if provider == "kimi":
+        api_key = _get_api_key('KIMI_API_KEY')
+        if api_key:
+            return _call_llm(api_key, message, "https://api.moonshot.cn/v1", "kimi-k2.6")
+    
+    # Fallback to DeepSeek
+    api_key = _get_api_key('DEEPSEEK_API_KEY')
+    if api_key:
+        return _call_llm(api_key, message, "https://api.deepseek.com", "deepseek-chat")
+    
+    return '未配置 AI API Key。请在 .env 中设置 KIMI_API_KEY 或 DEEPSEEK_API_KEY。'
+
+def _call_llm(api_key: str, message: str, base_url: str, model: str) -> str:
+    """通用 LLM 调用"""
+    import requests
+    try:
+        resp = requests.post(f'{base_url}/chat/completions',
+            headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
+            json={
+                'model': model,
+                'messages': [
+                    {'role': 'system', 'content': '你是 ATOS PRO 量化交易系统的 AI 助手。用中文回答，简洁专业。可以讨论交易策略、技术分析、风险管理、持仓建议、市场解读等。'},
+                    {'role': 'user', 'content': message}
+                ],
+                'max_tokens': 800,
+                'temperature': 0.7
+            },
             timeout=25)
         data = resp.json()
         return data['choices'][0]['message']['content']
@@ -503,6 +527,19 @@ class H(http.server.BaseHTTPRequestHandler):
         elif p.path=='/api/refresh':
             threading.Thread(target=refresh_all_prices,daemon=True).start()
             self._j({'ok':True})
+        elif p.path=='/api/chat':
+            try:
+                length = int(self.headers.get('Content-Length', 0))
+                body = json.loads(self.rfile.read(length)) if length > 0 else {}
+                msg = body.get('message','')
+                provider = body.get('provider','kimi')
+                if not msg:
+                    self._j({'error':'message required'})
+                else:
+                    reply = chat_with_ai(msg, provider)
+                    self._j({'reply': reply})
+            except Exception as e:
+                self._j({'error': str(e)})
         else:
             self.send_response(200); self.send_header('Content-Type','text/html; charset=utf-8'); self.send_header('Cache-Control','no-cache, no-store, must-revalidate'); self.send_header('Pragma','no-cache'); self.send_header('Expires','0'); self.end_headers()
             with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'index.html')) as f:
@@ -532,8 +569,9 @@ class H(http.server.BaseHTTPRequestHandler):
             try:
                 length=int(self.headers.get('Content-Length',0))
                 body=json.loads(self.rfile.read(length)) if length>0 else {}
-                reply=chat_with_ai(body.get('message',''))
-                self._j({'reply':reply})
+                provider = body.get('provider','kimi')
+                reply=chat_with_ai(body.get('message',''), provider)
+                self._j({'reply':reply, 'provider':provider})
             except Exception as e:
                 self._j({'reply':f'错误: {str(e)}'})
         else:
