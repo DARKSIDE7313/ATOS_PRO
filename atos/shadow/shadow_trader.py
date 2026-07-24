@@ -1345,6 +1345,18 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
             logger.info(f"⏭ {sym} 日内下跌 {(price/open_price-1)*100:.1f}% — 等企稳")
             continue
 
+        # 2b. 🏦 v20: 成交量/流动性过滤器（基金级风控，防小盘股滑点）
+        avg_volume = signals.get(sym, {}).get("volume", 0) or 0
+        if avg_volume > 0:
+            target_shares = max(1, int(account.total_equity * 0.001 / price))
+            volume_ratio = target_shares / avg_volume if avg_volume > 0 else 0
+            if volume_ratio > 0.02:  # 目标仓位超过日成交量2% → 流动性不足
+                logger.info(f"⏭ {sym} 流动性不足 (目标{target_shares}股/{avg_volume:.0f}日均量={volume_ratio:.1%})")
+                continue
+            if avg_volume < 50000:  # 日均成交量低于5万股 → 跳过
+                logger.debug(f"⏭ {sym} 成交量过低 ({avg_volume:.0f}股/日)")
+                continue
+
         # ── v11: 基金标准仓位计算 (Integrated Position Sizing) ──
         # 融合三个维度: 波动率倒数(30%) + 半凯利(30%) + 因子分数(40%)
         # 文艺复兴/AQR/桥水 的共同方法论

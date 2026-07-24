@@ -272,6 +272,31 @@ def read_state():
     c_chg=((c_pv-c_init)/c_init*100) if c_init>0 else 0
     d['combined']={'pv':round(c_pv,2),'pl':round(c_pl,2),'init':round(c_init,2),'chg':round(c_chg,2),'cash':round((si.get('cash',0)or 0)+(li.get('cash',0)or 0),2)}
     d['daily'] = _calc_daily_pnl()
+    # 🏦 基金级业绩指标（从 Shadow Trader 每周期更新）
+    try:
+        pf = os.path.join(BASE, 'data', 'performance.json')
+        if os.path.exists(pf):
+            with open(pf) as f:
+                pm = json.load(f)
+            m = pm.get('metrics', {})
+            d['fund_metrics'] = {
+                'sharpe': m.get('sharpe', 0),
+                'sortino': m.get('sortino', 0),
+                'calmar': m.get('calmar', 0),
+                'max_drawdown_pct': m.get('max_drawdown', 0),
+                'annual_return_pct': round(m.get('annual_return', 0), 1),
+                'annual_volatility_pct': round(m.get('annual_volatility', 0), 1),
+                'win_rate_pct': round(m.get('win_rate', 0), 1),
+                'profit_factor': round(m.get('profit_factor', 0), 2),
+                'grade': m.get('grade', 'N/A'),
+                'cycles': m.get('cycles', 0),
+            }
+            # 基准对比: SPY 同期表现
+            spy_ret = round(m.get('benchmark_return', 0), 1) if 'benchmark_return' in m else None
+            d['fund_metrics']['benchmark_spy_return_pct'] = spy_ret
+            d['fund_metrics']['alpha_pct'] = round(m.get('annual_return', 0) - (spy_ret or 0), 1)
+    except Exception:
+        d['fund_metrics'] = None
     # 📊 集成 auto-monitor 健康检查报告
     try:
         hp = os.path.join(BASE, 'data', 'health_check_state.json')
@@ -402,6 +427,13 @@ class H(http.server.BaseHTTPRequestHandler):
                 self._j(get_summary())
             except Exception as e:
                 self._j({'error': str(e)})
+        elif p.path=='/api/metrics':
+            try:
+                pf = os.path.join(BASE, 'data', 'performance.json')
+                if os.path.exists(pf):
+                    with open(pf) as f: self._j(json.load(f))
+                else: self._j({'error': 'no metrics data'})
+            except: self._j({'error': 'read failed'})
         elif p.path=='/api/health':
             try:
                 hp=os.path.join(BASE,'data','health_check_state.json')
