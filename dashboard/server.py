@@ -491,7 +491,7 @@ def _call_llm(api_key: str, message: str, base_url: str, model: str) -> str:
                     {'role': 'user', 'content': message}
                 ],
                 'max_tokens': 2000,  # v22: 提高以容纳 kimi-k3 的 reasoning
-                'temperature': 0.7
+                'temperature': 1.0  # Kimi only supports temperature=1
             },
             timeout=25)
         data = resp.json()
