@@ -410,10 +410,11 @@ def read_ai_insights():
     except Exception as e:
         result['signal_analysis_error'] = str(e)
 
-    # DB 历史（如果存在）
+    # DB 历史（如果存在，设置超时防卡死）
     if os.path.exists(db):
         try:
-            conn=sqlite3.connect(db); conn.row_factory=sqlite3.Row
+            conn=sqlite3.connect(db, timeout=2)  # 2秒超时
+            conn.row_factory=sqlite3.Row
             total=conn.execute("SELECT COUNT(*) FROM decisions").fetchone()[0]
             wins=conn.execute("SELECT COUNT(*) FROM outcomes WHERE outcome_type='WIN'").fetchone()[0]
             losses=conn.execute("SELECT COUNT(*) FROM outcomes WHERE outcome_type='LOSS'").fetchone()[0]
