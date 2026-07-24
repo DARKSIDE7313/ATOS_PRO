@@ -831,8 +831,20 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
             account.execute(sym, "SELL", pos["qty"], price, reason=f"止盈 +{pnl_pct:.1%}")
             logger.info(f"💰 止盈: {sym} +{pnl_pct:.1%}")
             continue
-        # 4. 自适应硬止损（v19回测优化: BULL=6%, CAUTIOUS=6%, BEAR=5%）
-        sl_level = 0.06 if spy_trend == "BULL" else (0.06 if spy_trend == "CAUTIOUS" else 0.05)
+        # 4. 🏦 v21: ATR动态止损（替代固定6%，适应不同波动率）
+        atr = signals.get(sym, {}).get("atr", 0)
+        if atr > 0 and price > 0:
+            atr_pct_stop = atr / price
+            if spy_trend == "BULL":
+                sl_mult = 2.5  # BULL: 2.5x ATR (~4-8% for typical stocks)
+            elif spy_trend == "CAUTIOUS":
+                sl_mult = 2.0
+            else:
+                sl_mult = 1.5
+            sl_atr = sl_mult * atr_pct_stop
+            sl_level = max(0.03, min(0.10, sl_atr))  # clamp [3%, 10%]
+        else:
+            sl_level = 0.06 if spy_trend == "BULL" else (0.06 if spy_trend == "CAUTIOUS" else 0.05)
         if pnl_pct <= -sl_level:
             account.execute(sym, "SELL", pos["qty"], price, reason=f"硬止损 {pnl_pct:.1%}")
             logger.info(f"🛑 止损: {sym} {pnl_pct:.1%}")
@@ -1313,6 +1325,29 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
         if ma200 > 0 and price > ma200 * 1.35:
             logger.info(f"⏭ {sym} 价格偏离MA200>{((price/ma200-1)*100):.0f}%>35%")
             continue
+
+        # 🏦 v21: RSI 超买过滤器（防追高，选回调买点）
+        rsi14 = signals.get(sym, {}).get("rsi14", 50)
+        if spy_trend == "BULL":
+            rsi_max = 75  # BULL 下允许适度强势
+        elif spy_trend == "CAUTIOUS":
+            rsi_max = 68
+        else:
+            rsi_max = 60
+        if rsi14 > rsi_max:
+            logger.info(f"⏭ {sym} RSI={rsi14:.0f}>{rsi_max} 超买 — 等回调")
+            continue
+
+        # 🏦 v21: 近期回调幅度过滤器（只买回调股，不追高）
+        high_20d = signals.get(sym, {}).get("high_20d", 0) or price
+        if high_20d > 0:
+            pullback = (price - high_20d) / high_20d
+            if pullback > -0.01:  # 距20日高点不到1% — 太接近高点
+                # 仅在有强烈动量信号时允许
+                mom_score = signals.get(sym, {}).get("score_momentum", 0)
+                if mom_score < 0.6:
+                    logger.info(f"⏭ {sym} 距20日高仅{pullback:+.1%} 动量{mom_score:.0%}不足 — 等回调")
+                    continue
 
         # v9: 允许加仓 — 包括小幅浮亏 (<5%)
         is_add = sym in account.positions
