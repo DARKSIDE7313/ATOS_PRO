@@ -359,8 +359,17 @@ def read_ai_insights():
     try:
         sf = os.path.join(BASE, 'data', 'shadow_state.json')
         if os.path.exists(sf):
-            with open(sf) as f:
-                st = json.load(f)
+            # 读取——可能被 shadow_trader 写锁阻塞，设短超时
+            import signal as _sig
+            def _alarm_handler(signum, frame):
+                raise TimeoutError("shadow_state.json read timeout")
+            _sig.signal(_sig.SIGALRM, _alarm_handler)
+            _sig.alarm(3)
+            try:
+                with open(sf) as f:
+                    st = json.load(f)
+            finally:
+                _sig.alarm(0)
             positions = st.get('positions', {})
             stops = st.get('trailing_stops', {})
             
