@@ -490,12 +490,22 @@ def _call_llm(api_key: str, message: str, base_url: str, model: str) -> str:
                     {'role': 'system', 'content': '你是 ATOS PRO 量化交易系统的 AI 助手。用中文回答，简洁专业。可以讨论交易策略、技术分析、风险管理、持仓建议、市场解读等。'},
                     {'role': 'user', 'content': message}
                 ],
-                'max_tokens': 800,
+                'max_tokens': 2000,  # v22: 提高以容纳 kimi-k3 的 reasoning
                 'temperature': 0.7
             },
             timeout=25)
         data = resp.json()
-        return data['choices'][0]['message']['content']
+        if "choices" in data and data["choices"]:
+            content = data["choices"][0].get("message", {}).get("content", "")
+            # kimi-k3 可能把 tokens 都花在 reasoning 上导致 content 为空
+            if not content:
+                reasoning = data["choices"][0].get("message", {}).get("reasoning_content", "")
+                if reasoning:
+                    content = f"[思考过程]\n{reasoning[:500]}...\n\n[需要更多 tokens 来生成回复]"
+                else:
+                    content = "(空响应，请重试)"
+            return content
+        return f'AI 响应异常: {str(data)[:200]}'
     except Exception as e:
         return f'AI 响应失败: {str(e)}'
 
