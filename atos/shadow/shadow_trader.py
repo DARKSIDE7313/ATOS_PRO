@@ -579,18 +579,17 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
         spy_ma20 = float(np.mean(spy_vals[-20:]))
         spy_ma50 = float(np.mean(spy_vals[-50:])) if len(spy_vals) >= 50 else spy_ma20
 
-        # Only BEAR if true death cross
+        # 🏦 v22: 放宽 BULL 判断 — 价格高于 MA20 即是牛市，不要求 >2%
         if spy_current < spy_ma20 and spy_current < spy_ma50 and spy_ma20 < spy_ma50:
             spy_trend = "BEAR"
             logger.warning(f"🐻 SPY死叉: ${spy_current:.0f} < MA20=${spy_ma20:.0f} < MA50=${spy_ma50:.0f}")
-        elif spy_current < spy_ma20:
+        elif spy_current < spy_ma20 * 0.98:
             spy_trend = "CAUTIOUS"
-            logger.info(f"🟡 SPY谨慎: ${spy_current:.0f} < MA20=${spy_ma20:.0f} (MA20>MA50金叉,仅回调)")
-        elif spy_current < spy_ma50:
-            spy_trend = "CAUTIOUS"
-            logger.info(f"🟡 SPY谨慎: ${spy_current:.0f} < MA50=${spy_ma50:.0f}")
-        elif spy_current > spy_ma20 * 1.02 and spy_ma20 > spy_ma50:
+            logger.info(f"🟡 SPY谨慎: ${spy_current:.0f} < MA20*0.98=${spy_ma20*0.98:.0f}")
+        elif spy_current > spy_ma20:
             spy_trend = "BULL"
+        else:
+            spy_trend = "BULL"  # 默认乐观 — 轻微低于MA20不算谨慎
     except Exception as e:
         spy_trend = "UNKNOWN"
         logger.warning(f"SPY趋势分析失败 → 降级UNKNOWN: {e}")
@@ -850,6 +849,17 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
             logger.info(f"🛑 止损: {sym} {pnl_pct:.1%}")
             continue
 
+        # 🏦 v22: Flat 持仓清理 — 持有7天以上且不涨不跌(-2%~+2%) → 卖出释放资金
+        if hold_days >= 7 and abs(pnl_pct) < 0.02:
+            # 但如果有高因子分数(>0.6)或强MACD，则保留
+            score = signals.get(sym, {}).get("score", 0)
+            macd_h = signals.get(sym, {}).get("macd_hist", 0)
+            if score < 0.55 and macd_h <= 0:
+                account.execute(sym, "SELL", pos["qty"], price,
+                              reason=f"Flat清理 {hold_days:.0f}天 PnL={pnl_pct:+.1%}")
+                logger.info(f"🗑 Flat清理: {sym} 持有{hold_days:.0f}天不涨 释放资金")
+                continue
+
         if sym not in account.trailing_stops:
             if not use_trailing:
                 continue
@@ -1075,14 +1085,8 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
         logger.info(f"🐻 趋势BEAR — 不开新仓，仅维持风控")
         return
     if spy_trend == "CAUTIOUS":
-        # 🆕 检查SPY是否跌破关键均线（用signals中的SPY数据）
-        spy_sig = signals.get("SPY", {})
-        spy_price_now = spy_sig.get("price", 0)
-        spy_ma20_now = spy_sig.get("ma50", spy_price_now)  # 用MA50近似
-        if spy_price_now > 0 and spy_ma20_now > 0 and spy_price_now < spy_ma20_now * 0.98:
-            logger.info(f"🟡 SPY ${spy_price_now:.0f} < MA50 ${spy_ma20_now:.0f} — 谨慎，不开新仓")
-            return
-        logger.info(f"🟡 趋势CAUTIOUS — 谨慎开仓（上限8只）")
+        # v22: 移除过度谨慎的子检查，CAUTIOUS也不应该完全禁止开仓
+        logger.info(f"🟡 趋势CAUTIOUS — 温和开仓（上限12只）")
 
     # 🆕 v5: 运行 Serenity 瓶颈扫描，获取候选加分（缓存版，每小时最多一次）
     serenity_boosts = {}
@@ -1112,8 +1116,8 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
         base_score_threshold = 0.35  # v16: 提高门槛（从0.28），只选最强标的
         logger.info(f"🟢 趋势BULL — 进攻模式（上限{trend_max_pos}只, 阈值{base_score_threshold}）")
     elif spy_trend == "CAUTIOUS":
-        trend_max_pos = 8
-        base_score_threshold = 0.38
+        trend_max_pos = 12  # v22: 从8提升至12，防止容量陷阱
+        base_score_threshold = 0.35  # v22: 从0.38降至0.35，匹配BULL阈值
         logger.info(f"🟡 趋势CAUTIOUS — 温和模式（上限{trend_max_pos}只, 阈值{base_score_threshold}）")
     else:
         trend_max_pos = 3
@@ -1145,8 +1149,28 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
 
     # 当前持仓数已达上限
     if len(account.positions) >= effective_max_pos:
-        logger.debug(f"持仓已满 ({len(account.positions)}/{effective_max_pos})，不开新仓")
-        return
+        # 🏦 v22: 弱持仓轮出 — 有更好信号时卖低分持仓让位
+        pick_score = pick["score"]
+        weakest_sym = None
+        weakest_score = 999
+        for psym, ppos in account.positions.items():
+            psig = signals.get(psym, {})
+            pscore = psig.get("score", psig.get("composite_score", 0))
+            # 只在浮亏<3%的持仓中找轮出候选（避免止损卖飞）
+            pprice = psig.get("price", ppos.get("last_price", 0))
+            pavg = ppos.get("avg_price", 0)
+            ppnl = (pprice/pavg - 1) if pavg > 0 else 0
+            if ppnl > -0.03 and pscore < weakest_score and pscore < pick_score - 0.05:
+                weakest_score = pscore
+                weakest_sym = psym
+        
+        if weakest_sym:
+            logger.info(f"🔄 轮出 {weakest_sym}(score={weakest_score:.3f}) 让位给 {sym}(score={pick_score:.3f})")
+            account.execute(weakest_sym, "SELL", account.positions[weakest_sym].get("qty", 0),
+                          price, reason=f"轮出让位 (低分{weakest_score:.3f}→高分{pick_score:.3f})")
+        else:
+            logger.debug(f"持仓已满 ({len(account.positions)}/{effective_max_pos})，无弱持仓可轮出")
+            return
 
     max_deploy = account.total_equity * (1.0 - account.min_cash_pct) * gate_exposure
     if gate_exposure < 1.0:
