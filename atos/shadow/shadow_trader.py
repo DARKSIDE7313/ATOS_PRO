@@ -896,7 +896,52 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
             logger.info(f"🎯 追踪止损: {sym} PnL={pnl_pct:+.2%}")
             continue
 
-    # 4c. 回撤更新
+    # 4c. 动量退出 — 持仓不涨不跌超过阈值 → 释放资金给更强信号
+    # v23: 解决"卡死"问题 — 持仓横盘但占用资金,系统无法开新仓
+    _MOMENTUM_EXIT_DAYS = 5       # 5天不涨不跌就走
+    _MOMENTUM_EXIT_THRESHOLD = 0.015  # 1.5%以内算"不涨不跌"
+    for sym, pos in list(account.positions.items()):
+        if sym not in account.positions:
+            continue
+        buy_date_str = pos.get("buy_date", "")
+        if not buy_date_str:
+            continue
+        try:
+            buy_date = datetime.fromisoformat(buy_date_str.replace("Z", "+00:00"))
+            days_held = (datetime.now(buy_date.tzinfo) - buy_date).days if buy_date.tzinfo else (datetime.now() - buy_date).days
+        except Exception:
+            continue
+        
+        avg = pos["avg_price"]
+        lp = pos.get("last_price", avg)
+        pnl_pct = (lp - avg) / avg if avg > 0 else 0
+        
+        # 不涨不跌判定: 持有>5天, |pnl|<1.5%, 且MACD不强势
+        macd_hist = signals.get(sym, {}).get("macd_hist", 0)
+        rsi = signals.get(sym, {}).get("rsi", 50)
+        
+        if (days_held >= _MOMENTUM_EXIT_DAYS 
+            and abs(pnl_pct) < _MOMENTUM_EXIT_THRESHOLD 
+            and macd_hist < 0.05 
+            and rsi < 55):
+            reason = f"动量退出 (持{days_held}天, PnL{pnl_pct:+.1%}, MACD={macd_hist:.3f})"
+            account.execute(sym, "SELL", pos["qty"], price, reason=reason)
+            log_trade("SELL", sym, pos["qty"], price, reason)
+            logger.info(f"🔄 {reason}: {sym}")
+            continue
+        
+        # 弱势持仓加速退出: 持有>3天, 亏损>2%, MACD<0, RSI<40
+        if (days_held >= 3 
+            and pnl_pct < -0.02 
+            and macd_hist < 0 
+            and rsi < 40):
+            reason = f"弱势退出 (持{days_held}天, PnL{pnl_pct:+.1%}, RSI={rsi:.0f})"
+            account.execute(sym, "SELL", pos["qty"], price, reason=reason)
+            log_trade("SELL", sym, pos["qty"], price, reason)
+            logger.info(f"🔄 {reason}: {sym}")
+            continue
+
+    # 4d. 回撤更新
     account.peak_equity = max(account.peak_equity, account.total_equity)
     update_drawdown(account.total_equity, account.peak_equity)
     current_dd = (account.peak_equity - account.total_equity) / account.peak_equity
@@ -1293,10 +1338,11 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
             logger.info(f"⏭ {sym} score={pick['score']:.2f}<{base_score_threshold} 跳过，分数太低")
             continue
 
-        # RSI过滤 — v15 收紧: 30-75 (原 15-85 太宽，牛市中追高买入后立即回调)
+        # RSI过滤 — v22统一: 趋势自适应阈值 (BULL<75, CAUTIOUS<68, BEAR<60)
         rsi = signals.get(sym, {}).get("rsi", 50)
-        if rsi > 75:
-            logger.info(f"⏭ {sym} RSI={rsi:.0f}>75 超买，跳过")
+        rsi_max = 75 if spy_trend == "BULL" else (68 if spy_trend == "CAUTIOUS" else 60)
+        if rsi > rsi_max:
+            logger.info(f"⏭ {sym} RSI={rsi:.0f}>{rsi_max} 超买({spy_trend})，跳过")
             continue
         if rsi < 30:
             logger.info(f"⏭ {sym} RSI={rsi:.0f}<30 弱势，等企稳")
@@ -1348,18 +1394,6 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
         ma200 = signals.get(sym, {}).get("ma200", 0)
         if ma200 > 0 and price > ma200 * 1.35:
             logger.info(f"⏭ {sym} 价格偏离MA200>{((price/ma200-1)*100):.0f}%>35%")
-            continue
-
-        # 🏦 v21: RSI 超买过滤器（防追高，选回调买点）
-        rsi14 = signals.get(sym, {}).get("rsi14", 50)
-        if spy_trend == "BULL":
-            rsi_max = 75  # BULL 下允许适度强势
-        elif spy_trend == "CAUTIOUS":
-            rsi_max = 68
-        else:
-            rsi_max = 60
-        if rsi14 > rsi_max:
-            logger.info(f"⏭ {sym} RSI={rsi14:.0f}>{rsi_max} 超买 — 等回调")
             continue
 
         # 🏦 v21: 近期回调幅度过滤器（只买回调股，不追高）

@@ -12,6 +12,7 @@ ATOS PRO v2 — 信号引擎
 import os
 import time
 import math
+import json
 import threading
 import socket
 import pandas as pd
@@ -21,8 +22,8 @@ from datetime import datetime, timedelta
 from atos.core.universe import ALL_SYMBOLS, LONG_TERM_SYMBOLS, SHORT_TERM_SYMBOLS
 from atos.core.logging import get_logger, log_signal, log_error
 
-# 🆕 全局 socket 超时 — 防止 yfinance HTTP 请求永久卡死
-socket.setdefaulttimeout(30)
+# 🆕 v19: 全局 socket 超时 — 8秒足够，30秒拖慢整个周期
+socket.setdefaulttimeout(8)
 
 logger = get_logger("signal_engine")
 
@@ -62,12 +63,15 @@ def _load_signal_cache():
         pass
 
 def _save_signal_cache():
+    """原子写入信号缓存 — 防止写入中断导致损坏"""
     try:
         _os.makedirs(_os.path.dirname(_SIGNAL_CACHE_FILE), exist_ok=True)
-        with open(_SIGNAL_CACHE_FILE, "w") as f:
+        tmp_path = _SIGNAL_CACHE_FILE + ".tmp"
+        with open(tmp_path, "w") as f:
             json.dump({"signals": _signal_cache, "timestamp": datetime.now().isoformat()}, f)
-    except Exception:
-        pass
+        _os.replace(tmp_path, _SIGNAL_CACHE_FILE)  # 原子替换
+    except Exception as e:
+        logger.warning(f"信号缓存保存失败: {e}")
 
 # 模块加载时恢复缓存
 _load_signal_cache()
@@ -129,11 +133,21 @@ def _get_cached_data(symbol: str, period: str = "1y", interval: str = "1d"):
         if now - ts < _CACHE_TTL:
             return df
 
+    # 🆕 中国大陆优化：先尝试Futu历史数据（本地，不被墙）
+    try:
+        from atos.data.futu_historical import get_history as futu_history
+        df = futu_history(symbol, days=260)  # ~1 year
+        if df is not None and not df.empty and len(df) >= 50:
+            _cache[key] = (datetime.now(), df)
+            return df
+    except Exception:
+        pass
+
     # 批量下载成功但缓存未命中 → 试一次单只下载，不行再兜底
     if _batch_success:
         try:
             with _yf_lock:
-                df = yf.download(symbol, period=period, interval=interval, progress=False, auto_adjust=True)
+                df = yf.download(symbol, period=period, interval=interval, progress=False, auto_adjust=True, timeout=8)
             if df is not None and not df.empty:
                 _cache[key] = (datetime.now(), df)
                 return df
@@ -150,7 +164,7 @@ def _get_cached_data(symbol: str, period: str = "1y", interval: str = "1d"):
         try:
             with _yf_lock:
                 try:
-                    df = yf.download(symbol, period=period, interval=interval, progress=False, auto_adjust=True)
+                    df = yf.download(symbol, period=period, interval=interval, progress=False, auto_adjust=True, timeout=8)
                 except Exception:
                     ticker = yf.Ticker(symbol)
                     df = ticker.history(period=period, interval=interval, auto_adjust=True)
@@ -173,68 +187,10 @@ _batch_fail_count = 0
 _batch_circuit_open = False
 
 def _prefetch_batch(symbols: list[str]) -> None:
-    """🚀 批量预下载所有股票数据到缓存（一次性调用，快 10-60 倍）
-    v11: 如果批量下载全部失败 → 标记熔断, 不浪费时间去逐个下载"""
-    global _batch_fail_count, _batch_circuit_open
-
-    need_fetch = []
-    now = datetime.now()
-    for sym in symbols:
-        key = f"{sym}:1y:1d"
-        if key in _cache:
-            ts, _ = _cache[key]
-            if now - ts < _CACHE_TTL:
-                continue
-        need_fetch.append(sym)
-
-    if len(need_fetch) < 5:
-        return  # 太少不值得批量
-
-    # v11: 熔断检查
-    if _batch_circuit_open:
-        logger.warning(f"🔌 批量下载已熔断 — 跳过 {len(need_fetch)} 只标的下载")
-        return
-
-    try:
-        ticker_str = " ".join(need_fetch)
-        logger.info(f"🚀 批量下载 {len(need_fetch)} 只股票...")
-        with _yf_lock:  # 🔒 串行化 yfinance 下载，防止 SQLite 并发损坏
-            df_all = yf.download(ticker_str, period="1y", interval="1d",
-                                progress=False, auto_adjust=True, group_by="ticker")
-        for sym in need_fetch:
-            try:
-                if isinstance(df_all.columns, pd.MultiIndex):
-                    if sym in df_all.columns.levels[0]:
-                        df_sym = df_all[sym].copy()
-                    else:
-                        continue
-                else:
-                    continue
-                if not df_sym.empty and len(df_sym) >= 10:
-                    key = f"{sym}:1y:1d"
-                    _cache[key] = (now, df_sym)
-            except Exception:
-                pass
-        # v11: 检查批量下载成功率
-        fetched = sum(1 for sym in need_fetch if f"{sym}:1y:1d" in _cache)
-        success_rate = fetched / len(need_fetch) if need_fetch else 0
-        if success_rate < 0.5 and len(need_fetch) > 20:
-            _batch_fail_count += 1
-            if _batch_fail_count >= 2:
-                _batch_circuit_open = True
-                logger.critical(f"🔌 批量下载连续失败 → 熔断! (成功率={success_rate:.0%})")
-        else:
-            _batch_fail_count = 0
-            _batch_circuit_open = False
-        logger.info(f"✅ 批量预下载完成 ({fetched}/{len(need_fetch)} 成功)")
-        global _batch_success
-        _batch_success = fetched >= len(need_fetch) * 0.8  # 80%以上算成功
-    except Exception as e:
-        _batch_fail_count += 1
-        if _batch_fail_count >= 2:
-            _batch_circuit_open = True
-            logger.critical(f"🔌 批量下载异常 → 熔断! ({e})")
-        logger.warning(f"批量下载失败（将逐个下载）: {e}")
+    """中国大陆：yfinance 被墙，跳过批量下载，单只 Futu 缓存"""
+    global _batch_fail_count, _batch_circuit_open, _batch_success
+    _batch_success = False
+    return  # 单只下载走 Futu 历史数据路径
 
 def clear_cache():
     """强制清空缓存（手动更新用）"""
@@ -456,6 +412,24 @@ def get_signals(symbols: list[str] = None) -> dict:
     """
     if symbols is None:
         symbols = ALL_SYMBOLS
+
+    # 🆕 周末/非交易日：跳过信号计算，直接返回空（避免无意义的数据下载）
+    from datetime import datetime as _dt, timezone as _tz
+    _now_utc = _dt.now(_tz.utc)
+    if _now_utc.weekday() >= 5:
+        logger.info(f"⏸ 周末休市（{_now_utc.strftime('%A')}），跳过信号计算")
+        return {}
+
+    # 🆕 每日重置批量下载熔断器（新的一天重新尝试）
+    global _batch_circuit_open, _batch_fail_count
+    _today = _dt.now().date()
+    _last_reset = getattr(get_signals, '_circuit_reset_date', None)
+    if _last_reset != _today:
+        _batch_circuit_open = False
+        _batch_fail_count = 0
+        get_signals._circuit_reset_date = _today
+        if _last_reset is not None:
+            logger.info("🔄 新的一天，重置批量下载熔断器")
 
     # 🚀 批量预下载（只发一次网络请求）
     _prefetch_batch(symbols)

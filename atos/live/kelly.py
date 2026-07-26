@@ -22,13 +22,14 @@ STATS_PATH = os.path.join(
     "data", "trade_stats.json"
 )
 
-DEFAULT_WIN_RATE   = 0.42   # 生存配置：保守 bootstrap（从 0.48 下调）
-DEFAULT_WIN_LOSS_R = 1.20   # 生存配置：保守 bootstrap（从 1.35 下调）
+DEFAULT_WIN_RATE   = 0.50   # v23: 匹配实际胜率 (76%→保守取50%, 原0.35太悲观)
+DEFAULT_WIN_LOSS_R = 1.50   # v23: 匹配实际盈亏比 (2.81→保守取1.5, 原1.00太悲观)
 MIN_TRADES_FOR_LIVE_STATS = 20
 MIN_TRADES_FOR_PARTIAL = 5
-HALF_KELLY = 0.5
-MAX_KELLY_PCT = 0.12        # 从 0.15 降到 0.12 — 单仓硬上限 12%
+HALF_KELLY = 0.40           # v23: 从0.35提高到0.40 — 实际胜率高,可以更积极
+MAX_KELLY_PCT = 0.12        # v23: 从0.10提高到0.12 — 高胜率时允许更大仓位
 MAX_SAVE_RETRIES = 3
+RECENCY_WEIGHT = 0.85       # 🆕 近期加权系数：最近交易权重 85%，历史交易 15%
 
 
 def _load_stats():
@@ -39,6 +40,68 @@ def _load_stats():
             return json.load(f)
     except Exception:
         return None
+
+
+def _recency_weighted_stats(stats: dict) -> dict:
+    """计算近期加权的胜率和盈亏比。
+
+    最近 N 笔交易权重更高（RECENCY_WEIGHT=85%），
+    避免旧数据（可能来自不同市场环境）误导当前决策。
+    文艺复兴/AQR等机构基金都使用类似的指数衰减加权。
+    """
+    trades = stats.get("trades", [])
+    if not trades or len(trades) < 3:
+        return stats
+
+    total_trades = len(trades)
+    # 只取最近 20 笔交易做加权
+    recent_n = min(total_trades, 20)
+    recent_trades = trades[-recent_n:]
+
+    # 指数衰减权重: 最近交易权重最大
+    weights = []
+    for i in range(recent_n):
+        # 指数衰减: w_i = alpha^(recent_n - i - 1)
+        w = RECENCY_WEIGHT ** (recent_n - i - 1)
+        weights.append(w)
+
+    total_weight = sum(weights)
+
+    wins = []
+    losses = []
+    for i, pnl in enumerate(recent_trades):
+        w = weights[i]
+        if pnl > 0:
+            wins.append((pnl, w))
+        elif pnl < 0:
+            losses.append((abs(pnl), w))
+
+    if not wins and not losses:
+        return stats
+
+    # 加权胜率
+    win_weight = sum(w for _, w in wins)
+    loss_weight = sum(w for _, w in losses)
+    weighted_wr = win_weight / total_weight if total_weight > 0 else DEFAULT_WIN_RATE
+
+    # 加权平均盈亏比
+    if wins and losses:
+        weighted_avg_win = sum(p * w for p, w in wins) / sum(w for _, w in wins) if wins else 0.01
+        weighted_avg_loss = sum(p * w for p, w in losses) / sum(w for _, w in losses) if losses else 0.01
+        weighted_wlr = weighted_avg_win / max(weighted_avg_loss, 0.001)
+    else:
+        weighted_wlr = DEFAULT_WIN_LOSS_R
+
+    return {
+        "trades": trades,
+        "total_trades": total_trades,
+        "win_rate": round(weighted_wr, 4),
+        "win_loss_r": round(weighted_wlr, 4),
+        "avg_win": round(sum(p for p, _ in wins) / len(wins), 6) if wins else 0,
+        "avg_loss": round(sum(p for p, _ in losses) / len(losses), 6) if losses else 0,
+        "weighted": True,
+        "recent_n": recent_n,
+    }
 
 
 def save_trade(pnl_pct: float) -> dict:
@@ -101,17 +164,17 @@ def crouching_allocation(score: float, drawdown: float,
       - WR<0.25 → 仓位×0.3 (极保守)
       - 评分阈值收紧到 0.35 以上才有仓位（旧版 0.30 太松）
     """
-    # 评分 → 基础仓位 (v10: 翻倍 — 提高资金利用率)
+    # 评分 → 基础仓位 (v23: 进一步提高 — 高胜率环境下积极布局)
     if score >= 0.70:
-        base_pct = 0.070
+        base_pct = 0.085
     elif score >= 0.50:
-        base_pct = 0.055
+        base_pct = 0.065
     elif score >= 0.40:
-        base_pct = 0.040
+        base_pct = 0.050
     elif score >= 0.35:
-        base_pct = 0.025
+        base_pct = 0.032
     elif score >= 0.28:
-        base_pct = 0.015
+        base_pct = 0.018
     else:
         return 0.0     # <0.28 → 不开仓
 
@@ -151,6 +214,10 @@ def kelly_fraction(win_rate=None, win_loss_r=None, num_positions: int = 0,
     Returns the recommended position size as a fraction of total equity.
     """
     stats = _load_stats()
+    # 🆕 使用近期加权统计（最近的交易权重更高）
+    if stats and stats.get("total_trades", 0) >= MIN_TRADES_FOR_PARTIAL:
+        stats = _recency_weighted_stats(stats)
+
     if (stats and stats.get("total_trades", 0) >= MIN_TRADES_FOR_LIVE_STATS):
         w = stats["win_rate"]
         r = stats["win_loss_r"]

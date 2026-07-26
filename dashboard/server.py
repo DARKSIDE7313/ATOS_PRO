@@ -349,102 +349,206 @@ def read_state():
     return d
 
 def read_ai_insights():
-    """🏦 v21: 智能信号分析 — 从当前状态生成可执行洞察"""
-    db=os.path.join(BASE,'data','ai_memory.db')
-    
-    # 基础: DB历史记录
-    result = {'decisions':[],'stats':{},'patterns':[],'sym_stats':[],'signal_analysis':[],'alerts':[]}
-    
-    # 生成信号质量分析（从当前持仓+信号）
+    """🏦 v23: 可执行智能分析 — 每个持仓给出具体操作建议"""
+    db = os.path.join(BASE, 'data', 'ai_memory.db')
+    result = {'decisions': [], 'stats': {}, 'patterns': [], 'sym_stats': [],
+              'signal_analysis': [], 'alerts': [], 'portfolio_insight': {}}
+
     try:
         sf = os.path.join(BASE, 'data', 'shadow_state.json')
-        if os.path.exists(sf):
-            # 读取——可能被 shadow_trader 写锁阻塞，设短超时
-            import signal as _sig
-            def _alarm_handler(signum, frame):
-                raise TimeoutError("shadow_state.json read timeout")
-            _sig.signal(_sig.SIGALRM, _alarm_handler)
-            _sig.alarm(3)
-            try:
-                with open(sf) as f:
-                    st = json.load(f)
-            finally:
-                _sig.alarm(0)
-            positions = st.get('positions', {})
-            stops = st.get('trailing_stops', {})
-            
-            # 持仓风险分析
-            for sym, pos in positions.items():
-                last = pos.get('last_price', 0) or pos.get('price', 0)
-                avg = pos.get('avg_price', 0)
-                qty = pos.get('qty', 0)
-                pnl_pct = (last/avg - 1) * 100 if avg > 0 else 0
-                
-                ts = stops.get(sym, {})
-                stop_px = ts.get('stop_price', 0)
-                risk_pct = (last - stop_px) / last * 100 if last > 0 and stop_px > 0 else 0
-                
-                signal = {'sym': sym, 'pnl_pct': round(pnl_pct, 1),
-                         'stop_loss': round(stop_px, 2), 'risk_to_stop_pct': round(risk_pct, 1)}
-                
-                if pnl_pct > 15:
-                    signal['alert'] = f'{sym} 盈利+{pnl_pct:.0f}%，建议部分止盈锁定利润'
-                    result['alerts'].append({'type': 'take_profit', 'sym': sym, 'msg': signal['alert']})
-                elif pnl_pct < -3:
-                    signal['alert'] = f'{sym} 亏损{pnl_pct:.1f}%，逼近止损线'
-                    result['alerts'].append({'type': 'risk', 'sym': sym, 'msg': signal['alert']})
-                elif risk_pct < 3 and stop_px > 0:
-                    signal['alert'] = f'{sym} 距止损仅{risk_pct:.1f}%，注意风险'
-                    result['alerts'].append({'type': 'warning', 'sym': sym, 'msg': signal['alert']})
-                else:
-                    signal['alert'] = '正常'
-                
-                result['signal_analysis'].append(signal)
-            
-            # 组合级别洞察
-            eq = st.get('equity', 0)
-            init = st.get('initial_cash', 300000)
-            total_ret = (eq/init - 1) * 100
-            result['portfolio_insight'] = {
-                'equity': round(eq, 2),
-                'total_return_pct': round(total_ret, 1),
-                'positions': len(positions),
-                'cash': round(st.get('cash', 0), 2),
-                'recommendation': (
-                    '组合集中度高，建议分散到不同行业' if len(positions) < 10 and total_ret < 0
-                    else '持仓健康，保持现有策略' if total_ret > 0
-                    else '市场震荡期，控制仓位等待机会'
-                )
-            }
+        if not os.path.exists(sf):
+            result['error'] = 'shadow_state.json not found'
+            return result
+
+        import signal as _sig
+        def _alarm(signum, frame): raise TimeoutError()
+        _sig.signal(_sig.SIGALRM, _alarm)
+        _sig.alarm(3)
+        try:
+            with open(sf) as f:
+                st = json.load(f)
+        finally:
+            _sig.alarm(0)
+
+        positions = st.get('positions', {})
+        stops = st.get('trailing_stops', {})
+        eq = st.get('equity', 0)
+        init = st.get('initial_cash', 300000)
+        cash = st.get('cash', 0)
+        trade_hist = st.get('trade_history', [])
+        trailing = st.get('trailing_stops', {})
+
+        # ── 逐持仓深度分析 ──
+        for sym, pos in sorted(positions.items()):
+            avg = pos.get('avg_price', 0)
+            lp = pos.get('last_price', avg)
+            qty = pos.get('qty', 0)
+            pnl_pct = (lp / avg - 1) * 100 if avg > 0 else 0
+            mkt_val = qty * lp
+            weight = mkt_val / eq * 100 if eq > 0 else 0
+
+            ts = stops.get(sym, {})
+            stop_px = ts.get('stop_price', 0)
+            risk_to_stop = (lp - stop_px) / lp * 100 if lp > 0 and stop_px > 0 else 0
+
+            # 信号评分 (0-100)
+            score = 50  # 基准
+            action = '持有'
+            action_reason = ''
+
+            if pnl_pct > 8:
+                score += 20
+                action = '部分止盈'
+                action_reason = f'盈利{pnl_pct:.1f}%，建议卖1/3锁利'
+            elif pnl_pct > 5:
+                score += 15
+                action = '持有'
+                action_reason = f'盈利{pnl_pct:.1f}%，让利润奔跑'
+            elif pnl_pct > 2:
+                score += 10
+                action = '持有'
+                action_reason = f'小幅盈利{pnl_pct:.1f}%'
+            elif pnl_pct < -5:
+                score -= 20
+                action = '止损'
+                action_reason = f'亏损{pnl_pct:.1f}%，建议立即止损'
+            elif pnl_pct < -3:
+                score -= 10
+                action = '密切关注'
+                action_reason = f'亏损{pnl_pct:.1f}%，接近止损线'
+            elif pnl_pct < -1:
+                score -= 5
+                action = '持有'
+                action_reason = f'小幅亏损{pnl_pct:.1f}%'
+            else:
+                score += 0
+                action = '持有'
+                action_reason = f'持平({pnl_pct:+.1f}%)'
+
+            # 距止损风险评估
+            if risk_to_stop > 0 and risk_to_stop < 2:
+                score -= 15
+                result['alerts'].append({
+                    'type': 'danger', 'sym': sym,
+                    'msg': f'🚨 {sym} 距止损仅{risk_to_stop:.1f}%! 立即评估'
+                })
+            elif risk_to_stop > 0 and risk_to_stop < 4:
+                score -= 5
+                result['alerts'].append({
+                    'type': 'warning', 'sym': sym,
+                    'msg': f'⚠️ {sym} 距止损{risk_to_stop:.1f}%，注意风险'
+                })
+
+            # 权重风险
+            if weight > 15:
+                result['alerts'].append({
+                    'type': 'concentration', 'sym': sym,
+                    'msg': f'⚠️ {sym} 权重{weight:.1f}%过大，建议减仓'
+                })
+
+            result['signal_analysis'].append({
+                'sym': sym, 'qty': qty,
+                'avg_price': round(avg, 2), 'last_price': round(lp, 2),
+                'pnl_pct': round(pnl_pct, 2), 'pnl_dollar': round((lp - avg) * qty, 2),
+                'weight_pct': round(weight, 1),
+                'stop_price': round(stop_px, 2), 'risk_to_stop_pct': round(risk_to_stop, 1),
+                'score': max(0, min(100, score)),
+                'action': action, 'action_reason': action_reason
+            })
+
+        # ── 组合级别分析 ──
+        invested = eq - cash
+        total_ret = (eq / init - 1) * 100 if init > 0 else 0
+        peak = st.get('peak_equity', eq)
+        dd = (peak - eq) / peak * 100 if peak > 0 else 0
+
+        # 行业集中度
+        sectors = {}
+        sector_map = {
+            'AAPL': 'Tech', 'MSFT': 'Tech', 'NVDA': 'Tech', 'GOOGL': 'Tech', 'META': 'Tech',
+            'JPM': 'Finance', 'BAC': 'Finance', 'GS': 'Finance', 'MS': 'Finance', 'V': 'Finance',
+            'JNJ': 'Health', 'UNH': 'Health', 'MRK': 'Health', 'PFE': 'Health', 'ABBV': 'Health',
+            'XOM': 'Energy', 'CVX': 'Energy',
+            'SBUX': 'Consumer', 'MCD': 'Consumer', 'KO': 'Consumer', 'PG': 'Consumer',
+            'QQQ': 'ETF', 'SPY': 'ETF', 'IWM': 'ETF'
+        }
+        for sym, pos in positions.items():
+            sec = sector_map.get(sym, 'Other')
+            mkt = pos.get('qty', 0) * pos.get('last_price', pos.get('avg_price', 0))
+            sectors[sec] = sectors.get(sec, 0) + mkt
+
+        sector_pcts = {k: round(v / invested * 100, 1) for k, v in sorted(sectors.items(), key=lambda x: -x[1])}
+
+        # 最近7天交易统计
+        from datetime import datetime as _dt, timedelta as _td
+        week_ago = (_dt.now() - _td(days=7)).isoformat()
+        recent_trades = [t for t in trade_hist if t.get('date', '') > week_ago]
+        recent_sells = [t for t in recent_trades if t.get('action') == 'SELL']
+        recent_wins = [t for t in recent_sells if t.get('pnl', 0) > 0]
+
+        result['portfolio_insight'] = {
+            'equity': round(eq, 2),
+            'cash': round(cash, 2),
+            'cash_pct': round(cash / eq * 100, 1),
+            'invested_pct': round(invested / eq * 100, 1),
+            'total_return_pct': round(total_ret, 2),
+            'drawdown_pct': round(dd, 2),
+            'positions_count': len(positions),
+            'sector_concentration': sector_pcts,
+            'weekly_trades': len(recent_trades),
+            'weekly_win_rate': round(len(recent_wins) / len(recent_sells) * 100, 1) if recent_sells else 0,
+            'weekly_pnl': round(sum(t.get('pnl', 0) for t in recent_sells), 2),
+            'top_risk': max(result['signal_analysis'], key=lambda x: -x['score'])['sym'] if result['signal_analysis'] else 'N/A',
+        }
+
+        # 组合建议
+        recs = []
+        if cash / eq > 0.25:
+            recs.append(f'现金占比{cash/eq*100:.0f}%过高，建议找机会加仓')
+        if cash / eq < 0.05:
+            recs.append('现金不足5%，注意流动性风险')
+        if dd > 5:
+            recs.append(f'回撤{dd:.1f}%较大，考虑降低仓位')
+        if len(positions) < 6:
+            recs.append(f'仅{len(positions)}只持仓，考虑分散到8-12只')
+        max_sector = max(sector_pcts.values()) if sector_pcts else 0
+        if max_sector > 40:
+            recs.append(f'最大行业占比{max_sector:.0f}%，建议分散')
+        if not recs:
+            recs.append('组合结构健康，继续持有')
+
+        result['portfolio_insight']['recommendations'] = recs
+
     except Exception as e:
         result['signal_analysis_error'] = str(e)
 
-    # DB 历史（如果存在，设置超时防卡死）
+    # DB 历史
     if os.path.exists(db):
         try:
-            conn=sqlite3.connect(db, timeout=2)  # 2秒超时
-            conn.row_factory=sqlite3.Row
-            total=conn.execute("SELECT COUNT(*) FROM decisions").fetchone()[0]
-            wins=conn.execute("SELECT COUNT(*) FROM outcomes WHERE outcome_type='WIN'").fetchone()[0]
-            losses=conn.execute("SELECT COUNT(*) FROM outcomes WHERE outcome_type='LOSS'").fetchone()[0]
-            rows=conn.execute("""SELECT d.id,d.timestamp,d.symbol,d.action,d.confidence,
+            conn = sqlite3.connect(db, timeout=2)
+            conn.row_factory = sqlite3.Row
+            total = conn.execute("SELECT COUNT(*) FROM decisions").fetchone()[0]
+            wins = conn.execute("SELECT COUNT(*) FROM outcomes WHERE outcome_type='WIN'").fetchone()[0]
+            losses = conn.execute("SELECT COUNT(*) FROM outcomes WHERE outcome_type='LOSS'").fetchone()[0]
+            rows = conn.execute("""SELECT d.id,d.timestamp,d.symbol,d.action,d.confidence,
                 d.factor_score,d.debate_summary,d.market_regime,
                 o.outcome_type,o.pnl_pct,o.exit_reason,o.ai_correct
                 FROM decisions d LEFT JOIN outcomes o ON d.id=o.decision_id
                 ORDER BY d.timestamp DESC LIMIT 40""").fetchall()
-            result['decisions']=[{'id':r['id'],'time':r['timestamp'],'sym':r['symbol'],'action':r['action'],
-                'conf':round(r['confidence'],3)if r['confidence']else 0,
-                'score':round(r['factor_score'],3)if r['factor_score']else 0,
-                'summary':(r['debate_summary']or'')[:120],'regime':r['market_regime']or'?',
-                'outcome':r['outcome_type']or'pending',
-                'pnl':round(r['pnl_pct']*100,2)if r['pnl_pct']else None,
-                'exit':r['exit_reason']or'','correct':r['ai_correct']} for r in rows]
-            result['stats']={'total':total,'wins':wins,'losses':losses,
-                'win_rate':round(wins/(wins+losses)*100,1)if(wins+losses)>0 else 0}
+            result['decisions'] = [{'id': r['id'], 'time': r['timestamp'], 'sym': r['symbol'],
+                'action': r['action'],
+                'conf': round(r['confidence'], 3) if r['confidence'] else 0,
+                'score': round(r['factor_score'], 3) if r['factor_score'] else 0,
+                'summary': (r['debate_summary'] or '')[:120], 'regime': r['market_regime'] or '?',
+                'outcome': r['outcome_type'] or 'pending',
+                'pnl': round(r['pnl_pct'] * 100, 2) if r['pnl_pct'] else None,
+                'exit': r['exit_reason'] or '', 'correct': r['ai_correct']} for r in rows]
+            result['stats'] = {'total': total, 'wins': wins, 'losses': losses,
+                'win_rate': round(wins / (wins + losses) * 100, 1) if (wins + losses) > 0 else 0}
             conn.close()
         except Exception as e:
             result['db_error'] = str(e)
-    
+
     return result
 
 def _get_api_key(key_name: str) -> str:
