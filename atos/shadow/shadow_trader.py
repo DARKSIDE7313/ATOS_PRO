@@ -818,13 +818,25 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
             logger.info(f"🛑 Triple-Barrier止损: {sym} PnL={pnl_pct:+.2%}")
             continue
 
-        # ── v16: 利润保护 — 让赢家跑, 截断亏损 ──
-        # 1. +10%: 止损提到成本价（保本）— 从+5%推后，避免过早震出
-        if pnl_pct >= 0.10 and sym in account.trailing_stops:
+        # ── v23: 利润保护 — 更早保本 + 分批止盈 ──
+        # 1. +3%: 止损提到成本价（保本）— 高胜率策略: 让浮盈≥3%的持仓不亏
+        if pnl_pct >= 0.03 and sym in account.trailing_stops:
             ts = account.trailing_stops[sym]
             if ts.activation_price is None or ts.activation_price < pos["avg_price"] * 1.001:
                 ts.activation_price = pos["avg_price"] * 1.001
-        # 2. 自适应止盈（v19回测优化: BULL=22%, CAUTIOUS=18%, BEAR=12%）
+        # 2. 分批止盈 — v23: +5%卖1/3, +10%再卖1/3, +18%清仓
+        if pnl_pct >= 0.05 and pnl_pct < 0.10:
+            # 检查是否已经分批止盈过（通过 trade_history 中同 symbol 的部分止盈记录）
+            recent_partial = any(
+                t.get("symbol") == sym and "部分止盈" in t.get("reason", "") 
+                for t in account.trade_history[-5:]
+            )
+            if not recent_partial:
+                third = max(1, pos["qty"] // 3)
+                account.execute(sym, "SELL", third, price, reason=f"部分止盈 +{pnl_pct:.1%} (卖1/3锁利)")
+                logger.info(f"💰 部分止盈: {sym} +{pnl_pct:.1%} 卖{third}股")
+                continue
+        # 3. 自适应止盈（v19回测优化: BULL=22%, CAUTIOUS=18%, BEAR=12%）
         tp_level = 0.22 if spy_trend == "BULL" else (0.18 if spy_trend == "CAUTIOUS" else 0.12)
         if pnl_pct >= tp_level:
             account.execute(sym, "SELL", pos["qty"], price, reason=f"止盈 +{pnl_pct:.1%}")
@@ -1328,6 +1340,22 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
         if price <= 0:
             continue
         
+        # ── v23: 入场质量确认 — 多指标对齐才开仓 ──
+        # 1. MACD 确认: 不能深度负值 (允许小幅回调, 但不买崩跌)
+        macd_hist = signals.get(sym, {}).get("macd_hist", 0)
+        if macd_hist < -0.5:
+            logger.info(f"⏭ {sym} MACD={macd_hist:.3f}<-0.5 深度负值，等企稳")
+            continue
+        # 2. 成交量确认: 不能极度缩量 (无量上涨是假突破)
+        vol_ratio = signals.get(sym, {}).get("volume_ratio", 1.0)
+        if vol_ratio < 0.3:
+            logger.info(f"⏭ {sym} 量比={vol_ratio:.2f}<0.3 极度缩量，等放量")
+            continue
+        # 3. RSI 不能超卖区反弹无力 (RSI<30的弱势股不接飞刀)
+        rsi = signals.get(sym, {}).get("rsi", 50)
+        if rsi < 25:
+            logger.info(f"⏭ {sym} RSI={rsi:.0f}<25 极度弱势，不接飞刀")
+            continue
         # ============================================================
         # 硬性要求：必须跑赢手续费 + 滑点（真正生效）
         # ============================================================
