@@ -388,7 +388,7 @@ def read_ai_insights():
             weight = mkt_val / eq * 100 if eq > 0 else 0
 
             ts = stops.get(sym, {})
-            stop_px = ts.get('stop_price', 0)
+            stop_px = ts.get('stop_price', ts.get('stop', 0))  # 兼容 stop/stop_price 两种key
             risk_to_stop = (lp - stop_px) / lp * 100 if lp > 0 and stop_px > 0 else 0
 
             # 信号评分 (0-100)

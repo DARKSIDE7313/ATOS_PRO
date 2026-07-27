@@ -1204,6 +1204,33 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
         except Exception:
             pass
 
+    # ── v23: 行业再平衡 — 超限行业自动卖最弱持仓 ──
+    if sector_exposure and account.positions:
+        try:
+            from atos.portfolio.correlation import SECTOR_MAP
+            for sector, exposure in sector_exposure.items():
+                limit = SECTOR_LIMITS.get(sector, 0.25)
+                if exposure > limit:
+                    # 找该行业最弱持仓
+                    sector_positions = []
+                    for sym, pos in account.positions.items():
+                        if SECTOR_MAP.get(sym, "Unknown") == sector:
+                            avg = pos.get("avg_price", 0)
+                            lp = pos.get("last_price", avg)
+                            pnl = (lp - avg) / avg if avg > 0 else 0
+                            sector_positions.append((sym, pnl, pos))
+                    if sector_positions:
+                        # 卖最弱的
+                        weakest = min(sector_positions, key=lambda x: x[1])
+                        sym, pnl, pos = weakest
+                        price = signals.get(sym, {}).get("price", pos.get("last_price", 0))
+                        if price > 0:
+                            reason = f"行业再平衡 ({sector}{exposure:.0%}>{limit:.0%} 卖最弱{sym} PnL{pnl:+.1%})"
+                            account.execute(sym, "SELL", pos["qty"], price, reason=reason)
+                            logger.info(f"⚖️ {reason}")
+        except Exception as e:
+            logger.debug(f"行业再平衡跳过: {e}")
+
     # 当前持仓数已达上限
     if len(account.positions) >= effective_max_pos:
         # 🏦 v22: 弱持仓轮出 — 有更好信号时卖低分持仓让位
@@ -1483,9 +1510,9 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
         # 文艺复兴/AQR/桥水 的共同方法论
         enhanced_score = pick["score"]
 
-        # 获取当前胜率/盈亏比 — v15: 默认值反映实际情况
-        current_wr = 0.35  # 从0.42下调，更保守的默认值
-        current_wlr = 1.50  # 从1.20上调（止损放宽到-7%，止盈提高到+18%）
+        # 获取当前胜率/盈亏比 — v23: 匹配 Kelly 默认值
+        current_wr = 0.50  # v23: 匹配 kelly.py DEFAULT_WIN_RATE
+        current_wlr = 1.50  # v23: 匹配 kelly.py DEFAULT_WIN_LOSS_R
         num_trades = 0
         try:
             from atos.live.kelly import _load_stats
@@ -1516,6 +1543,18 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
         target_pct = kd["adjusted_kelly"]
         if kd["scale"] < 1.0:
             logger.info(f"📉 回撤减仓: {sym} DD={current_dd:.1%} scale={kd['scale']:.0%} → {target_pct:.2%}")
+
+        # ── v23: ATR 波动率仓位调整 — 高波动标的自动缩小仓位 ──
+        atr_val = signals.get(sym, {}).get("atr", 0)
+        if atr_val > 0 and price > 0:
+            atr_pct = atr_val / price  # ATR 占价格比例
+            if atr_pct > 0.04:      # ATR > 4% → 高波动，仓位减半
+                target_pct *= 0.50
+                logger.info(f"📊 ATR调整: {sym} ATR={atr_pct:.1%}>4% 高波动 → 仓位×0.50")
+            elif atr_pct > 0.025:   # ATR > 2.5% → 中等波动，仓位×0.75
+                target_pct *= 0.75
+                logger.info(f"📊 ATR调整: {sym} ATR={atr_pct:.1%}>2.5% → 仓位×0.75")
+            # ATR ≤ 2.5% → 低波动，正常仓位
 
         if target_pct > 0.005:
             logger.info(f"📐 FundStd: {sym} score={enhanced_score:.3f} → {target_pct:.1%} "
