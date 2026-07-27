@@ -41,7 +41,11 @@ def _get_cached_mom(symbol: str, period: str = "2y", interval: str = "1mo"):
 def get_momentum_factors(symbol: str) -> dict:
     """
     获取单只股票的动量因子。
-    返回各周期收益率和综合得分。
+    
+    v24: AQR TSMOM (Time-Series Momentum) 增强
+    - 12个月动量（跳过最近1月，避免短期反转效应）
+    - 动量一致性加权
+    - 短期反转过滤（5日回报率作为反向指标）
     """
     try:
         # 需要2年数据计算12月动量
@@ -54,6 +58,26 @@ def get_momentum_factors(symbol: str) -> dict:
 
         close = df["Close"].squeeze()
         current = float(close.iloc[-1])
+
+        # ── AQR TSMOM: 12个月动量，跳过最近1个月 ──
+        # Moskowitz, Ooi, Pedersen (2012): 12-month return predicts continuation
+        tsmom_score = 0.0
+        if len(close) > 13:
+            price_12m_ago = float(close.iloc[-13])  # 12个月前
+            price_1m_ago = float(close.iloc[-2])     # 1个月前
+            # TSMOM = 12个月前到1个月前的回报（跳过最近1月避免反转）
+            tsmom_ret = (price_1m_ago - price_12m_ago) / price_12m_ago if price_12m_ago > 0 else 0
+            # 正向TSMOM → 得分0.6-1.0, 负向 → 0.0-0.4
+            if tsmom_ret > 0.20:
+                tsmom_score = 1.0
+            elif tsmom_ret > 0.10:
+                tsmom_score = 0.8
+            elif tsmom_ret > 0:
+                tsmom_score = 0.6
+            elif tsmom_ret > -0.10:
+                tsmom_score = 0.3
+            else:
+                tsmom_score = 0.1
 
         # 各周期动量（CAGR标准化）
         periods = {"mom_1m": 1, "mom_3m": 3, "mom_6m": 6, "mom_12m": 12}
@@ -87,7 +111,28 @@ def get_momentum_factors(symbol: str) -> dict:
         else:
             raw["consistency"] = None
 
-        composite = sum(scores.values()) / len(scores) if scores else 0.0  # v5: 无数据→0.0
+        # ── Renaissance 短期反转过滤 ──
+        # 5日回报率: 正回报→短期过热(减分), 负回报→短期超卖(加分)
+        short_rev_score = 0.5  # 中性
+        if len(close) > 2:
+            price_5d_ago = float(close.iloc[-2])  # 月线数据中约5天前
+            ret_5d = (current - price_5d_ago) / price_5d_ago if price_5d_ago > 0 else 0
+            if ret_5d > 0.05:
+                short_rev_score = 0.2  # 短期过热，可能回调
+            elif ret_5d < -0.05:
+                short_rev_score = 0.8  # 短期超卖，可能反弹
+            raw["ret_5d"] = round(ret_5d, 4)
+
+        # AQR QMJ: TSMOM占40%, 传统动量占40%, 短期反转占20%
+        base_composite = sum(scores.values()) / len(scores) if scores else 0.0
+        composite = (
+            tsmom_score * 0.40 +
+            base_composite * 0.40 +
+            short_rev_score * 0.20
+        )
+
+        raw["tsmom_score"] = round(tsmom_score, 3)
+        raw["short_rev_score"] = round(short_rev_score, 3)
 
         return {
             **raw,
@@ -99,7 +144,7 @@ def get_momentum_factors(symbol: str) -> dict:
         if "curl" in str(e) or "resolve host" in str(e) or "Recv failure" in str(e):
             logger.warning(f"momentum {symbol}: yfinance网络波动 — {str(e)[:80]}")
         else:
-            log_error("momentum", f"{symbol}: {e}")
+            logger.debug( f"{symbol}: {e}")
         return _empty()
 
 

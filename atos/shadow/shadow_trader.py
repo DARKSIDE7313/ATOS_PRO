@@ -735,19 +735,47 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
     # 仅保留止损(-5%)和止盈(+15%)作为退出机制
     ROTATION_DISABLED = True
 
-    # ── v16: 部分止盈 (涨15%卖1/4，让利润充分奔跑) ──
-    # v15 +8%卖1/3仍太激进 → v16推至+15%卖1/4，保留更多仓位吃大波段
+    # ── v24: 两阶段部分止盈 — 基于 GS 成功模式优化 ──
+    # GS 实证: 7次分批止盈各~9%, 共+$2,212 → 提前到+5%首次锁利
+    # Renaissance 核心: 让利润跑但分阶段锁定
     for sym, pos in list(account.positions.items()):
         qty_now = pos.get("shares", pos.get("qty", 0))
         px = signals.get(sym, {}).get("price", pos.get("avg_price", 0))
         if px <= 0: continue
         pnl = (px - pos["avg_price"]) / pos["avg_price"] if pos["avg_price"] > 0 else 0
-        if pnl >= 0.15 and qty_now >= 4:
+        
+        # Tier 1: +5% → 卖1/4锁利 (GS模式: 第一次止盈)
+        if pnl >= 0.05 and pnl < 0.15 and qty_now >= 4:
+            partial_key = f"_partial1_{sym}"
+            if not getattr(account, partial_key, False):
+                sell_qty = max(1, qty_now // 4)
+                if sell_qty > 0:
+                    account.execute(sym, "SELL", sell_qty, px,
+                                  reason=f"Tier1止盈 +{pnl:.1%} (卖1/4锁利@5%)")
+                    logger.info(f"💰 Tier1止盈: {sym} {sell_qty}/{qty_now}股 +{pnl:.1%}")
+                    setattr(account, partial_key, True)
+        
+        # Tier 2: +15% → 再卖1/4 (原逻辑保留)
+        elif pnl >= 0.15 and qty_now >= 4:
             sell_qty = max(1, qty_now // 4)
             if sell_qty > 0:
                 account.execute(sym, "SELL", sell_qty, px,
-                              reason=f"部分止盈 +{pnl:.1%} (卖1/4锁利)")
-                logger.info(f"💰 部分止盈: {sym} {sell_qty}/{qty_now}股 +{pnl:.1%}")
+                              reason=f"Tier2止盈 +{pnl:.1%} (卖1/4锁利@15%)")
+                logger.info(f"💰 Tier2止盈: {sym} {sell_qty}/{qty_now}股 +{pnl:.1%}")
+        
+        # ── v24: Citadel 动量衰减止盈 ──
+        # 浮盈>3%但MACD转负 → 动量衰减，提前锁利
+        if pnl > 0.03:
+            macd_val = signals.get(sym, {}).get("macd_hist", 0)
+            if macd_val < -0.3:
+                momentum_exit_key = f"_momexit_{sym}"
+                if not getattr(account, momentum_exit_key, False):
+                    sell_qty = max(1, qty_now // 3)
+                    if sell_qty > 0:
+                        account.execute(sym, "SELL", sell_qty, px,
+                                      reason=f"动量衰减止盈 +{pnl:.1%} MACD={macd_val:.2f} (卖1/3)")
+                        logger.info(f"📉 动量衰减止盈: {sym} {sell_qty}股 +{pnl:.1%} MACD转负")
+                        setattr(account, momentum_exit_key, True)
 
     # 4b. 追踪止损（每个标的独立判断）
     # BUGFIX 2026-06-11: 
@@ -1550,17 +1578,36 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
         if kd["scale"] < 1.0:
             logger.info(f"📉 回撤减仓: {sym} DD={current_dd:.1%} scale={kd['scale']:.0%} → {target_pct:.2%}")
 
-        # ── v23: ATR 波动率仓位调整 — 高波动标的自动缩小仓位 ──
+        # ── v24: Bridgewater Risk Parity — 连续波动率仓位调整 ──
+        # 目标: 每只持仓贡献相同的风险（等风险贡献）
+        # 高波动标的自动缩小仓位，低波动标的自动放大仓位
         atr_val = signals.get(sym, {}).get("atr", 0)
         if atr_val > 0 and price > 0:
-            atr_pct = atr_val / price  # ATR 占价格比例
-            if atr_pct > 0.04:      # ATR > 4% → 高波动，仓位减半
-                target_pct *= 0.50
-                logger.info(f"📊 ATR调整: {sym} ATR={atr_pct:.1%}>4% 高波动 → 仓位×0.50")
-            elif atr_pct > 0.025:   # ATR > 2.5% → 中等波动，仓位×0.75
-                target_pct *= 0.75
-                logger.info(f"📊 ATR调整: {sym} ATR={atr_pct:.1%}>2.5% → 仓位×0.75")
-            # ATR ≤ 2.5% → 低波动，正常仓位
+            atr_pct = atr_val / price  # ATR 占价格比例 = 日波动率代理
+            target_vol = 0.015  # 目标日波动率 1.5%
+            # 连续调整: vol_scalar = target_vol / actual_vol
+            vol_scalar = target_vol / atr_pct if atr_pct > 0 else 1.0
+            # Clamp 在 0.3x - 1.5x 之间
+            vol_scalar = max(0.30, min(1.50, vol_scalar))
+            old_pct = target_pct
+            target_pct *= vol_scalar
+            if abs(vol_scalar - 1.0) > 0.05:
+                logger.info(f"📊 RiskParity: {sym} ATR={atr_pct:.1%} vol_scalar={vol_scalar:.2f} → 仓位{old_pct:.1%}→{target_pct:.1%}")
+
+        # ── v24: Renaissance 均值回归入场加分 ──
+        # 在上升趋势中回调3-8%时买入（"buy the dip"）
+        if not is_add:
+            ma50_val = signals.get(sym, {}).get("ma50", 0)
+            if ma50_val > 0 and price > 0:
+                ma50_dev = (price - ma50_val) / ma50_val
+                if -0.08 <= ma50_dev <= -0.02:
+                    # 回调2-8% → 均值回归入场机会，仓位加20%
+                    target_pct *= 1.20
+                    logger.info(f"📉 MeanRev: {sym} MA50回调{ma50_dev:.1%} → 仓位×1.20")
+                elif ma50_dev > 0.08:
+                    # 偏离MA50超过8% → 追高风险，仓位减20%
+                    target_pct *= 0.80
+                    logger.info(f"📈 MeanRev: {sym} MA50偏离+{ma50_dev:.1%} → 仓位×0.80")
 
         if target_pct > 0.005:
             logger.info(f"📐 FundStd: {sym} score={enhanced_score:.3f} → {target_pct:.1%} "

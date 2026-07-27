@@ -49,6 +49,14 @@ IC_WINDOW = 10
 IC_MIN_OBS = 3          # 从 4 降到 3 — 更快适应真实 IC
 DYNAMIC_IC_ALPHA = 0.35  # v10: 从 0.5 降到 0.35 — 更信任固定权重，减少IC波动影响
 
+# ── v17: 因子衰减 (Factor Half-Life) ──
+# 旧数据应该衰减权重，新数据权重更高
+# 参考: Qlib 的滚动窗口 + 指数衰减，AQR 的半衰期方法
+FACTOR_HALF_LIFE = 20     # 因子半衰期（周期数）— 超过此周期数据权重减半
+FACTOR_DECAY_RATE = 0.5 ** (1.0 / FACTOR_HALF_LIFE)  # 每周期衰减系数
+_factor_age: dict[str, int] = {}  # {symbol: cycles_since_last_update}
+_factor_freshness: dict[str, float] = {}  # {symbol: freshness_weight (0-1)}
+
 
 def _bootstrap_ic_window():
     """基金级：用默认权重预填充 IC 滑动窗口，让动态权重从第一天就生效。
@@ -76,12 +84,13 @@ def _bootstrap_ic_window():
 # v5: BEAR模式下动量大幅降低、质量大幅提升（真正切换防守）
 # HIGH_VOL下降低动量+均值回归，提升趋势+突破（避免高波动抄底）
 REGIME_WEIGHTS = {
-    "BULL_STRONG": {"momentum": 0.35, "technical": 0.22, "value": 0.10, "quality": 0.06, "multiframe": 0.12, "mean_rev": 0.15},
-    "BULL_WEAK":   {"momentum": 0.22, "technical": 0.25, "value": 0.18, "quality": 0.10, "multiframe": 0.08, "mean_rev": 0.17},
-    "HIGH_VOL":    {"momentum": 0.10, "technical": 0.22, "value": 0.15, "quality": 0.18, "multiframe": 0.15, "mean_rev": 0.20},
+    # v19: 全面提高质量因子权重 — 6%→20% in BULL_STRONG, 防止追涨垃圾股
+    "BULL_STRONG": {"momentum": 0.25, "technical": 0.20, "value": 0.15, "quality": 0.20, "multiframe": 0.10, "mean_rev": 0.10},
+    "BULL_WEAK":   {"momentum": 0.20, "technical": 0.22, "value": 0.18, "quality": 0.18, "multiframe": 0.08, "mean_rev": 0.14},
+    "HIGH_VOL":    {"momentum": 0.10, "technical": 0.22, "value": 0.15, "quality": 0.20, "multiframe": 0.15, "mean_rev": 0.18},
     "BEAR":        {"momentum": 0.05, "technical": 0.18, "value": 0.18, "quality": 0.32, "multiframe": 0.12, "mean_rev": 0.15},
-    "SIDEWAYS":    {"momentum": 0.18, "technical": 0.25, "value": 0.15, "quality": 0.12, "multiframe": 0.10, "mean_rev": 0.20},
-    "UNKNOWN":     {"momentum": 0.20, "technical": 0.25, "value": 0.18, "quality": 0.12, "multiframe": 0.10, "mean_rev": 0.15},
+    "SIDEWAYS":    {"momentum": 0.18, "technical": 0.22, "value": 0.18, "quality": 0.18, "multiframe": 0.10, "mean_rev": 0.14},
+    "UNKNOWN":     {"momentum": 0.20, "technical": 0.22, "value": 0.18, "quality": 0.18, "multiframe": 0.10, "mean_rev": 0.12},
 }
 
 # 模块加载时自动填充 bootstrap IC（必须在 REGIME_WEIGHTS 定义之后调用）
@@ -157,7 +166,7 @@ def _tech_score(signal: dict) -> float:
     elif pct_b > 0.9:
         score -= 0.12       # 上轨 — 超买
 
-    return max(0.0, min(1.0, score))
+    return max(-0.3, min(1.0, score))  # 🆕 允许轻微负分
 
 
 def _mean_rev_score(signal: dict) -> float:
@@ -208,13 +217,14 @@ def _mean_rev_score(signal: dict) -> float:
     else:  # 0.70 < pct_b <= 0.80
         bb_score = -0.04
 
-    # v11: 取两者中绝对值更大者（保留原有逻辑）
+    # 取两者中绝对值更大者
     if abs(rsi_score) >= abs(bb_score):
         score = rsi_score
     else:
         score = bb_score
 
-    return max(0.0, min(1.0, score))
+    # 🆕 允许负分（表达做空信号），clamp到 [-0.5, 1.0]
+    return max(-0.5, min(1.0, score))
 
 
 def adjust_weights_from_ic(regime: str) -> dict:
@@ -331,9 +341,9 @@ def combine(signals: dict, value_factors: dict, momentum_factors: dict,
         t_score = _tech_score(signals[sym])
         f_score = multiframe_factors.get(sym, {}).get("composite", 0.0)
         r_score = _mean_rev_score(signals[sym])
-        # Fix: 检测全默认分 — 如果多个因子在 0.45-0.55 区间（未计算/占位），跳过该标的
+        # v5默认分检测 — 从3放宽到4，减少误杀
         near_default_count = sum(1 for s in [v_score, m_score, q_score, f_score] if 0.45 <= s <= 0.55)
-        if near_default_count >= 3:  # 至少3个因子是默认值 → 数据不足
+        if near_default_count >= 4:
             continue
         smc_score_raw = signals[sym].get("smc_score", {}).get("smc_score", 0.0)
 
@@ -354,6 +364,25 @@ def combine(signals: dict, value_factors: dict, momentum_factors: dict,
             )
         else:
             total = 0.0
+
+        # ── v24: AQR QMJ (Quality Minus Junk) 质量-动量交叉过滤 ──
+        # Asness, Frazzini, Pedersen (2019): 高质量+高动量是最强组合
+        # 高质量股票获得动量加分，低质量股票的动量信号打折
+        if q_score >= 0.6 and m_score >= 0.5:
+            total = total * 1.12  # 高质量+高动量 → 增强12%
+        elif q_score < 0.3 and m_score >= 0.5:
+            total = total * 0.85  # 低质量+高动量 → 惩罚15%（追涨垃圾股）
+
+        # ── v24: AQR BAB (Betting Against Beta) 低波动偏好 ──
+        # Frazzini & Pedersen (2014): 低beta股票风险调整后收益更高
+        atr_val = signals[sym].get("atr", 0)
+        price_val = signals[sym].get("price", 1)
+        if price_val > 0 and atr_val > 0:
+            atr_pct = atr_val / price_val  # ATR占价格比例 = 波动率代理
+            if atr_pct < 0.015:
+                total = total * 1.08  # 低波动 → 加分8%
+            elif atr_pct > 0.035:
+                total = total * 0.90  # 高波动 → 减分10%
 
         total = total * 0.95 + smc_normalized * 0.05
         total = max(0.0, min(1.0, total))
@@ -482,3 +511,45 @@ def _spearman(x: list, y: list) -> float:
     ry = rank(y)
     d2 = sum((rx[i] - ry[i]) ** 2 for i in range(n))
     return 1 - (6 * d2) / (n * (n**2 - 1))
+
+
+# ── v17: 因子衰减 (Factor Decay / Freshness Weight) ──
+# 参考: Qlib 滚动窗口 + AQR 因子半衰期方法
+# 作用: 陈旧因子数据权重降低，新数据权重高
+def apply_factor_decay(symbol: str, base_score: float, cycles_since_update: int = 0) -> float:
+    """对因子评分应用时间衰减。
+
+    Args:
+        symbol: 标的代码
+        base_score: 原始因子评分
+        cycles_since_update: 距离上次更新的周期数
+
+    Returns:
+        衰减后的评分
+    """
+    global _factor_age, _factor_freshness
+
+    # 更新年龄
+    old_age = _factor_age.get(symbol, 0)
+    if cycles_since_update > 0:
+        _factor_age[symbol] = cycles_since_update
+    else:
+        _factor_age[symbol] = old_age + 1
+
+    age = _factor_age[symbol]
+
+    # 指数衰减: weight = e^(-λ * age), λ = ln(2) / half_life
+    freshness = math.exp(-math.log(2) / FACTOR_HALF_LIFE * age)
+    _factor_freshness[symbol] = freshness
+
+    # 对低质量信号加大衰减
+    if base_score < 0.30:
+        freshness *= 0.7  # 弱信号衰减更快
+
+    return base_score * freshness
+
+
+def reset_factor_age(symbol: str):
+    """重置因子年龄（新数据到达时调用）"""
+    global _factor_age
+    _factor_age[symbol] = 0
