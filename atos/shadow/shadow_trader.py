@@ -1360,6 +1360,12 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
             if sector_exposure.get(sym_sector, 0) >= sector_limit:
                 logger.info(f"⏭ {sym} 行业{sym_sector}已超限 (容忍度最高{sector_limit:.0%})")
                 continue
+            # v23: 同行业持仓数量限制 — 防高相关性虚假分散（7/11教训）
+            same_sector_count = sum(1 for s in account.positions if SECTOR_MAP.get(s, "Unknown") == sym_sector)
+            max_per_sector = 3  # 每行业最多3只
+            if same_sector_count >= max_per_sector and sym not in account.positions:
+                logger.info(f"⏭ {sym} {sym_sector}行业已有{same_sector_count}只≥{max_per_sector} — 相关性过高")
+                continue
         except Exception:
             pass
 
@@ -2010,6 +2016,39 @@ def main():
                 sys.exit(0)
 
             cycle += 1
+
+            # ── v23: 每日相关性扫描（每288周期=每天一次）──
+            if cycle % 288 == 1 and len(account.positions) >= 2:
+                try:
+                    from atos.portfolio.correlation import check_concentration_risk
+                    pos_list = []
+                    for sym, pos in account.positions.items():
+                        lp = pos.get("last_price", pos.get("avg_price", 0))
+                        pos_list.append({
+                            "symbol": sym,
+                            "mkt_val": pos["qty"] * lp,
+                            "avg_price": pos.get("avg_price", 0),
+                            "last_price": lp,
+                            "qty": pos["qty"],
+                        })
+                    alerts = check_concentration_risk(pos_list, correlation_threshold=0.75)
+                    if alerts:
+                        for a in alerts[:3]:  # 只处理最严重的前3对
+                            logger.warning(f"🔗 相关性告警: {a['suggestion']}")
+                        # 自动减持最高相关性配对中市值较小的
+                        top = alerts[0]
+                        reduce_sym = top.get("reduce_symbol", "")
+                        if reduce_sym and reduce_sym in account.positions:
+                            rpos = account.positions[reduce_sym]
+                            rprice = rpos.get("last_price", rpos.get("avg_price", 0))
+                            if rprice > 0:
+                                reduce_qty = max(1, int(rpos["qty"] * 0.30))
+                                reason = f"相关性减持 ({top['pair'][0]}-{top['pair'][1]} corr={top['correlation']:.0%})"
+                                account.execute(reduce_sym, "SELL", reduce_qty, rprice, reason=reason)
+                                logger.info(f"🔗 {reason} — 卖{reduce_sym} {reduce_qty}股")
+                except Exception as e:
+                    logger.debug(f"相关性扫描跳过: {e}")
+
             run_shadow_cycle(account, cycle)
             time.sleep(5 * 60)  # 5分钟周期
         except KeyboardInterrupt:
