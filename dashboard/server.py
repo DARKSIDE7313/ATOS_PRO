@@ -549,6 +549,27 @@ def read_ai_insights():
         except Exception as e:
             result['db_error'] = str(e)
 
+    # ── v23: 用实际交易统计替代 AI 辩论统计（AI辩论API已挂，数据不可靠）──
+    try:
+        ts_file = os.path.join(BASE, 'data', 'trade_stats.json')
+        if os.path.exists(ts_file):
+            with open(ts_file) as f:
+                trade_stats = json.load(f)
+            result['stats'] = {
+                'total': trade_stats.get('total_trades', 0),
+                'wins': trade_stats.get('wins', 0),
+                'losses': trade_stats.get('losses', 0),
+                'win_rate': round(trade_stats.get('win_rate', 0) * 100, 1),
+                'win_loss_ratio': round(trade_stats.get('win_loss_ratio', 0), 2),
+                'avg_win_pct': round(trade_stats.get('avg_win', 0) * 100, 2),
+                'avg_loss_pct': round(trade_stats.get('avg_loss', 0) * 100, 2),
+                'kelly_wr': trade_stats.get('win_rate', 0),
+                'kelly_wlr': trade_stats.get('win_loss_ratio', 0),
+                'source': 'actual_trades',
+            }
+    except Exception:
+        pass
+
     return result
 
 def _get_api_key(key_name: str) -> str:
