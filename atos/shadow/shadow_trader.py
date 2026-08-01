@@ -870,6 +870,14 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
             account.execute(sym, "SELL", pos["qty"], price, reason=f"止盈 +{pnl_pct:.1%}")
             logger.info(f"💰 止盈: {sym} +{pnl_pct:.1%}")
             continue
+        # 3b. v24: Citadel超买主动止盈 — RSI>80且盈利>2% → 锁定利润
+        # 高胜率策略: 超买区域大概率回调, 先落袋为安
+        rsi_sell = signals.get(sym, {}).get("rsi", 50)
+        if rsi_sell > 80 and pnl_pct > 0.02:
+            half = max(1, pos["qty"] // 2)
+            account.execute(sym, "SELL", half, price, reason=f"超买止盈 RSI={rsi_sell:.0f} PnL={pnl_pct:+.1%}")
+            logger.info(f"📈 Citadel超买止盈: {sym} RSI={rsi_sell:.0f} PnL={pnl_pct:+.1%} 卖{half}股")
+            continue
         # 4. 🏦 v21: ATR动态止损（替代固定6%，适应不同波动率）
         atr = signals.get(sym, {}).get("atr", 0)
         if atr > 0 and price > 0:
@@ -987,6 +995,24 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
     current_dd = (account.peak_equity - account.total_equity) / account.peak_equity
     if current_dd > 0.05:
         logger.info(f"📉 当前回撤: {current_dd:.2%} (峰值${account.peak_equity:,.0f})")
+
+    # ── v24: Citadel 单仓集中度熔断 — 单仓>15%自动减持到12% ──
+    # 防止单一持仓过大导致黑天鹅风险
+    _CONC_LIMIT = 0.15   # 单仓上限15%
+    _CONC_TARGET = 0.12  # 减持目标12%
+    for sym, pos in list(account.positions.items()):
+        lp = pos.get("last_price", pos.get("avg_price", 0))
+        mkt_val = pos["qty"] * lp
+        weight = mkt_val / account.total_equity if account.total_equity > 0 else 0
+        if weight > _CONC_LIMIT and lp > 0:
+            # 计算需要卖多少股才能回到12%
+            target_val = account.total_equity * _CONC_TARGET
+            excess_val = mkt_val - target_val
+            sell_qty = max(1, int(excess_val / lp))
+            if sell_qty < pos["qty"]:
+                account.execute(sym, "SELL", sell_qty, lp,
+                              reason=f"集中度熔断 {weight:.0%}>{_CONC_LIMIT:.0%} → 减至{_CONC_TARGET:.0%}")
+                logger.info(f"🛡️ 集中度熔断: {sym} {weight:.1%}>{_CONC_LIMIT:.0%} 卖{sell_qty}股")
 
     # 4d. 风格检查（回撤/熔断）
     risk_state = get_risk_state()
@@ -1417,6 +1443,20 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
         if rsi < 25:
             logger.info(f"⏭ {sym} RSI={rsi:.0f}<25 极度弱势，不接飞刀")
             continue
+
+        # ── v24: 量化基金策略增强 ──
+        # Renaissance(Medallion): 上升趋势中的短期超卖 = 最佳买入点
+        # "Buy the dip in an uptrend" — 回调到支撑位时买入
+        ma50_val = signals.get(sym, {}).get("ma50", 0)
+        if 25 <= rsi <= 40 and ma50_val > 0 and price > ma50_val * 0.98:
+            pick["score"] += 0.04  # 上升趋势中超卖回调 → 加分
+            logger.info(f"📊 Renaissance信号: {sym} RSI={rsi:.0f} 超卖回调+价格在MA50上方 → score+0.04")
+
+        # AQR: 时间序列动量确认 — 价格>MA20>MA50 = 确认上升
+        ma20_val = signals.get(sym, {}).get("ma20", 0)
+        if ma20_val > 0 and ma50_val > 0 and price > ma20_val > ma50_val:
+            pick["score"] += 0.03  # 完美多头排列 → 加分
+            logger.info(f"📊 AQR动量: {sym} 价格>MA20>MA50 多头排列 → score+0.03")
         # ============================================================
         # 硬性要求：必须跑赢手续费 + 滑点（真正生效）
         # ============================================================
