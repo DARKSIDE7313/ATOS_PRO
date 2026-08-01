@@ -20,7 +20,7 @@ def _live_price(sym):
             if sym in pos and isinstance(pos[sym], dict):
                 lp = pos[sym].get('last_price', 0) or 0
                 if lp > 0: return lp
-        except: pass
+        except (json.JSONDecodeError, IOError, KeyError, TypeError): pass
     # 再查长线 state（longterm 标的不在 shadow 中）
     fp2 = os.path.join(BASE, 'data', 'longterm_state.json')
     if os.path.exists(fp2):
@@ -30,7 +30,7 @@ def _live_price(sym):
             if sym in pos and isinstance(pos[sym], dict):
                 lp = pos[sym].get('last_price', 0) or 0
                 if lp > 0: return lp
-        except: pass
+        except (json.JSONDecodeError, IOError, KeyError, TypeError): pass
     return 0
 
 
@@ -63,7 +63,7 @@ def _fetch_price(sym):
         r=subprocess.run([py,'-c',code,sym],capture_output=True,timeout=10,text=True)
         p=float(r.stdout.strip())
         if p>0: _price_cache[sym]=p;_price_ts=time.time()
-    except: pass
+    except (subprocess.TimeoutExpired, ValueError, OSError): pass
 
 def refresh_all_prices():
     """仅对 state 中没有价格的标的做一次 yfinance 查询"""
@@ -75,7 +75,7 @@ def refresh_all_prices():
                 with open(fpn) as f: raw = json.load(f)
                 for k in ['positions', 'holdings']:
                     all_syms.update((raw.get(k, {}) or {}).keys())
-            except: pass
+            except (json.JSONDecodeError, IOError, KeyError, TypeError): pass
     # 只获取 state 中没有 last_price 或 last_price=0 的标的
     for s in sorted(all_syms):
         if s not in _price_cache or _price_cache.get(s, 0) <= 0:
@@ -178,7 +178,7 @@ def read_state():
             d['cycle_count']=raw.get('cycle_count',0)
             d['last_cycle']=raw.get('last_cycle','')
             d['equity_total']=round(raw.get('equity',0),2)
-        except: pass
+        except (json.JSONDecodeError, IOError, KeyError, TypeError): pass
     # 读取 Phoenix 长期仓位 (合并新旧两个来源)
     d['long'] = {'pv':0, 'pl':0, 'cash':0, 'init':0, 'chg':0, 'pos':[], 'cnt':0}
 
@@ -230,7 +230,7 @@ def read_state():
                 leg.get('initial_cash', 1_000_000),
                 'legacy'
             )
-        except: pass
+        except (json.JSONDecodeError, IOError, KeyError, TypeError): pass
 
     # 2. Phoenix v3 仓位 — 只添加不在 legacy 里的，不额外加资金
     fpn_new = os.path.join(BASE, 'phoenix_state.json')
@@ -245,12 +245,12 @@ def read_state():
                     with open(fpn_legacy) as f:
                         leg = json.load(f)
                     legacy_syms = set(leg.get('positions', {}).keys())
-                except: pass
+                except (json.JSONDecodeError, IOError, KeyError, TypeError): pass
             new_only = {k: v for k, v in new_pos.items() if k not in legacy_syms}
             if new_only:
                 # 不加额外资金 — 只用 legacy 的 $1M 初始
                 _add_long_positions(new_only, 0, 0, 'phoenix_v3')
-        except: pass
+        except (json.JSONDecodeError, IOError, KeyError, TypeError): pass
 
     d['long_meta'] = {'rebalance': '2026-06-03 (legacy) + Phoenix v3',
                       'last_run': '', 'runs': 0}
@@ -264,7 +264,7 @@ def read_state():
                 'last_run': str(raw.get('last_full_run', ''))[:19],
                 'runs': raw.get('runs', 0)
             }
-        except: pass
+        except (json.JSONDecodeError, IOError, KeyError, TypeError): pass
     si=d.get('short',{}); li=d.get('long',{})
     c_init=(si.get('init',0)or 0)+(li.get('init',0)or 0)
     c_pv=(si.get('pv',0)or 0)+(li.get('pv',0)or 0)
@@ -313,7 +313,7 @@ def read_state():
                 'perf': h.get('performance', {}),
                 'exposure': h.get('exposure', {}),
             }
-    except: pass
+    except (json.JSONDecodeError, IOError, KeyError, TypeError): pass
     rd=os.path.join(BASE,'reports')
     if os.path.exists(rd):
         # 先收集所有 phoenix_report_ 文件，按修改时间排序
@@ -345,7 +345,7 @@ def read_state():
                         m=re.search(r'\|.*?\| (.*)', line)
                         if m: events.append(m.group(1).strip()[:120])
             d['monitor_events']=events[-5:]
-    except: pass
+    except (json.JSONDecodeError, IOError, KeyError, TypeError): pass
     return d
 
 def read_ai_insights():
