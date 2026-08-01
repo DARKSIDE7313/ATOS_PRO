@@ -1259,10 +1259,22 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
             pass
 
     # ── v23: 行业再平衡 — 超限行业自动卖最弱持仓 ──
+    # v24 FIX: 1) exposure改用总权益做分母 2) 每周期最多卖1次防级联
     if sector_exposure and account.positions:
         try:
             from atos.portfolio.correlation import SECTOR_MAP
-            for sector, exposure in sector_exposure.items():
+            # 用总权益重新计算各行业敞口（而不是占总投资的百分比）
+            eq = account.total_equity
+            real_exposure = {}
+            for sym, pos in account.positions.items():
+                sector = SECTOR_MAP.get(sym, "Unknown")
+                mkt = pos["qty"] * pos.get("last_price", pos.get("avg_price", 0))
+                real_exposure[sector] = real_exposure.get(sector, 0) + mkt / eq if eq > 0 else 0
+
+            rebalanced = False  # v24: 每周期最多卖1只防级联
+            for sector, exposure in real_exposure.items():
+                if rebalanced:
+                    break
                 limit = SECTOR_LIMITS.get(sector, 0.25)
                 if exposure > limit:
                     # 找该行业最弱持仓
@@ -1279,9 +1291,20 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
                         sym, pnl, pos = weakest
                         price = signals.get(sym, {}).get("price", pos.get("last_price", 0))
                         if price > 0:
-                            reason = f"行业再平衡 ({sector}{exposure:.0%}>{limit:.0%} 卖最弱{sym} PnL{pnl:+.1%})"
-                            account.execute(sym, "SELL", pos["qty"], price, reason=reason)
-                            logger.info(f"⚖️ {reason}")
+                            # 只卖一部分，不是全卖 — 卖到刚好低于limit
+                            target_val = eq * limit * 0.9  # 留10%余量
+                            current_sector_val = sum(
+                                p["qty"] * p.get("last_price", p.get("avg_price", 0))
+                                for s2, p in account.positions.items()
+                                if SECTOR_MAP.get(s2, "Unknown") == sector
+                            )
+                            excess_val = current_sector_val - target_val
+                            sell_qty = max(1, min(pos["qty"], int(excess_val / price)))
+                            if sell_qty > 0:
+                                reason = f"行业再平衡 ({sector}{exposure:.0%}>{limit:.0%} 减{sym}{sell_qty}股)"
+                                account.execute(sym, "SELL", sell_qty, price, reason=reason)
+                                logger.info(f"⚖️ {reason}")
+                                rebalanced = True  # 本周期只卖1次
         except Exception as e:
             logger.debug(f"行业再平衡跳过: {e}")
 
