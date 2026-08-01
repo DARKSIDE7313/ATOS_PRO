@@ -2006,9 +2006,11 @@ def main():
         with open(state_file) as f:
             saved = json.load(f)
         # v11: 强制上限 — 防止旧状态$1M覆盖配置的$300K
+        # v24 FIX: 允许利润累积 — cap改为initial*1.5（允许50%利润），不再吞掉收益
+        max_allowed = max_short_capital * 1.50  # 允许最多50%利润
         initial = min(saved.get("initial_cash", max_short_capital), max_short_capital)
         account = ShadowAccount(initial_cash=initial)
-        account.cash = min(saved.get("cash", account.initial_cash), max_short_capital)
+        account.cash = min(saved.get("cash", account.initial_cash), max_allowed)
         account.positions = saved.get("positions", {})
         # Fix: 标准化持仓键名（shares ↔ qty 一致性）
         for sym, p in account.positions.items():
