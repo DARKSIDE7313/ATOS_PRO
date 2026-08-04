@@ -46,7 +46,7 @@ def fetch_account_data():
                     "code":   row["code"],
                     "qty":    int(row["qty"]),
                     "cost":   float(row["cost_price"]),
-                    "last":   float(row["last_price"]),
+                    "last":   float(row["nominal_price"]),
                     "pl_val": float(row["pl_val"]),
                 })
         print('[OK] 账户: 总资产 ' + '$' + f"{account['total']:,.2f}")

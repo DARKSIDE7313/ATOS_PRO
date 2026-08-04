@@ -1,458 +1,275 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ATOS Dashboard</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>ATOS PRO — 实时仪表盘</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#15171a;color:#c4c8cc;font-family:Inter,-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased}
-nav{display:flex;background:rgba(255,255,255,.02);border-bottom:1px solid rgba(255,255,255,.06);padding:0 20px;overflow-x:auto;position:sticky;top:0;z-index:10;backdrop-filter:blur(12px)}
-nav a{padding:14px 20px;font-size:12px;font-weight:500;letter-spacing:.8px;text-transform:uppercase;color:#838990;border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap;cursor:pointer;text-decoration:none}
-nav a:hover{color:#c4c8cc}
-nav a.active{color:#e8eaed;border-bottom-color:#7b9ea3}
-#app{max-width:1400px;margin:0 auto;padding:24px}
-.page{display:none}.page.show{display:block}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:24px}
-.kpi{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.04);border-radius:12px;padding:16px}
-.kpi .lbl{font-size:9px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:#838990;margin-bottom:4px}
-.kpi .val{font-size:26px;font-weight:600;letter-spacing:-.5px;color:#e8eaed}
-.kpi .sub{font-size:11px;color:#838990;margin-top:2px}
-.up{color:#30d158}.down{color:#ff453a}
-.card{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.04);border-radius:12px;padding:20px;margin-bottom:16px}
-.card h2{font-size:10px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:#838990;margin-bottom:14px}
-table{width:100%;border-collapse:collapse;font-size:12px}
-th{padding:6px 8px;text-align:left;font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#838990;border-bottom:1px solid rgba(255,255,255,.06);white-space:nowrap}
-td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.03);white-space:nowrap}
-tr:hover td{background:rgba(255,255,255,.03)}
-.num{font-family:"JetBrains Mono","SF Mono",monospace;text-align:right}
-.sym{font-weight:500;color:#e8eaed}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
-@media(max-width:768px){.grid2{grid-template-columns:1fr}}
-.log{display:flex;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.02);font-size:11px;color:#838990;line-height:1.4}
-.log .lt{color:#7b9ea3;font-family:"JetBrains Mono",monospace;font-size:10px;white-space:nowrap;min-width:80px}
-.log .lm{flex:1}
-.loading{padding:40px;text-align:center;color:#838990;font-size:13px}
-.empty{color:#838990;font-size:12px;padding:16px;text-align:center}
-.badge{display:inline-block;padding:2px 8px;font-size:9px;font-weight:600;border-radius:4px}
-.badge.up{background:rgba(48,209,88,.12);color:#30d158}
-.badge.down{background:rgba(255,69,58,.12);color:#ff453a}
-.badge.warn{background:rgba(255,204,0,.12);color:#ffcc00}
-.badge.neutral{background:rgba(255,255,255,.04);color:#838990}
-.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
-.controls input,.controls select{
-  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);color:#c4c8cc;
-  padding:6px 10px;border-radius:8px;font-size:12px;font-family:"JetBrains Mono",monospace;outline:none;
-}
-.controls input:focus,.controls select:focus{border-color:#7b9ea3}
-.controls label{font-size:10px;color:#838990;text-transform:uppercase;letter-spacing:1px}
-.btn-run{
-  background:rgba(48,209,88,.12);border:1px solid rgba(48,209,88,.2);color:#30d158;
-  padding:6px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;
-  text-transform:uppercase;letter-spacing:.8px;
-}
-.btn-run:hover{background:rgba(48,209,88,.2)}
-.btn-run:disabled{opacity:.4;cursor:not-allowed}
-.chart-card{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.04);border-radius:12px;padding:20px;margin-bottom:16px}
-.chart-card h2{font-size:10px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:#838990;margin-bottom:14px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0a0e17;color:#e0e6ed;min-height:100vh}
+.header{background:linear-gradient(135deg,#1a1f2e,#0f1419);padding:16px 24px;border-bottom:1px solid #1e2a3a;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.header h1{font-size:22px;font-weight:700;color:#4fc3f7}
+.header .clock{font-size:14px;color:#8899aa;font-family:monospace}
+.status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.status-dot.live{background:#4caf50;box-shadow:0 0 8px #4caf50}
+.status-dot.closed{background:#ff9800;box-shadow:0 0 8px #ff9800}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;padding:16px;max-width:1600px;margin:0 auto}
+.card{background:#131a24;border:1px solid #1e2a3a;border-radius:10px;overflow:hidden}
+.card-title{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#8899aa;padding:12px 16px;background:#171e2a;border-bottom:1px solid #1e2a3a}
+.kpi-row{display:flex;gap:12px;padding:12px 16px;flex-wrap:wrap}
+.kpi{flex:1;min-width:90px;text-align:center}
+.kpi .val{font-size:22px;font-weight:700;font-family:monospace}
+.kpi .lbl{font-size:11px;color:#667788;margin-top:2px}
+.up{color:#4caf50}.down{color:#f44336}.warn{color:#ff9800}
+table{width:100%;font-size:12px;border-collapse:collapse}
+th{text-align:left;padding:8px 12px;font-weight:500;color:#667788;font-size:11px;text-transform:uppercase;border-bottom:1px solid #1e2a3a}
+td{padding:6px 12px;border-bottom:1px solid #0f1419;font-family:monospace;font-size:11px}
+td.sym{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-weight:600;font-size:13px}
+tr:hover{background:#171e2a}
+.badge{padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+.badge-buy{background:#1b3a1b;color:#4caf50}
+.badge-sell{background:#3a1b1b;color:#f44336}
+.badge-wait{background:#1b2a3a;color:#8899aa}
+.badge-phoenix{background:#1b1b3a;color:#7b9ea3}
+.tab-row{display:flex;border-bottom:1px solid #1e2a3a}
+.tab{padding:8px 16px;font-size:12px;cursor:pointer;color:#667788;border-bottom:2px solid transparent;transition:.2s;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+.tab:hover,.tab.active{color:#4fc3f7;border-bottom-color:#4fc3f7}
+.tab-content{display:none;max-height:300px;overflow-y:auto}
+.tab-content.active{display:block}
+.footer{text-align:center;padding:12px;color:#445566;font-size:11px;border-top:1px solid #1e2a3a;margin-top:16px}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+.pulse{animation:pulse 2s infinite}
+.num{text-align:right}
+.no-data{color:#667788;font-size:12px;padding:20px;text-align:center}
+@media(max-width:768px){.grid{grid-template-columns:1fr;padding:8px}.kpi .val{font-size:18px}}
 </style>
 </head>
 <body>
-<nav id="nav">
-  <a href="#" data-page="overview" class="active">Overview</a>
-  <a href="#" data-page="short">Short-Term</a>
-  <a href="#" data-page="long">Long-Term</a>
-  <a href="#" data-page="trades">Trades</a>
-  <a href="#" data-page="backtest">Backtest</a>
-  <span id="market-clock" style="margin-left:auto;padding:10px 16px;font-size:11px;font-family:JetBrains Mono,monospace;color:#838990;display:flex;align-items:center;gap:8px;white-space:nowrap">
-    <span id="mkt-time">--:--:--</span>
-    <span id="mkt-status" style="padding:2px 8px;border-radius:4px;font-size:9px;font-weight:600">--</span>
-  </span>
-</nav>
-<div id="app">
 
-<!-- ============ OVERVIEW PAGE ============ -->
-<div class="page show" id="p-overview">
-  <div class="kpis" id="ov-kpis"><div class="loading">Loading...</div></div>
-  <div class="grid2">
-    <div class="card"><h2>Short-Term</h2><div id="ov-short-info"><div class="loading">Loading...</div></div></div>
-    <div class="card"><h2>Long-Term</h2><div id="ov-long-info"><div class="loading">Loading...</div></div></div>
+<div class="header">
+  <div>
+    <h1>⚡ ATOS PRO <span style="font-size:14px;color:#667788;font-weight:400">实时仪表盘</span></h1>
   </div>
-  <div class="card"><h2>Activity Log</h2><div id="ov-log"><div class="loading">Loading...</div></div></div>
+  <div class="clock" id="clock">--</div>
 </div>
 
-<!-- ============ SHORT-TERM PAGE ============ -->
-<div class="page" id="p-short">
-  <div class="kpis" id="st-kpis"><div class="loading">Loading...</div></div>
-  <div class="card"><h2>Positions</h2><div id="st-table"><div class="loading">Loading...</div></div></div>
-  <div class="card"><h2>System</h2><div id="st-sys"><div class="loading">Loading...</div></div></div>
-</div>
-
-<!-- ============ LONG-TERM PAGE ============ -->
-<div class="page" id="p-long">
-  <div class="kpis" id="lt-kpis"><div class="loading">Loading...</div></div>
-  <div class="card"><h2>Holdings</h2><div id="lt-table"><div class="loading">Loading...</div></div></div>
-  <div class="card"><h2>Strategy</h2><div id="lt-strat"><div class="loading">Loading...</div></div></div>
-</div>
-
-<!-- ============ TRADES PAGE ============ -->
-<div class="page" id="p-trades">
-  <div class="card"><h2>Trade History</h2><div id="tr-table"><div class="loading">Loading...</div></div></div>
-</div>
-
-<!-- ============ BACKTEST PAGE ============ -->
-<div class="page" id="p-backtest">
-  <div class="controls">
-    <label>Ticker</label><input type="text" id="bt-ticker" value="NVDA" style="width:100px">
-    <label>Strategy</label>
-    <select id="bt-strategy">
-      <option value="rsi2">RSI-2 极端反转</option>
-      <option value="bollinger">布林带均值回归</option>
-      <option value="momentum">双动量趋势</option>
-      <option value="trend">EMA 趋势跟踪</option>
-    </select>
-    <button class="btn-run" id="bt-run" onclick="runBacktest()">▶ Run Backtest</button>
+<div class="grid">
+  <!-- 总览 -->
+  <div class="card" style="grid-column:1/-1">
+    <div class="card-title">📊 组合总览</div>
+    <div class="kpi-row">
+      <div class="kpi"><div class="val" id="total-pv">--</div><div class="lbl">总资产</div></div>
+      <div class="kpi"><div class="val" id="total-pnl">--</div><div class="lbl">总盈亏</div></div>
+      <div class="kpi"><div class="val" id="total-ret">--</div><div class="lbl">总回报</div></div>
+      <div class="kpi"><div class="val" id="total-cash">--</div><div class="lbl">总现金</div></div>
+      <div class="kpi"><div class="val" id="mkt-status">--</div><div class="lbl" id="mkt-label">市场状态</div></div>
+    </div>
   </div>
-  <div class="kpis" id="bt-kpis" style="display:none"></div>
-  <div class="chart-card" id="bt-charts" style="display:none"><h2>Equity Curve</h2><canvas id="equityChart" height="200"></canvas></div>
-  <div class="card" id="bt-table" style="display:none"><h2>Trade History</h2>
-    <table><thead><tr><th>Time</th><th>Sym</th><th>Action</th><th>Qty</th><th>Price</th><th>P&amp;L</th><th>Reason</th></tr></thead><tbody id="bt-tbody"></tbody></table>
+
+  <!-- Shadow 短线 -->
+  <div class="card">
+    <div class="card-title">🔴 短线 Shadow <span style="font-weight:400;font-size:11px;color:#667788" id="shadow-summary"></span></div>
+    <div class="kpi-row">
+      <div class="kpi"><div class="val" id="s-pv">--</div><div class="lbl">市值</div></div>
+      <div class="kpi"><div class="val" id="s-pnl">--</div><div class="lbl">盈亏</div></div>
+      <div class="kpi"><div class="val" id="s-ret">--</div><div class="lbl">回报</div></div>
+    </div>
+    <div style="max-height:350px;overflow-y:auto">
+    <table><thead><tr><th>标的</th><th>持仓</th><th class="num">均价</th><th class="num">现价</th><th class="num">市值</th><th class="num">盈亏</th><th class="num">占比</th></tr></thead>
+    <tbody id="short-pos"></tbody></table>
+    </div>
   </div>
-  <div class="loading" id="bt-loading" style="display:none">Running backtest...</div>
-  <div class="empty" id="bt-empty">Enter a ticker and select a strategy, then click Run Backtest</div>
+
+  <!-- LongTerm 长线 -->
+  <div class="card">
+    <div class="card-title">🔵 长线 LongTerm + Phoenix <span style="font-weight:400;font-size:11px;color:#667788" id="long-summary"></span></div>
+    <div class="kpi-row">
+      <div class="kpi"><div class="val" id="l-pv">--</div><div class="lbl">市值</div></div>
+      <div class="kpi"><div class="val" id="l-pnl">--</div><div class="lbl">盈亏</div></div>
+      <div class="kpi"><div class="val" id="l-holdings">--</div><div class="lbl">持仓数</div></div>
+    </div>
+    <div style="max-height:350px;overflow-y:auto">
+    <table><thead><tr><th>标的</th><th>持仓</th><th class="num">均价</th><th class="num">现价</th><th class="num">市值</th><th class="num">盈亏</th><th>来源</th></tr></thead>
+    <tbody id="long-pos"></tbody></table>
+    </div>
+  </div>
+
+  <!-- 最近交易 -->
+  <div class="card">
+    <div class="card-title">📋 最近交易 <span style="font-weight:400;font-size:11px;color:#667788" id="trade-summary"></span></div>
+    <div style="max-height:350px;overflow-y:auto">
+    <table><thead><tr><th>时间</th><th>标的</th><th>方向</th><th>原因</th></tr></thead>
+    <tbody id="trades-list"></tbody></table>
+    </div>
+  </div>
+
+  <!-- AI Insights -->
+  <div class="card">
+    <div class="card-title">🧠 AI 决策 <span style="font-weight:400;font-size:11px;color:#667788" id="ai-summary"></span></div>
+    <div class="tab-row">
+      <div class="tab active" onclick="switchTab('v6')">v6 增强</div>
+      <div class="tab" onclick="switchTab('v5')">v5 辩论</div>
+    </div>
+    <div class="tab-content active" id="tab-v6" style="max-height:280px">
+      <table><thead><tr><th>标的</th><th>决策</th><th class="num">信心</th><th>原因</th></tr></thead>
+      <tbody id="ai-v6"></tbody></table>
+    </div>
+    <div class="tab-content" id="tab-v5" style="max-height:280px">
+      <table><thead><tr><th>时间</th><th>标的</th><th>决策</th><th class="num">信心</th></tr></thead>
+      <tbody id="ai-v5"></tbody></table>
+    </div>
+  </div>
 </div>
 
-</div>
+<div class="footer">ATOS PRO v3 · 数据每30秒刷新 · <span id="last-update">--</span></div>
 
 <script>
-// ---- Navigation ----
-document.querySelectorAll('nav a').forEach(a=>{
-  a.addEventListener('click',e=>{
-    e.preventDefault();
-    document.querySelectorAll('nav a').forEach(x=>x.classList.remove('active'));
-    a.classList.add('active');
-    document.querySelectorAll('.page').forEach(p=>p.classList.remove('show'));
-    document.getElementById('p-'+a.dataset.page).classList.add('show');
-  });
-});
+const FMT = new Intl.NumberFormat('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});
+const FMT2 = new Intl.NumberFormat('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 
-let allResults = {};  // strategy -> {trades, signals, price_data, etc}
-let equityChart=null, wrChart=null, pnlDistChart=null;
+function $(id){return document.getElementById(id)}
+function pnlClass(v){return v>=0?'up':'down'}
+function pnlSign(v){return v>=0?'+'+FMT.format(v):FMT.format(v)}
+function pnlSignPct(v){return v>=0?'+'+v.toFixed(2)+'%':v.toFixed(2)+'%'}
 
-// ---- Market Clock (US Eastern Time) ----
-function updateMarketClock() {
-  const now = new Date();
-  // US Eastern Time (EDT=UTC-4, EST=UTC-5). Simple: check if between Mar-Nov for EDT.
-  const mar = new Date(now.getUTCFullYear(), 2, 14); // 2nd Sunday March
-  const nov = new Date(now.getUTCFullYear(), 10, 7); // 1st Sunday Nov
-  const isDst = now >= mar && now < nov;
-  const offset = isDst ? -4 : -5;
-  const etHours = (now.getUTCHours() + offset + 24) % 24;
-  const etMins = now.getUTCMinutes();
-  const etSecs = now.getUTCSeconds();
-  const etDay = new Date(now.getTime() + offset * 3600000).getUTCDay();
-
-  const timeStr = `${String(etHours).padStart(2,'0')}:${String(etMins).padStart(2,'0')}:${String(etSecs).padStart(2,'0')}`;
-  const tz = isDst ? 'EDT' : 'EST';
-  document.getElementById('mkt-time').textContent = `🇺🇸 ${timeStr} ${tz}`;
-
-  // Market status: Mon-Fri 9:30-16:00 ET
-  const mktMin = etHours * 60 + etMins;
-  const openMin = 9*60 + 30;
-  const closeMin = 16*60;
-  const isWeekday = etDay >= 1 && etDay <= 5;
-  let status, cls;
-  if (!isWeekday) {
-    status = 'WEEKEND';
-    cls = 'badge warn';
-  } else if (mktMin < openMin) {
-    const minsToOpen = openMin - mktMin;
-    status = `PRE-MARKET (${Math.floor(minsToOpen/60)}h${minsToOpen%60}m to open)`;
-    cls = 'badge neutral';
-  } else if (mktMin >= closeMin) {
-    status = 'CLOSED';
-    cls = 'badge down';
-  } else {
-    const minsLeft = closeMin - mktMin;
-    status = `🟢 OPEN (${Math.floor(minsLeft/60)}h${minsLeft%60}m left)`;
-    cls = 'badge up';
-  }
-  const el = document.getElementById('mkt-status');
-  el.textContent = status;
-  el.className = cls;
+function updateMarketClock(){
+  const now=new Date();
+  const mar=new Date(now.getUTCFullYear(),2,14);
+  const nov=new Date(now.getUTCFullYear(),10,7);
+  const isDst=now>=mar&&now<nov;
+  const offset=isDst?-4:-5;
+  const etH=((now.getUTCHours()+offset+24)%24);
+  const etM=now.getUTCMinutes();const etS=now.getUTCSeconds();
+  const etDay=new Date(now.getTime()+offset*3600000).getUTCDay();
+  const timeStr=`${String(etH).padStart(2,'0')}:${String(etM).padStart(2,'0')}:${String(etS).padStart(2,'0')}`;
+  const tz=isDst?'EDT':'EST';
+  const mktMin=etH*60+etM;
+  const isWeekday=etDay>=1&&etDay<=5;
+  const mktOpen=isWeekday&&mktMin>=570&&mktMin<960;
+  const dotCls=mktOpen?'live pulse':'closed';
+  const tzName=isDst?'EDT':'EST';
+  $('clock').innerHTML=`<span class="status-dot ${dotCls}"></span> ${timeStr} ${tzName} · ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][etDay]} · 市场${mktOpen?'开盘 🟢':'休市 🔴'}`;
+  return {mktOpen,timeStr,tz:tzName,dayOfWeek:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][etDay]};
 }
-updateMarketClock();
-setInterval(updateMarketClock, 1000); // every second
 
-// ---- Load live data on startup ----
-async function loadLiveData(){
+let mktInfo=updateMarketClock();
+setInterval(()=>{mktInfo=updateMarketClock()},1000);
+
+async function refresh(){
   try{
-    const d=await (await fetch('/api/live?'+Date.now())).json();
-    renderOverview(d);
-    renderShortTerm(d.short_term);
-    renderLongTerm(d.long_term);
-    renderTrades(d.trades||[]);
-    renderActivityLog(d.activity_log||[]);
-  }catch(e){console.error('live data error:',e)}
-}
-loadLiveData();
-setInterval(loadLiveData, 60000); // refresh every 60s
+    const[short,long,ai,trades]=await Promise.all([
+      fetch('/api/short?'+Date.now()).then(r=>r.json()).catch(()=>null),
+      fetch('/api/long?'+Date.now()).then(r=>r.json()).catch(()=>null),
+      fetch('/api/ai?'+Date.now()).then(r=>r.json()).catch(()=>null),
+      fetch('/api/trades?'+Date.now()).then(r=>r.json()).catch(()=>null),
+    ]);
 
-function renderOverview(d){
-  const ov=d.overview;
-  const pnlCls=ov.combined_pnl>=0?'up':'down';
-  const retCls=ov.return_pct>=0?'up':'down';
-  document.getElementById('ov-kpis').innerHTML=`
-    <div class="kpi"><div class="lbl">Combined PV</div><div class="val">$${ov.combined_pv.toLocaleString('en',{minimumFractionDigits:2})}</div><div class="sub">Short + Long</div></div>
-    <div class="kpi ${pnlCls}"><div class="lbl">Combined P&amp;L</div><div class="val">${ov.combined_pnl>=0?'+':''}$${Math.abs(ov.combined_pnl).toLocaleString('en',{minimumFractionDigits:2})}</div><div class="sub">${ov.combined_pnl>=0?'Profit':'Loss'}</div></div>
-    <div class="kpi ${retCls}"><div class="lbl">Return</div><div class="val">${ov.return_pct>=0?'+':''}${ov.return_pct.toFixed(2)}%</div><div class="sub">From $${ov.initial_capital.toLocaleString()}</div></div>
-    <div class="kpi"><div class="lbl">Total Cash</div><div class="val">$${ov.total_cash.toLocaleString('en',{minimumFractionDigits:2})}</div><div class="sub">Available</div></div>
-  `;
-  document.getElementById('ov-short-info').innerHTML=`
-    <div class="log"><span class="lt">Value</span><span class="lm">$${ov.short.value.toLocaleString('en',{minimumFractionDigits:2})}</span></div>
-    <div class="log"><span class="lt">Cash</span><span class="lm">$${ov.short.cash.toLocaleString('en',{minimumFractionDigits:2})}</span></div>
-    <div class="log"><span class="lt">Return</span><span class="lm ${ov.short.return_pct>=0?'up':'down'}">${ov.short.return_pct>=0?'+':''}${ov.short.return_pct.toFixed(2)}%</span></div>
-    <div class="log"><span class="lt">Positions</span><span class="lm">${ov.short.positions}</span></div>
-    <div class="log"><span class="lt">Cycles</span><span class="lm">${ov.short.cycles}</span></div>
-  `;
-  document.getElementById('ov-long-info').innerHTML=`
-    <div class="log"><span class="lt">Value</span><span class="lm">$${ov.long.value.toLocaleString('en',{minimumFractionDigits:2})}</span></div>
-    <div class="log"><span class="lt">Cash</span><span class="lm">$${ov.long.cash.toLocaleString('en',{minimumFractionDigits:2})}</span></div>
-    <div class="log"><span class="lt">Return</span><span class="lm ${ov.long.return_pct>=0?'up':'down'}">${ov.long.return_pct>=0?'+':''}${ov.long.return_pct.toFixed(2)}%</span></div>
-    <div class="log"><span class="lt">Holdings</span><span class="lm">${ov.long.holdings}</span></div>
-    <div class="log"><span class="lt">Rebalance</span><span class="lm">${ov.long.rebalance}</span></div>
-  `;
-}
+    $('mkt-status').innerHTML=mktInfo.mktOpen?'🟢 开盘':'🔴 休市';
+    $('mkt-label').innerText=mktInfo.mktOpen?'交易中...':'下一个交易日';
 
-function renderShortTerm(st){
-  document.getElementById('st-kpis').innerHTML=`
-    <div class="kpi"><div class="lbl">Portfolio Value</div><div class="val">$${st.portfolio_value.toLocaleString('en',{minimumFractionDigits:2})}</div></div>
-    <div class="kpi ${st.pnl>=0?'up':'down'}"><div class="lbl">P&amp;L</div><div class="val">${st.pnl>=0?'+':''}$${Math.abs(st.pnl).toLocaleString('en',{minimumFractionDigits:2})}</div></div>
-    <div class="kpi ${st.return_pct>=0?'up':'down'}"><div class="lbl">Return</div><div class="val">${st.return_pct>=0?'+':''}${st.return_pct.toFixed(2)}%</div></div>
-    <div class="kpi"><div class="lbl">Cash</div><div class="val">$${st.cash.toLocaleString('en',{minimumFractionDigits:2})}</div></div>
-    <div class="kpi"><div class="lbl">Positions</div><div class="val">${st.positions_count}</div></div>
-  `;
-  if(st.positions&&st.positions.length){
-    document.getElementById('st-table').innerHTML=`<table><thead><tr><th>Sym</th><th>Shares</th><th>Avg</th><th>Price</th><th>Value</th><th>P&amp;L</th><th>Return</th><th>Day Chg</th><th>Weight</th></tr></thead>
-    <tbody>${st.positions.map(p=>`
-      <tr><td class="sym">${p.sym}</td><td class="num">${p.shares}</td><td class="num">$${p.avg.toFixed(2)}</td><td class="num">$${p.price.toFixed(2)}</td><td class="num">$${p.value.toLocaleString('en',{minimumFractionDigits:2})}</td><td class="num ${p.pnl>=0?'up':'down'}">${p.pnl>=0?'+':''}${p.pnl.toFixed(2)}</td><td class="num ${p.return>=0?'up':'down'}">${p.return>=0?'+':''}${p.return.toFixed(2)}%</td><td class="num ${(p.day_chg||0)>=0?'up':'down'}">${p.day_chg>=0?'+':''}${(p.day_chg||0).toFixed(2)} (${(p.day_chg_pct||0)>=0?'+':''}${(p.day_chg_pct||0).toFixed(2)}%)</td><td class="num">${p.weight.toFixed(1)}%</td></tr>
-    `).join('')}</tbody></table>`;
-  }
-  if(st.system){
-    document.getElementById('st-sys').innerHTML=`
-      <div class="log"><span class="lt">Cycles</span><span class="lm">${st.system.cycles}</span></div>
-      <div class="log"><span class="lt">Last Cycle</span><span class="lm">${st.system.last_cycle}</span></div>
-      <div class="log"><span class="lt">Equity</span><span class="lm">$${st.system.equity.toLocaleString('en',{minimumFractionDigits:2})}</span></div>
-    `;
-  }
-}
+    // Shadow
+    if(short&&!short.error){
+      $('s-pv').innerHTML='$'+FMT.format(short.portfolio_value);
+      $('s-pnl').innerHTML=`<span class="${pnlClass(short.pnl)}">${pnlSign(short.pnl)}</span>`;
+      $('s-ret').innerHTML=`<span class="${pnlClass(short.return_pct)}">${pnlSignPct(short.return_pct)}</span>`;
+      $('shadow-summary').innerText=`${short.positions.length}持仓 · ${short.cycles}周期`;
+      let html='';
+      short.positions.sort((a,b)=>Math.abs(b.pnl)-Math.abs(a.pnl)).forEach(p=>{
+        html+=`<tr>
+          <td class="sym">${p.sym}</td><td>${p.qty}股</td>
+          <td class="num">$${FMT2.format(p.avg)}</td><td class="num">$${FMT2.format(p.price)}</td>
+          <td class="num">$${FMT.format(p.value)}</td>
+          <td class="num ${pnlClass(p.pnl)}">${pnlSign(p.pnl)} (${pnlSignPct(p.return_pct)})</td>
+          <td class="num">${p.weight}%</td></tr>`;
+      });
+      $('short-pos').innerHTML=html||'<tr><td colspan="7" class="no-data">无持仓</td></tr>';
+    }
 
-function renderLongTerm(lt){
-  document.getElementById('lt-kpis').innerHTML=`
-    <div class="kpi"><div class="lbl">Portfolio Value</div><div class="val">$${lt.portfolio_value.toLocaleString('en',{minimumFractionDigits:2})}</div></div>
-    <div class="kpi ${lt.pnl>=0?'up':'down'}"><div class="lbl">P&amp;L</div><div class="val">${lt.pnl>=0?'+':''}$${Math.abs(lt.pnl).toLocaleString('en',{minimumFractionDigits:2})}</div></div>
-    <div class="kpi ${lt.return_pct>=0?'up':'down'}"><div class="lbl">Return</div><div class="val">${lt.return_pct>=0?'+':''}${lt.return_pct.toFixed(2)}%</div></div>
-    <div class="kpi"><div class="lbl">Cash</div><div class="val">$${lt.cash.toLocaleString('en',{minimumFractionDigits:2})}</div></div>
-    <div class="kpi"><div class="lbl">Holdings</div><div class="val">${lt.holdings_count}</div></div>
-  `;
-  if(lt.holdings&&lt.holdings.length){
-    document.getElementById('lt-table').innerHTML=`<table><thead><tr><th>Sym</th><th>Shares</th><th>Avg</th><th>Price</th><th>Value</th><th>P&amp;L</th><th>Return</th><th>Score</th><th>Weight</th></tr></thead>
-    <tbody>${lt.holdings.map(h=>`
-      <tr><td class="sym">${h.sym}</td><td class="num">${h.shares}</td><td class="num">$${h.avg.toFixed(2)}</td><td class="num">$${h.price.toFixed(2)}</td><td class="num">$${h.value.toLocaleString('en',{minimumFractionDigits:2})}</td><td class="num ${h.pnl>=0?'up':'down'}">${h.pnl>=0?'+':''}${h.pnl.toFixed(2)}</td><td class="num ${h.return>=0?'up':'down'}">${h.return>=0?'+':''}${h.return.toFixed(2)}%</td><td class="num">${h.score.toFixed(1)}</td><td class="num">${h.weight.toFixed(1)}%</td></tr>
-    `).join('')}</tbody></table>`;
-  }
-  if(lt.strategy){
-    document.getElementById('lt-strat').innerHTML=`
-      <div class="log"><span class="lt">Rebalance</span><span class="lm">${lt.strategy.rebalance}</span></div>
-      <div class="log"><span class="lt">Cash</span><span class="lm">$${lt.strategy.cash.toLocaleString('en',{minimumFractionDigits:2})}</span></div>
-    `;
-  }
-}
+    // LongTerm
+    if(long&&!long.error){
+      $('l-pv').innerHTML='$'+FMT.format(long.portfolio_value);
+      $('l-pnl').innerHTML=`<span class="${pnlClass(long.pnl)}">${pnlSign(long.pnl)}</span>`;
+      $('l-holdings').innerText=long.holdings.length;
+      $('long-summary').innerText=`${long.holdings.length}持仓 · ${long.runs}次运行`;
+      let html='';
+      long.holdings.sort((a,b)=>Math.abs(b.pnl)-Math.abs(a.pnl)).forEach(p=>{
+        html+=`<tr>
+          <td class="sym">${p.sym}</td><td>${p.qty}股</td>
+          <td class="num">$${FMT2.format(p.avg)}</td><td class="num">$${FMT2.format(p.price)}</td>
+          <td class="num">$${FMT.format(p.value)}</td>
+          <td class="num ${pnlClass(p.pnl)}">${pnlSign(p.pnl)} (${pnlSignPct(p.return_pct)})</td>
+          <td><span class="badge ${p.source==='phoenix_v3'?'badge-phoenix':'badge-wait'}">${p.source||'longterm'}</span></td></tr>`;
+      });
+      $('long-pos').innerHTML=html||'<tr><td colspan="7" class="no-data">无持仓</td></tr>';
+    }
 
-function renderTrades(trades){
-  if(!trades||!trades.length){document.getElementById('tr-table').innerHTML='<div class="empty">No trade history</div>';return}
-  document.getElementById('tr-table').innerHTML=`<table><thead><tr><th>Time</th><th>Sym</th><th>Action</th><th>Price</th><th>P&amp;L%</th></tr></thead>
-  <tbody>${trades.map(t=>`
-    <tr><td style="color:#838990;font-size:10px">${t.date}</td><td class="sym">${t.symbol}</td><td class="${t.action==='SELL'?(t.pnl_pct>=0?'up':'down'):t.action==='STOP_LOSS'?'down':''}">${t.action}</td><td class="num">$${t.price}</td><td class="num ${(t.pnl_pct||0)>=0?'up':'down'}">${(t.pnl_pct||0)>=0?'+':''}${((t.pnl_pct||0)*100).toFixed(1)}%</td></tr>
-  `).join('')}</tbody></table>`;
-}
+    // Combined totals
+    if(short&&long&&!short.error&&!long.error){
+      const totalPv=(short.portfolio_value||0)+(long.portfolio_value||0);
+      const totalPnl=(short.pnl||0)+(long.pnl||0);
+      const totalCash=(short.cash||0)+(long.cash||0);
+      const initCapital=1300000; // $300K short + $1M long
+      const totalRet=((totalPv-initCapital)/initCapital*100);
+      $('total-pv').innerHTML='$'+FMT.format(totalPv);
+      $('total-pnl').innerHTML=`<span class="${pnlClass(totalPnl)}">${pnlSign(totalPnl)}</span>`;
+      $('total-ret').innerHTML=`<span class="${pnlClass(totalRet)}">${pnlSignPct(totalRet)}</span>`;
+      $('total-cash').innerHTML='$'+FMT.format(totalCash);
+    }
 
-function renderActivityLog(log){
-  if(!log||!log.length){document.getElementById('ov-log').innerHTML='<div class="empty">No activity</div>';return}
-  document.getElementById('ov-log').innerHTML=log.map(l=>`
-    <div class="log"><span class="lt">${(l.time||'').replace('T',' ')}</span><span class="lm">${l.msg}</span></div>
-  `).join('');
-}
+    // Trades
+    if(trades){
+      $('trade-summary').innerText=`${trades.total}笔 · W${trades.win_trades}/L${trades.loss_trades}`;
+      let html='';
+      trades.recent.reverse().forEach(t=>{
+        const isBuy=(t.action||'').includes('BUY');
+        html+=`<tr>
+          <td style="color:#667788;font-size:10px">${(t.time||'').slice(5,16)}</td>
+          <td class="sym">${t.symbol}</td>
+          <td><span class="badge ${isBuy?'badge-buy':'badge-sell'}">${t.action}</span></td>
+          <td style="font-size:11px;color:#8899aa">${t.reason||''}</td></tr>`;
+      });
+      $('trades-list').innerHTML=html||'<tr><td colspan="4" class="no-data">无记录</td></tr>';
+    }
 
-// ---- API Calls ----
-async function apiRun(ticker, strategy){
-  const r=await fetch('/api/run',{
-    method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({ticker,strategy,capital:100000})
-  });
-  return r.json();
-}
+    // AI
+    if(ai){
+      $('ai-summary').innerText=`v5:${ai.v5_count}条 · v6:${ai.v6_count}条`;
+      let v6html='';
+      (ai.recent_v6||[]).reverse().forEach(d=>{
+        const v=(d.verdict||'');
+        v6html+=`<tr>
+          <td class="sym">${d.symbol}</td>
+          <td><span class="badge ${v.includes('BUY')?'badge-buy':v.includes('SELL')?'badge-sell':'badge-wait'}">${d.verdict||'?'}</span></td>
+          <td class="num">${((d.confidence||0)*100).toFixed(0)}%</td>
+          <td style="font-size:11px;color:#8899aa">${(d.reason||'').slice(0,60)}</td></tr>`;
+      });
+      $('ai-v6').innerHTML=v6html||'<tr><td colspan="4" class="no-data">暂无v6决策</td></tr>';
+      let v5html='';
+      (ai.recent_v5||[]).reverse().forEach(d=>{
+        v5html+=`<tr>
+          <td style="font-size:10px;color:#667788">${(d.time||'').slice(5,16)}</td>
+          <td class="sym">${d.symbol}</td>
+          <td><span class="badge ${(d.action||'').includes('BUY')?'badge-buy':d.action==='SELL'?'badge-sell':'badge-wait'}">${d.action}</span></td>
+          <td class="num">${((d.confidence||0)*100).toFixed(0)}%</td></tr>`;
+      });
+      $('ai-v5').innerHTML=v5html||'<tr><td colspan="4" class="no-data">暂无v5决策</td></tr>';
+    }
 
-// ---- Quick Run (Overview) ----
-async function quickRun(){
-  const ticker=document.getElementById('ov-ticker').value.toUpperCase().trim();
-  if(!ticker)return;
-  const strat=document.getElementById('ov-strategy').value;
-  document.getElementById('ov-run').disabled=true;
-  document.getElementById('ov-quick-result').style.display='block';
-  document.getElementById('ov-quick-result').innerHTML='<div class="loading">Running '+ticker+' '+strat+'...</div>';
-  try{
-    const d=await apiRun(ticker,strat);
-    allResults[strat]=d;
-    const wins=d.trades.filter(t=>t.pnl>0).length;
-    const wr=d.total_trades?wins/d.total_trades:0;
-    document.getElementById('ov-quick-result').innerHTML=`
-      <div class="log"><span class="lt">Ticker</span><span class="lm">${d.ticker}</span></div>
-      <div class="log"><span class="lt">Strategy</span><span class="lm">${d.strategy}</span></div>
-      <div class="log"><span class="lt">Trades</span><span class="lm">${d.total_trades}</span></div>
-      <div class="log"><span class="lt">WR</span><span class="lm ${wr>=0.55?'up':'down'}">${(wr*100).toFixed(0)}%</span></div>
-      <div class="log"><span class="lt">P&L</span><span class="lm ${d.trades.reduce((s,t)=>s+t.pnl,0)>=0?'up':'down'}">$${d.trades.reduce((s,t)=>s+t.pnl,0).toFixed(0)}</span></div>
-    `;
-    updateOverview(ticker);
+    $('last-update').innerText='更新于 '+new Date().toLocaleTimeString('zh-CN');
   }catch(e){
-    document.getElementById('ov-quick-result').innerHTML='<div class="empty">Error: '+e.message+'</div>';
+    console.error('Refresh error:',e);
   }
-  document.getElementById('ov-run').disabled=false;
 }
 
-function updateOverview(ticker){
-  // Update overview KPIs with latest result
-  const d=allResults['rsi2']||allResults[Object.keys(allResults)[0]]||{};
-  if(!d.total_trades) return;
-  const wins=d.trades.filter(t=>t.pnl>0).length;
-  document.getElementById('ov-wr').textContent=(wins/d.total_trades*100).toFixed(0)+'%';
-  document.getElementById('ov-trades').textContent=d.total_trades;
-  document.getElementById('ov-best').textContent=d.strategy||'—';
-  document.getElementById('ov-best-wr').textContent='on '+ticker;
-  const totalPnl=d.trades.reduce((s,t)=>s+t.pnl,0);
-  document.getElementById('ov-pnl').textContent=(totalPnl>=0?'+':'')+'$'+totalPnl.toFixed(0);
-  document.getElementById('ov-pnl-sub').textContent=d.total_trades+' trades';
-  document.getElementById('ov-wr').className='val '+(wins/d.total_trades>=0.55?'up':'down');
-  document.getElementById('ov-pnl').className='val '+(totalPnl>=0?'up':'down');
-
-  // Overview log
-  document.getElementById('ov-log').innerHTML=`
-    <div class="log"><span class="lt">${new Date().toLocaleTimeString()}</span><span class="lm">Backtest ${ticker} ${d.strategy} — ${d.total_trades} trades, ${(wins/d.total_trades*100).toFixed(0)}% WR</span></div>
-  `;
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+  event.target.classList.add('active');
+  $('tab-'+name).classList.add('active');
 }
 
-// ---- Full Backtest ----
-async function runBacktest(){
-  const ticker=document.getElementById('bt-ticker').value.toUpperCase().trim();
-  if(!ticker)return;
-  const strat=document.getElementById('bt-strategy').value;
-  const btn=document.getElementById('bt-run');
-  btn.disabled=true;
-  document.getElementById('bt-empty').style.display='none';
-  document.getElementById('bt-loading').style.display='block';
-  document.getElementById('bt-kpis').style.display='none';
-  document.getElementById('bt-charts').style.display='none';
-  document.getElementById('bt-table').style.display='none';
-
-  try{
-    const d=await apiRun(ticker,strat);
-    allResults[strat]=d;
-
-    // KPIs
-    const wins=d.trades.filter(t=>t.pnl>0).length;
-    const losses=d.total_trades-wins;
-    const totalPnl=d.trades.reduce((s,t)=>s+t.pnl,0);
-    document.getElementById('bt-kpis').innerHTML=`
-      <div class="kpi"><div class="lbl">Strategy</div><div class="val">${d.strategy}</div><div class="sub">${ticker}</div></div>
-      <div class="kpi"><div class="lbl">Trades</div><div class="val">${d.total_trades}</div><div class="sub">${wins}W / ${losses}L</div></div>
-      <div class="kpi ${wins/d.total_trades>=0.55?'':'down'}"><div class="lbl">Win Rate</div><div class="val">${d.total_trades?(wins/d.total_trades*100).toFixed(0)+'%':'—'}</div><div class="sub">Target ≥ 55%</div></div>
-      <div class="kpi ${totalPnl>=0?'up':'down'}"><div class="lbl">P&amp;L</div><div class="val">${totalPnl>=0?'+':''}$${totalPnl.toFixed(0)}</div><div class="sub">Net profit</div></div>
-    `;
-    document.getElementById('bt-kpis').style.display='grid';
-
-    // Equity chart
-    if(equityChart)equityChart.destroy();
-    const prices=d.price_data||[];
-    const step=Math.max(1,Math.floor(prices.length/50));
-    const labels=prices.filter((_,i)=>i%step===0).map(p=>(p.time||'').slice(0,10));
-    const closeVals=prices.filter((_,i)=>i%step===0).map(p=>p.close);
-    equityChart=new Chart(document.getElementById('equityChart'),{
-      type:'line',
-      data:{labels,datasets:[{label:'Close',data:closeVals,borderColor:'#7b9ea3',backgroundColor:'rgba(123,158,163,.08)',fill:true,tension:.3,borderWidth:1.5,pointRadius:0}]},
-      options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#838990',maxTicksLimit:8,font:{size:9}}},y:{ticks:{color:'#838990',font:{size:9}}}}}
-    });
-    document.getElementById('bt-charts').style.display='block';
-
-    // Trade table
-    document.getElementById('bt-tbody').innerHTML=d.trades.map(t=>`
-      <tr>
-        <td style="color:#838990;font-size:10px">${(t.time||'').slice(0,16)}</td>
-        <td class="sym">${t.ticker}</td>
-        <td class="${t.side==='BUY'?'up':'down'}">${t.side}</td>
-        <td class="num">${t.qty||'—'}</td>
-        <td class="num">$${Number(t.price).toFixed(2)}</td>
-        <td class="num ${t.pnl>=0?'up':'down'}">${t.pnl>=0?'+':''}$${Number(t.pnl).toFixed(0)}</td>
-        <td style="color:#838990;font-size:10px;max-width:200px;overflow:hidden;text-overflow:ellipsis">${t.reason||''}</td>
-      </tr>
-    `).join('');
-    document.getElementById('bt-table').style.display='block';
-
-    // Also update trades page
-    updateTradesPage(d);
-
-    // Update overview
-    updateOverview(ticker);
-
-  }catch(e){
-    document.getElementById('bt-loading').innerHTML='<div class="empty">Error: '+e.message+'</div>';
-  }
-  document.getElementById('bt-loading').style.display='none';
-  btn.disabled=false;
-}
-
-function updateTradesPage(d){
-  if(!d||!d.trades)return;
-  const wins=d.trades.filter(t=>t.pnl>0).length;
-  document.getElementById('tr-table').innerHTML=`
-    <table><thead><tr><th>Time</th><th>Sym</th><th>Action</th><th>Price</th><th>P&amp;L</th><th>Reason</th></tr></thead>
-    <tbody>${d.trades.map(t=>`
-      <tr>
-        <td style="color:#838990;font-size:10px">${(t.time||'').slice(0,16)}</td>
-        <td class="sym">${t.ticker||d.ticker}</td>
-        <td class="${t.side==='BUY'?'up':'down'}">${t.side}</td>
-        <td class="num">$${Number(t.price).toFixed(2)}</td>
-        <td class="num ${t.pnl>=0?'up':'down'}">${t.pnl>=0?'+':''}$${Number(t.pnl).toFixed(0)}</td>
-        <td style="color:#838990;font-size:10px">${t.reason||''}</td>
-      </tr>
-    `).join('')}</tbody></table>
-  `;
-
-  // Win rate chart
-  if(wrChart)wrChart.destroy();
-  const batchSize=5;
-  const wrData=[];
-  for(let i=batchSize;i<=d.trades.length;i+=batchSize){
-    const batch=d.trades.slice(0,i);
-    const w=batch.filter(t=>t.pnl>0).length;
-    wrData.push({x:i,y:(w/i*100).toFixed(1)});
-  }
-  if(wrData.length>0){
-    wrChart=new Chart(document.getElementById('wrChart'),{
-      type:'line',
-      data:{labels:wrData.map(d=>'#'+d.x),datasets:[{label:'WR%',data:wrData.map(d=>d.y),borderColor:'#30d158',backgroundColor:'rgba(48,209,88,.08)',fill:true,borderWidth:2,tension:.3,pointRadius:1}]},
-      options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#838990',font:{size:9}}},y:{min:0,max:100,ticks:{color:'#838990',callback:v=>v+'%',font:{size:9}}}}}
-    });
-  }
-
-  // PnL distribution chart
-  if(pnlDistChart)pnlDistChart.destroy();
-  const pnlData=d.trades.slice(-30).map(t=>(t.pnl_pct||0).toFixed(2));
-  pnlDistChart=new Chart(document.getElementById('pnlDistChart'),{
-    type:'bar',
-    data:{labels:pnlData.map((_,i)=>'#'+(d.trades.length-pnlData.length+i+1)),datasets:[{data:pnlData,backgroundColor:pnlData.map(v=>v>=0?'rgba(48,209,88,.6)':'rgba(255,69,58,.6)')}]},
-    options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#838990',font:{size:9}}},y:{ticks:{color:'#838990',callback:v=>v+'%',font:{size:9}}}}}
-  });
-}
+refresh();
+setInterval(refresh,30000);
 </script>
 </body>
 </html>

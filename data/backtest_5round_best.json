@@ -1,0 +1,37 @@
+{
+  "strategy": "R3 \u4f53\u5236\u81ea\u9002\u5e94",
+  "params": {
+    "bull_score_threshold": 0.25,
+    "bull_positions": 20,
+    "bull_tp": 0.4,
+    "bull_sl": 0.08,
+    "bull_trail": 0.15,
+    "mild_score_threshold": 0.3,
+    "mild_positions": 15,
+    "mild_tp": 0.32,
+    "mild_sl": 0.07,
+    "mild_trail": 0.12,
+    "bear_score_threshold": 0.4,
+    "bear_positions": 4,
+    "bear_tp": 0.15,
+    "bear_sl": 0.05,
+    "bear_trail": 0.07
+  },
+  "best_result": {
+    "total_trades": 134,
+    "total_buys": 134,
+    "win_count": 70,
+    "loss_count": 64,
+    "win_rate": "0.5224",
+    "total_pnl": "305935.47",
+    "avg_win": "6327.37",
+    "avg_loss": "2140.32",
+    "profit_factor": "3.2334",
+    "final_equity": "596782.46",
+    "total_return": "0.9893",
+    "annual_return": "0.2577",
+    "sharpe_ratio": "2.3028",
+    "max_drawdown": "-0.1112",
+    "avg_hold_days": "0.0"
+  }
+}

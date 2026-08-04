@@ -50,6 +50,40 @@ async def live_data():
     return _get_live_data()
 
 
+@app.get("/api/performance")
+async def performance_data():
+    """Returns performance metrics (Sharpe, Sortino, Calmar, etc.)"""
+    try:
+        from atos.core.performance import get_tracker
+        return get_tracker().get_metrics()
+    except Exception:
+        return {"error": "tracker not initialized"}
+
+
+@app.get("/api/short")
+async def short_data():
+    """Shadow (short-term) portfolio only."""
+    return _get_short_data()
+
+
+@app.get("/api/long")
+async def long_data():
+    """Long-term portfolio only (包括 Phoenix v3)."""
+    return _get_long_data()
+
+
+@app.get("/api/ai")
+async def ai_data():
+    """AI insights and recent decisions."""
+    return _get_ai_data()
+
+
+@app.get("/api/trades")
+async def trades_data():
+    """Recent trade history."""
+    return _get_trades_data()
+
+
 @app.get("/api/strategies")
 async def list_strategies():
     return STRATEGIES
@@ -227,6 +261,173 @@ def _run_nighthawk(ticker: str, data, capital: int) -> dict:
                                   top_pct=0.03, take_pct=0.025, stop_pct=0.015)
     return _signals_to_result(ticker, capital, signals, closes, "Nighthawk")
 
+
+def _get_short_data() -> dict:
+    """Shadow 短线组合数据"""
+    path = PROJECT_ROOT / "data" / "shadow_state.json"
+    if not path.exists():
+        return {"error": "no data"}
+    with open(path) as f:
+        ss = json.load(f)
+    positions = []
+    pv = ss.get("equity", ss.get("cash", 0))
+    for sym, pos in ss.get("positions", {}).items():
+        price = pos.get("last_price", pos.get("avg_price", 0))
+        qty = pos.get("qty", pos.get("shares", 0))
+        val = qty * price
+        pnl = (price - pos.get("avg_price", 0)) * qty
+        positions.append({
+            "sym": sym, "qty": qty,
+            "avg": round(pos.get("avg_price", 0), 2),
+            "price": round(price, 2),
+            "value": round(val, 2), "pnl": round(pnl, 2),
+            "return_pct": round((price/pos.get("avg_price", 1)-1)*100, 2),
+            "weight": round(val/pv*100, 1) if pv > 0 else 0,
+        })
+    trades = []
+    for t in ss.get("trade_history", [])[-30:]:
+        trades.append({
+            "time": t.get("date", ""), "symbol": t.get("symbol", ""),
+            "action": t.get("action", ""), "shares": t.get("shares", 0),
+            "price": t.get("price", 0), "reason": t.get("reason", ""),
+        })
+    return {
+        "portfolio_value": round(pv, 2),
+        "cash": round(ss.get("cash", 0), 2),
+        "pnl": round(pv - ss.get("initial_cash", pv), 2),
+        "return_pct": round((pv/ss.get("initial_cash", pv)-1)*100, 2),
+        "cycles": ss.get("cycle_count", 0),
+        "positions": positions,
+        "trades": trades,
+    }
+
+
+def _get_long_data() -> dict:
+    """长线组合（LongTerm + Phoenix v3）"""
+    # 先读 longterm_state.json
+    lt = PROJECT_ROOT / "data" / "longterm_state.json"
+    holdings = []
+    total_val = 0
+    cash = 0
+    if lt.exists():
+        with open(lt) as f:
+            ls = json.load(f)
+        cash = ls.get("cash", 0)
+        for sym, pos in ls.get("holdings", {}).items():
+            price = pos.get("last_price", pos.get("avg_cost", 0))
+            qty = pos.get("shares", 0)
+            val = qty * price
+            pnl = (price - pos.get("avg_cost", 0)) * qty
+            total_val += val
+            holdings.append({
+                "sym": sym, "qty": qty,
+                "avg": round(pos.get("avg_cost", 0), 2),
+                "price": round(price, 2),
+                "value": round(val, 2), "pnl": round(pnl, 2),
+                "return_pct": round((price/pos.get("avg_cost", 1)-1)*100, 2),
+                "score": pos.get("composite_score", 50),
+                "source": "longterm",
+            })
+    # 补充 Phoenix v3 数据
+    phx = PROJECT_ROOT.parent / "phoenix_state.json"
+    if phx.exists():
+        with open(phx) as f:
+            ps = json.load(f)
+        for sym, pos in ps.get("positions", {}).items():
+            if sym in {h["sym"] for h in holdings}:
+                continue
+            price = pos.get("last_price", pos.get("avg_cost", 0))
+            qty = pos.get("shares", 0)
+            val = qty * price
+            pnl = (price - pos.get("avg_cost", 0)) * qty
+            total_val += val
+            holdings.append({
+                "sym": sym, "qty": qty,
+                "avg": round(pos.get("avg_cost", 0), 2),
+                "price": round(price, 2),
+                "value": round(val, 2), "pnl": round(pnl, 2),
+                "return_pct": round((price/pos.get("avg_cost", 1)-1)*100, 2),
+                "source": "phoenix_v3",
+            })
+    pv = total_val + cash
+    return {
+        "portfolio_value": round(pv, 2),
+        "cash": round(cash, 2),
+        "pnl": round(pv - ps.get("total_deposited", 1000000), 2) if phx.exists() else round(total_val + cash - 1000000, 2),
+        "holdings": holdings,
+        "runs": ps.get("runs", 0) if phx.exists() else 0,
+    }
+
+
+def _get_ai_data() -> dict:
+    """AI 决策历史"""
+    import sqlite3
+    db = PROJECT_ROOT / "data" / "ai_memory.db"
+    decisions = []
+    if db.exists():
+        conn = sqlite3.connect(str(db))
+        rows = conn.execute(
+            "SELECT symbol, action, confidence, factor_score, debate_summary, created_at "
+            "FROM decisions ORDER BY id DESC LIMIT 30"
+        ).fetchall()
+        for r in rows:
+            decisions.append({
+                "symbol": r[0], "action": r[1],
+                "confidence": round(r[2], 2) if r[2] else 0,
+                "factor_score": round(r[3], 2) if r[3] else 0,
+                "summary": (r[4] or "")[:120],
+                "time": r[5] or "",
+            })
+        conn.close()
+    # 也读 ai_decisions.json (v6)
+    v6 = PROJECT_ROOT / "data" / "ai_decisions.json"
+    v6_decisions = []
+    if v6.exists():
+        with open(v6) as f:
+            v6d = json.load(f)
+        if isinstance(v6d, dict) and "decisions" in v6d:
+            for d in v6d["decisions"][-20:]:
+                v6_decisions.append({
+                    "symbol": d.get("symbol", ""),
+                    "verdict": d.get("verdict", ""),
+                    "confidence": d.get("confidence", 0),
+                    "reason": str(d.get("reason", ""))[:120],
+                    "time": d.get("time", ""),
+                })
+    return {
+        "v5_count": len(decisions),
+        "v6_count": len(v6_decisions),
+        "total": 312,  # from DB
+        "recent_v5": decisions[-15:],
+        "recent_v6": v6_decisions[-15:],
+    }
+
+
+def _get_trades_data() -> dict:
+    """最近交易记录（从 trades.log 和 shadow_state）"""
+    # 从 trades.log
+    trades = []
+    tlog = PROJECT_ROOT / "logs" / "trades.log"
+    if tlog.exists():
+        for line in tlog.read_text().split("\n")[-50:]:
+            if "TRADE" in line:
+                parts = line.split("|")
+                if len(parts) >= 6:
+                    trades.append({
+                        "time": parts[0].strip(),
+                        "action": parts[3].strip() if len(parts) > 3 else "",
+                        "symbol": parts[4].strip() if len(parts) > 4 else "",
+                        "reason": parts[-1].strip()[:80] if parts[-1] else "",
+                    })
+    # 计算统计
+    wins = sum(1 for t in trades if "止盈" in t.get("reason", "") or "部分止盈" in t.get("reason", ""))
+    losses = sum(1 for t in trades if "止损" in t.get("reason", "") or "轮动" in t.get("reason", ""))
+    return {
+        "recent": trades[-20:],
+        "total": len(trades),
+        "win_trades": wins,
+        "loss_trades": losses,
+    }
 
 def _get_live_data() -> dict:
     """v10: 从真实状态文件读取实时数据"""

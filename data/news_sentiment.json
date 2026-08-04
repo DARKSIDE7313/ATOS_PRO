@@ -1,0 +1,138 @@
+{
+  "stocks": {
+    "MS": {
+      "score": 0.15,
+      "articles": 1,
+      "latest_headline": "AI displacement in the workplace is increasing \u2013 and affecting young people most",
+      "updated": "2026-08-04T18:33:52.185909"
+    },
+    "MSFT": {
+      "score": 0.103,
+      "articles": 11,
+      "latest_headline": "Microsoft\u2019s stock is on a run not seen in 26 years \u2014 erasing its year-to-date lo",
+      "updated": "2026-08-04T18:33:52.185943"
+    },
+    "AMZN": {
+      "score": 0.15,
+      "articles": 3,
+      "latest_headline": "Amazon says it had best-ever Thanksgiving Holiday week with record sales and num",
+      "updated": "2026-08-04T18:33:52.185947"
+    },
+    "TLT": {
+      "score": -0.075,
+      "articles": 1,
+      "latest_headline": "U.S. stock futures and bond yields drop on reports Putin has updated nuclear doc",
+      "updated": "2026-08-04T18:33:52.185949"
+    },
+    "BA": {
+      "score": -0.05,
+      "articles": 3,
+      "latest_headline": "Moody\u2019s places all of Boeing\u2019s ratings on review for a downgrade",
+      "updated": "2026-08-04T18:33:52.185951"
+    },
+    "MCD": {
+      "score": -0.225,
+      "articles": 1,
+      "latest_headline": "McDonald's is about to report earnings. Here's what to expect",
+      "updated": "2026-08-04T18:33:52.185953"
+    },
+    "XOM": {
+      "score": 0.3,
+      "articles": 1,
+      "latest_headline": "Trump says Exxon and Chevron made 'too much money' off high oil prices during Ir",
+      "updated": "2026-08-04T18:33:52.185955"
+    },
+    "CVX": {
+      "score": 0.3,
+      "articles": 1,
+      "latest_headline": "Trump says Exxon and Chevron made 'too much money' off high oil prices during Ir",
+      "updated": "2026-08-04T18:33:52.185957"
+    },
+    "AAPL": {
+      "score": 0.1,
+      "articles": 2,
+      "latest_headline": "Apple launches fresh legal challenge against UK encrypted data access demand",
+      "updated": "2026-08-04T18:33:52.185959"
+    },
+    "BRK.B": {
+      "score": 0.094,
+      "articles": 3,
+      "latest_headline": "Berkshire Hathaway shares hit eight-month high",
+      "updated": "2026-08-04T18:33:52.185961"
+    },
+    "SPY": {
+      "score": 0.025,
+      "articles": 3,
+      "latest_headline": "Berkshire Hathaway shares hit eight-month high",
+      "updated": "2026-08-04T18:33:52.185963"
+    },
+    "META": {
+      "score": 0.15,
+      "articles": 1,
+      "latest_headline": "Meta likely to highlight smart glasses, avoid social media policy on upcoming ea",
+      "updated": "2026-08-04T18:33:52.185965"
+    },
+    "TSLA": {
+      "score": 0.013,
+      "articles": 6,
+      "latest_headline": "SpaceX has now lost the equivalent of a full Tesla in market capitalization",
+      "updated": "2026-08-04T18:33:52.185967"
+    },
+    "NFLX": {
+      "score": 0.225,
+      "articles": 2,
+      "latest_headline": "Netflix woes setting up for a Hollywood ending, says trader Mike Khouw",
+      "updated": "2026-08-04T18:33:52.185969"
+    },
+    "GS": {
+      "score": -0.15,
+      "articles": 2,
+      "latest_headline": "Brent crude tops $100 a barrel. How the next stop could be $120",
+      "updated": "2026-08-04T18:33:52.185971"
+    },
+    "NVDA": {
+      "score": -0.27,
+      "articles": 2,
+      "latest_headline": "Stocks Sink in Broad AI Rout Sparked by China's DeepSeek",
+      "updated": "2026-08-04T18:33:52.185973"
+    },
+    "AVGO": {
+      "score": -0.15,
+      "articles": 2,
+      "latest_headline": "DeepSeek Won't Sink U.S. AI Titans",
+      "updated": "2026-08-04T18:33:52.185974"
+    },
+    "JPM": {
+      "score": 0.0,
+      "articles": 1,
+      "latest_headline": "Trump Adds Fuel to Claims That Big Banks Discriminate Against Conservatives",
+      "updated": "2026-08-04T18:33:52.185976"
+    },
+    "BAC": {
+      "score": 0.0,
+      "articles": 1,
+      "latest_headline": "Trump Adds Fuel to Claims That Big Banks Discriminate Against Conservatives",
+      "updated": "2026-08-04T18:33:52.185978"
+    },
+    "INTC": {
+      "score": 0.075,
+      "articles": 2,
+      "latest_headline": "BlackRock\u2019s Li Says AI Overweight Intact Despite Higher Risks",
+      "updated": "2026-08-04T18:33:52.185980"
+    },
+    "C": {
+      "score": 0.05,
+      "articles": 1,
+      "latest_headline": "Risk Demand Grows for Europe as AI Woes Hit US, Citi\u2019s Chew Says",
+      "updated": "2026-08-04T18:33:52.185981"
+    },
+    "GOOGL": {
+      "score": 0.3,
+      "articles": 2,
+      "latest_headline": "Savary: Dollar Dominance to Remain for Decades",
+      "updated": "2026-08-04T18:33:52.185983"
+    }
+  },
+  "macro": -0.4,
+  "updated": "2026-08-04T18:33:52.186089"
+}

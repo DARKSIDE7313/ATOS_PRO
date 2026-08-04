@@ -47,7 +47,7 @@ def get_quality_factors(symbol: str) -> dict:
                 if "curl" in str(e) or "resolve host" in str(e) or "Recv failure" in str(e):
                     logger.warning(f"quality {symbol}: yfinance网络波动 — {str(e)[:80]}")
                 else:
-                    log_error("quality", f"{symbol}: {e}")
+                    logger.debug( f"{symbol}: {e}")
                 return _empty()
 
     roe = info.get("returnOnEquity")

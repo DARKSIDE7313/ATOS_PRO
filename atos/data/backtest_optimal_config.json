@@ -1,0 +1,31 @@
+{
+  "config": {
+    "score_threshold": 0.35,
+    "stop_loss_pct": 0.07,
+    "take_profit_pct": 0.22,
+    "trail_pct": 0.1,
+    "max_single_pct": 0.08,
+    "max_positions": 8,
+    "cooldown_days": 21,
+    "partial_profit_pct": 0.1,
+    "partial_sell_frac": 0.33
+  },
+  "result": {
+    "total_trades": 445,
+    "total_buys": 113,
+    "win_count": 385,
+    "loss_count": 60,
+    "win_rate": 0.8652,
+    "total_pnl": 28606.21,
+    "avg_win": 170.05,
+    "avg_loss": 614.41,
+    "profit_factor": 1.776,
+    "final_equity": 326530.38,
+    "total_return": 0.0884,
+    "annual_return": 0.0286,
+    "sharpe_ratio": 1.2015,
+    "max_drawdown": -0.0349,
+    "avg_hold_days": 0.0
+  },
+  "composite": 88.12599999999999
+}

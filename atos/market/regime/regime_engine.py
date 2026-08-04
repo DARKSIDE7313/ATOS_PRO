@@ -12,6 +12,7 @@ Regime Engine — 市场状态引擎
 import pandas as pd
 import numpy as np
 from statistics import median
+from typing import Optional
 
 
 class RegimeEngine:
@@ -24,7 +25,7 @@ class RegimeEngine:
         self.regime_history = []     # 历史状态序列（用于平滑）
 
     def update(self, spy_close: float, vix_close: float = 15.0,
-               breadth: float | None = None):
+               breadth: Optional[float] = None):
         """
         更新一个交易日的数据。
 
@@ -42,7 +43,7 @@ class RegimeEngine:
         if breadth is not None:
             self.breadth_values.append(breadth)
 
-    def _compute_ma200(self, series: pd.Series) -> float | None:
+    def _compute_ma200(self, series: pd.Series) -> Optional[float]:
         if len(series) < 200:
             return None
         return series.rolling(200).mean().iloc[-1]

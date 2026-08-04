@@ -42,9 +42,11 @@ LONG_TERM_SYMBOLS: list[str] = [
     "COST", "WMT", "SPY", "QQQ", "BRK-B", "XOM", "CAT",
 ]
 
+# v16: Shadow 聚焦科技+金融+周期，移除与 LongTerm 重叠的防御股（MRK,JNJ,DIS）
 SHORT_TERM_SYMBOLS: list[str] = [
     "NVDA", "TSLA", "AMD", "META", "AVGO", "MU", "GS", "BA",
-    "NKE", "SBUX", "DIS", "IWM", "TLT",
+    "NKE", "SBUX", "IWM", "TLT", "MS", "CAT", "UPS", "JPM",
+    "COIN", "PLTR", "SOFI", "MARA",
 ]
 
 

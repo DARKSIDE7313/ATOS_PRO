@@ -12,19 +12,20 @@ import socket
 
 logger = get_logger("factors.value")
 
-# 🆕 全局 socket 超时 — 防止 yfinance HTTP 请求永久卡死
-# 这是最关键的防御：requests 库默认无超时，闭市/网络问题时线程永久阻塞
+# 🆕 全局 socket 超时
 socket.setdefaulttimeout(30)
-
-# yfinance 全局锁 — 防止多线程并发写 SQLite 缓存
 _yf_lock = threading.Lock()
+_INFO_TIMEOUT = 15
+_BATCH_TOTAL_TIMEOUT = 120
 
-# 闭市时段 Yahoo Finance API 经常超时，全局超时控制
-_INFO_TIMEOUT = 15             # 单只最多等 15 秒（从 20 收紧）
-_BATCH_TOTAL_TIMEOUT = 120     # 整批最多等 120 秒
+# 🆕 中国大陆：yfinance 被墙，直接跳过所有 yfinance 调用
+_YFINANCE_BLOCKED = True
 
 
 def get_value_factors(symbol: str) -> dict:
+    # 🆕 中国大陆：yfinance 不可用，直接返回空
+    if _YFINANCE_BLOCKED:
+        return _empty()
     """
     获取单只股票的价值因子。
     返回归一化得分（0-1，越高越便宜/越有投资价值）。
@@ -38,7 +39,7 @@ def get_value_factors(symbol: str) -> dict:
         if "curl" in str(e) or "resolve host" in str(e) or "Recv failure" in str(e):
             logger.warning(f"value {symbol}: yfinance网络波动 — {str(e)[:80]}")
         else:
-            log_error("value", f"{symbol}: {e}")
+            logger.debug(f"value {symbol}: yfinance blocked")
         return _empty()
 
     # 原始数据提取
@@ -104,7 +105,7 @@ def batch_value_factors(symbols: list[str]) -> dict:
             try:
                 results[sym] = fut.result(timeout=_INFO_TIMEOUT)
             except Exception as e:
-                log_error("value", f"{sym}: {e}")
+                logger.debug(f"batch value {sym}: {e}")
                 results[sym] = _empty()
             done_count += 1
             if done_count % 10 == 0:

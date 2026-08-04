@@ -102,18 +102,25 @@ def _set_cache(key: str, value):
 
 
 def _download_with_retry(symbol: str, **kwargs) -> Optional[pd.DataFrame]:
-    """带重试的 yfinance 下载（基金级容错）"""
-    for attempt in range(3):
-        try:
-            df = yf.download(symbol, progress=False, auto_adjust=True, **kwargs)
-            if df is not None and not df.empty:
-                return df
-        except Exception as e:
-            if attempt < 2:
-                time.sleep(2 * (attempt + 1))
-            else:
-                logger.warning(f"{symbol} yfinance下载失败 (3次): {e}")
-                return None
+    """下载数据（Futu优先，yfinance备用，中国大陆优化）"""
+    # 🆕 优先用Futu历史数据
+    try:
+        from atos.data.futu_historical import get_history
+        clean_symbol = symbol.replace("^", "")
+        df = get_history(clean_symbol, days=260)
+        if df is not None and not df.empty and len(df) >= 20:
+            return df
+    except Exception:
+        pass
+
+    # Fallback: yfinance (单次尝试，不重试 — 中国被墙)
+    try:
+        df = yf.download(symbol, progress=False, auto_adjust=True, timeout=10, **kwargs)
+        if df is not None and not df.empty:
+            return df
+    except Exception:
+        pass
+
     return None
 
 
@@ -169,7 +176,7 @@ def get_vxn_excess_rank() -> Optional[float]:
         vix = _download_with_retry("^VIX", period="2y", interval="1d")
         vxn = _download_with_retry("^VXN", period="2y", interval="1d")
 
-        if vix.empty or vxn.empty or len(vix) < 252 or len(vxn) < 252:
+        if vix is None or vxn is None or vix.empty or vxn.empty or len(vix) < 252 or len(vxn) < 252:
             return None
 
         vix_c = vix["Close"].squeeze()
@@ -207,7 +214,7 @@ def get_curve_slope_rank() -> Optional[float]:
         dgs2 = _download_with_retry("^FVX", period="2y", interval="1d")
         dgs10 = _download_with_retry("^TNX", period="2y", interval="1d")
 
-        if dgs2.empty or dgs10.empty or len(dgs2) < 252 or len(dgs10) < 252:
+        if dgs2 is None or dgs10 is None or dgs2.empty or dgs10.empty or len(dgs2) < 252 or len(dgs10) < 252:
             return None
 
         s2 = dgs2["Close"].squeeze()

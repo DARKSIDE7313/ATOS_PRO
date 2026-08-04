@@ -10,20 +10,51 @@ import subprocess
 import sys
 
 URL_FILE = os.path.expanduser("~/.atos_tunnel_url")
-# 也检查 /tmp 的（兼容旧版）
-if not os.path.exists(URL_FILE):
-    URL_FILE = "/tmp/cloudflared_url.txt"
+# 也检查 /tmp 的（兼容旧版）和 cloudflared 日志
+def _find_tunnel_url():
+    """从多个来源找当前 tunnel URL"""
+    # 1. 先从 state 文件读
+    for path in [URL_FILE, "/tmp/cloudflared_url.txt", "/tmp/atos_tunnel_url.txt"]:
+        if os.path.exists(path):
+            try:
+                with open(path) as f:
+                    url = f.read().strip()
+                    if "trycloudflare.com" in url:
+                        return url
+            except: pass
+    # 2. 从 cloudflared 日志找
+    try:
+        import subprocess
+        r = subprocess.run(
+            "grep -oE 'https://[a-z0-9-]+\\.trycloudflare\\.com' /tmp/atos_tunnel.log 2>/dev/null | tail -1",
+            shell=True, capture_output=True, text=True, timeout=5
+        )
+        url = r.stdout.strip()
+        if "trycloudflare.com" in url:
+            return url
+    except: pass
+    # 3. 从 cloudflared 历史文件
+    try:
+        hist = os.path.expanduser("~/ATOS_PRO/cloudflared_url_history.txt")
+        if os.path.exists(hist):
+            with open(hist) as f:
+                for line in reversed(list(f)):
+                    line = line.strip()
+                    if "trycloudflare.com" in line:
+                        # 验证是否还活着
+                        try:
+                            import urllib.request
+                            req = urllib.request.Request(line, method="HEAD")
+                            urllib.request.urlopen(req, timeout=5)
+                            return line
+                        except: pass
+    except: pass
+    return None
 WORKER_SCRIPT = os.path.expanduser("~/ATOS_PRO/cloudflare-worker.js")
 WORKER_NAME = "atos-dashboard"
 
 def get_current_tunnel_url() -> str | None:
-    if not os.path.exists(URL_FILE):
-        return None
-    try:
-        with open(URL_FILE) as f:
-            return f.read().strip()
-    except Exception:
-        return None
+    return _find_tunnel_url()
 
 def get_deployed_tunnel_url() -> str | None:
     """从 Worker 源码中读取当前的 TUNNEL_ORIGIN"""

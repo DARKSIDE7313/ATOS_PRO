@@ -15,14 +15,13 @@
 import os
 import json
 
-MAX_DAILY_LOSS_PCT = 0.025      # 日亏损超过 2.5% → 熔断（从 3% 收紧）
-MAX_DRAWDOWN_PCT = 0.12         # 最大回撤 12%（从 15% 收紧）→ 暂停新开仓
-MAX_CONSECUTIVE_LOSSES = 3      # 连续 3 次亏损 → 降频（从 5 收紧）
+MAX_DAILY_LOSS_PCT = 0.025      # 日亏损超过 2.5% → 熔断
+MAX_DRAWDOWN_PCT = 0.10         # 最大回撤 10%（从 12% 收紧）→ 暂停新开仓
+MAX_CONSECUTIVE_LOSSES = 3      # 连续 3 次亏损 → 降频
 COOLDOWN_CYCLES = 24            # v9: 冷却从48→24周期(约2小时)
-STOP_LOSS_PCT = 0.05            # 收紧止损5%: 减少大亏, 提升盈亏比 (PF从0.38→目标0.8+)
-TAKE_PROFIT_PCT = 0.15          # 放宽止盈15%: 让赢家跑 (解决"68%胜率但亏钱"的悖论)
-MAX_ORDERS_PER_CYCLE = 6
-MAX_DAILY_LOSS_PCT = 0.03       # 日亏损上限3%: 触发熔断停交易 (多层断路器)
+STOP_LOSS_PCT = 0.05            # v16: 止损5%（从6%收紧，更快截断亏损）
+TAKE_PROFIT_PCT = 0.18          # 止盈18%: 让赢家充分奔跑（从15%提高）
+MAX_ORDERS_PER_CYCLE = 4        # 每周期最多4笔（从6降低，减少churning）
 
 # 持久化路径
 _RISK_STATE_FILE = None  # 在 load_risk_state() 中初始化

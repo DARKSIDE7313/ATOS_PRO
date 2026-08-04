@@ -539,6 +539,17 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
     market_ok, market_reason = is_safe_to_trade()
     is_market_hours = market_ok  # 仅在交易时段开新仓
 
+    # ---- v26: 定时抓取新闻情绪（每30分钟一次）----
+    import time as _time
+    _last_news = getattr(run_shadow_cycle, '_last_news_fetch', 0)
+    if _time.time() - _last_news > 1800:  # 30分钟
+        try:
+            from atos.news.sentiment_engine import refresh_news
+            refresh_news()
+            run_shadow_cycle._last_news_fetch = _time.time()
+        except Exception as e:
+            logger.warning(f"📰 新闻抓取失败: {e}")
+
     # ---- 1. 市场状态 ----
     spy, vix = _get_market_data_cached()
     # RegimeEngine 持久化实例（避免每次重建导致学习数据丢失）
@@ -642,6 +653,14 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
         q = batch_quality_factors(symbols)
         factor_result = combine(signals, v, m, q, regime["regime"], use_v3_signals=True)
         top_picks = get_top_picks(factor_result, n=10)
+        # v26: IC方向自适应 — 因子反向时反转选股
+        if getattr(run_shadow_cycle, '_ic_inverted', False):
+            # 反转: 从底部选取（低分股反而涨）
+            all_picks = sorted(factor_result.get("scores", {}).items(), key=lambda x: x[1])
+            inverted_picks = [{"symbol": s, "score": sc} for s, sc in all_picks[:10] if sc > 0]
+            if inverted_picks:
+                top_picks = inverted_picks
+                logger.info(f"🔄 IC反转选股: {[p['symbol'] for p in top_picks[:5]]}")
     except Exception as e:
         logger.error(f"因子失败: {e}")
 
@@ -690,6 +709,19 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
                     run_shadow_cycle._ic_ema = prev_ic_ema * 0.7 + current_ic * 0.3
                 smoothed_ic = run_shadow_cycle._ic_ema
                 logger.info(f"[IC反馈] IC={current_ic:.4f} (平滑={smoothed_ic:.4f}) | {ic_result.get('verdict','')} | n={ic_result['n']}")
+
+                # v26: IC方向自适应 — 负IC时反转因子权重
+                # IC持续<-0.05说明因子反向，应该反转选股方向
+                if smoothed_ic < -0.05:
+                    run_shadow_cycle._ic_inverted = True
+                    if not getattr(run_shadow_cycle, '_ic_invert_logged', False):
+                        logger.warning(f"🔄 IC持续为负({smoothed_ic:.4f}) → 因子方向反转，低分股优先")
+                        run_shadow_cycle._ic_invert_logged = True
+                elif smoothed_ic > 0.02:
+                    if getattr(run_shadow_cycle, '_ic_inverted', False):
+                        logger.info(f"🔄 IC回正({smoothed_ic:.4f}) → 恢复正常选股方向")
+                    run_shadow_cycle._ic_inverted = False
+                    run_shadow_cycle._ic_invert_logged = False
 
         # 存储本周期分数和价格，供下周期使用
         run_shadow_cycle._prev_scores = factor_result.get("scores", {}) if factor_result else {}
@@ -1507,6 +1539,27 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
         if ma20_val > 0 and ma50_val > 0 and price > ma20_val > ma50_val:
             pick["score"] += 0.03  # 完美多头排列 → 加分
             logger.info(f"📊 AQR动量: {sym} 价格>MA20>MA50 多头排列 → score+0.03")
+
+        # ── v26: 新闻情绪信号 ──
+        # 新闻情绪>+0.15 → 加分买入, 情绪<-0.15 → 减分/跳过
+        try:
+            from atos.news.sentiment_engine import get_sentiment, get_macro_sentiment
+            news_score = get_sentiment(sym)
+            macro_news = get_macro_sentiment()
+            if news_score > 0.15:
+                bonus = min(news_score * 0.1, 0.05)  # 最多加0.05
+                pick["score"] += bonus
+                logger.info(f"📰 新闻利好: {sym} sentiment={news_score:+.2f} → score+{bonus:.3f}")
+            elif news_score < -0.15:
+                penalty = min(abs(news_score) * 0.1, 0.05)
+                pick["score"] -= penalty
+                logger.info(f"📰 新闻利空: {sym} sentiment={news_score:+.2f} → score-{penalty:.3f}")
+            # 宏观情绪极端时调整
+            if macro_news < -0.3:
+                pick["score"] -= 0.02  # 宏观恐慌 → 降低买入意愿
+                logger.info(f"📰 宏观偏空: sentiment={macro_news:+.2f} → score-0.02")
+        except ImportError:
+            pass  # 新闻模块不可用不影响交易
         # ============================================================
         # 硬性要求：必须跑赢手续费 + 滑点（真正生效）
         # ============================================================

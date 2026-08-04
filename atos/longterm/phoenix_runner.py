@@ -156,15 +156,24 @@ class PhoenixRunner:
         self.state["trade_history"] = history[-200:]
 
     def get_portfolio_value(self) -> float:
-        """计算当前组合总市值（现金 + 持仓）"""
+        """计算当前组合总市值（Futu优先，中国大陆优化）"""
         positions_value = 0.0
         for symbol, pos in self.get_positions().items():
             try:
-                stock = yf.Ticker(symbol)
-                info = stock.info or {}
-                price = float(info.get("currentPrice", 0) or info.get("regularMarketPrice", 0) or pos.get("avg_cost", 0))
+                # 🆕 优先用Futu获取实时价格
+                from atos.data.futu_historical import get_history
+                df = get_history(symbol, days=5)
+                if df is not None and not df.empty:
+                    price = float(df["Close"].iloc[-1])
+                else:
+                    price = pos.get("avg_cost", 0)
             except Exception:
-                price = pos.get("avg_cost", 0)
+                try:
+                    stock = yf.Ticker(symbol)
+                    info = stock.info or {}
+                    price = float(info.get("currentPrice", 0) or info.get("regularMarketPrice", 0) or pos.get("avg_cost", 0))
+                except Exception:
+                    price = pos.get("avg_cost", 0)
             positions_value += pos.get("shares", 0) * price
         return self.state.get("cash", 0) + positions_value
 
@@ -313,6 +322,29 @@ class PhoenixRunner:
                 results["skipped"] += 1
                 results["details"].append({"symbol": sym, "status": "SKIPPED", "reason": f"qty={qty}"})
                 continue
+
+            # 🆕 现金约束：买入前检查可用现金（防止负现金）
+            if action == "BUY":
+                available_cash = self.state.get("cash", 0)
+                # 如果现金已经是负数，完全禁止新买入（只能卖出回血）
+                if available_cash <= 0:
+                    results["skipped"] += 1
+                    results["details"].append({
+                        "symbol": sym, "status": "SKIPPED",
+                        "reason": f"现金为负(${available_cash:,.0f}) — 已超投，禁止新买入"
+                    })
+                    logger.warning(f"  🚫 {sym} 禁止买入: 现金${available_cash:,.0f}为负，系统已超投")
+                    continue
+                buy_cost = qty * price
+                min_cash_reserve = CAPITAL.get("cash_reserve_pct", 0.05) * CAPITAL["total"]
+                if available_cash - buy_cost < min_cash_reserve:
+                    results["skipped"] += 1
+                    results["details"].append({
+                        "symbol": sym, "status": "SKIPPED",
+                        "reason": f"现金不足: ${available_cash:,.0f}可用, 需${buy_cost:,.0f} (保留${min_cash_reserve:,.0f})"
+                    })
+                    logger.warning(f"  ⏭ {sym} 跳过买入: 现金${available_cash:,.0f} < ${buy_cost:,.0f}+${min_cash_reserve:,.0f}储备")
+                    continue
 
             if dry_run:
                 logger.info(f"  [DRY RUN] {action} {sym} x{qty} @ ${price:.2f} — {order.get('reason','')}")

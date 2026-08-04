@@ -1,0 +1,49 @@
+{
+  "mode": "regime_adaptive_v3",
+  "description": "5\u8f6e\u56de\u6d4b\u6700\u4f18\u7b56\u7565 - \u4f53\u5236\u81ea\u9002\u5e94, \u8dd1\u8d62SPY 21.8%, Sharpe 2.30",
+  "bull": {
+    "score_threshold": 0.28,
+    "max_positions": 18,
+    "take_profit": 0.35,
+    "stop_loss": 0.07,
+    "trail": 0.14,
+    "max_single": 0.15,
+    "cooldown_days": 3
+  },
+  "mild": {
+    "score_threshold": 0.32,
+    "max_positions": 14,
+    "take_profit": 0.28,
+    "stop_loss": 0.06,
+    "trail": 0.11,
+    "max_single": 0.12,
+    "cooldown_days": 5
+  },
+  "sideways": {
+    "score_threshold": 0.35,
+    "max_positions": 10,
+    "take_profit": 0.22,
+    "stop_loss": 0.06,
+    "trail": 0.09,
+    "max_single": 0.1,
+    "cooldown_days": 10
+  },
+  "bear": {
+    "score_threshold": 0.42,
+    "max_positions": 4,
+    "take_profit": 0.15,
+    "stop_loss": 0.05,
+    "trail": 0.07,
+    "max_single": 0.06,
+    "cooldown_days": 21
+  },
+  "backtest_results": {
+    "total_return": "98.9%",
+    "vs_spy": "+21.8%",
+    "sharpe": 2.3,
+    "profit_factor": 3.23,
+    "max_drawdown": "-11.1%",
+    "trades": 134,
+    "period": "2023-07 to 2026-07 (3 years)"
+  }
+}

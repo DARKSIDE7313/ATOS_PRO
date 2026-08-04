@@ -639,6 +639,13 @@ class H(http.server.BaseHTTPRequestHandler):
         p=urlparse(self.path)
         if p.path=='/api': self._j(read_state())
         elif p.path=='/api/ai': self._j(read_ai_insights())
+        elif p.path=='/api/news':
+            try:
+                nf = os.path.join(BASE, 'data', 'news_sentiment.json')
+                if os.path.exists(nf):
+                    with open(nf) as f: self._j(json.load(f))
+                else: self._j({'stocks': {}, 'macro': 0.0, 'updated': 'never'})
+            except Exception as e: self._j({'error': str(e)})
         elif p.path=='/api/daily':
             try:
                 from atos.core.daily_returns import get_summary

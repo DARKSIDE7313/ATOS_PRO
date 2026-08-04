@@ -1,0 +1,125 @@
+# ATOS PRO v17 — 统一策略配置 (Unified Strategy Config)
+# ==========================================================
+# 参考: Qlib 的 YAML 工作流, Freqtrade 的 config.json
+# 所有参数集中管理，支持不同场景快速切换。
+#
+# 使用方法:
+#   from atos.config_loader import load_config
+#   cfg = load_config("default")  # 或 "conservative" / "aggressive"
+
+default:
+  name: "ATOS v17 标准策略"
+  description: "多因子 + Triple-Barrier + 动态仓位管理"
+
+  # === 资金 ===
+  capital:
+    short_term: 300000    # Shadow 短线资金
+    long_term: 1000000    # LongTerm 长线资金
+    total: 1300000
+
+  # === 因子引擎 ===
+  factors:
+    half_life: 20         # 因子半衰期（周期数）
+    min_score: 0.35       # 最低因子分（当前趋势BULL）
+    cautious_score: 0.38  # CAUTIOUS 模式最低分
+    bear_score: 0.45      # BEAR 模式最低分
+    weights:
+      value: 0.18
+      momentum: 0.25
+      quality: 0.10
+      technical: 0.25
+      multiframe: 0.08
+      mean_rev: 0.14
+
+  # === 持仓管理 ===
+  positions:
+    max_bull: 12          # BULL 模式最大持仓
+    max_cautious: 8       # CAUTIOUS 模式
+    max_bear: 3           # BEAR 模式
+    min_cash_pct: 0.03    # 最低现金比例
+    max_single_pct: 0.25  # 单只最大权重
+    etf_min_pct: 0.15     # ETF最低占比
+
+  # === 风控 (Triple-Barrier) ===
+  risk:
+    stop_loss_pct: 0.05   # 硬止损 5%
+    take_profit_pct: 0.18 # 硬止盈 18%
+    atr_stop_mult: 2.0    # ATR止损倍数
+    trail_pct_bull: 0.14  # BULL 追踪止损
+    trail_pct_cautious: 0.10
+    trail_pct_bear: 0.07
+    triple_barrier:
+      max_hold_days: 20   # 最长持仓天数
+      profit_vol_mult: 2.0
+      stop_vol_mult: 1.5
+    drawdown:
+      max_daily_loss: 0.025
+      max_total_dd: 0.10
+      kelly_scales:       # 回撤→仓位比例
+        - dd: 0.02; scale: 1.0
+        - dd: 0.05; scale: 0.5
+        - dd: 0.10; scale: 0.25
+        - dd: 1.00; scale: 0.0
+
+  # === 部分止盈 ===
+  partial_take_profit:
+    threshold: 0.15      # 涨15%后部分止盈
+    sell_ratio: 0.25     # 卖1/4
+    breakeven_at: 0.10   # 涨10%后止损拉至成本价
+
+  # === 执行 ===
+  execution:
+    commission_per_share: 0.005
+    min_commission: 1.0
+    slippage_pct: 0.001
+    max_orders_per_cycle: 4
+
+  # === 冷却期 ===
+  cooldown:
+    cycles: 24            # 卖出后冷却周期
+
+  # === AI 增强 ===
+  ai:
+    enhanced_interval: 8  # 每8周期运行v6 AI
+    quality_threshold: 40 # 质量门控最低分
+    intel_interval: 6     # 情报刷新间隔
+
+conservative:
+  name: "ATOS v17 保守策略"
+  description: "低风险，适合熊市/高波动"
+  factors:
+    min_score: 0.40
+    cautious_score: 0.42
+    bear_score: 0.50
+  positions:
+    max_bull: 8
+    max_cautious: 5
+    max_bear: 2
+    min_cash_pct: 0.10
+    max_single_pct: 0.15
+  risk:
+    stop_loss_pct: 0.04
+    take_profit_pct: 0.12
+    trail_pct_bull: 0.10
+    triple_barrier:
+      max_hold_days: 15
+  partial_take_profit:
+    threshold: 0.12
+    sell_ratio: 0.33
+
+aggressive:
+  name: "ATOS v17 激进策略"
+  description: "高收益目标，适合强牛市"
+  factors:
+    min_score: 0.30
+  positions:
+    max_bull: 15
+    max_single_pct: 0.30
+    etf_min_pct: 0.05
+  risk:
+    stop_loss_pct: 0.07
+    take_profit_pct: 0.22
+    trail_pct_bull: 0.18
+    drawdown:
+      max_daily_loss: 0.035
+      max_total_dd: 0.15
