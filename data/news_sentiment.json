@@ -13,10 +13,10 @@
       "updated": "2026-08-04T18:33:52.185943"
     },
     "AMZN": {
-      "score": 0.15,
-      "articles": 3,
-      "latest_headline": "Amazon says it had best-ever Thanksgiving Holiday week with record sales and num",
-      "updated": "2026-08-04T18:33:52.185947"
+      "score": -0.021,
+      "articles": 10,
+      "latest_headline": "Malaysia Says Investment Pipeline Holds Despite Political Angst",
+      "updated": "2026-08-05T17:16:44.194184"
     },
     "TLT": {
       "score": -0.075,
@@ -31,28 +31,28 @@
       "updated": "2026-08-04T18:33:52.185951"
     },
     "MCD": {
-      "score": -0.225,
-      "articles": 1,
-      "latest_headline": "McDonald's is about to report earnings. Here's what to expect",
-      "updated": "2026-08-04T18:33:52.185953"
+      "score": 0.136,
+      "articles": 10,
+      "latest_headline": "McDonald\u2019s says its value meals have become too complicated",
+      "updated": "2026-08-05T05:38:49.674865"
     },
     "XOM": {
-      "score": 0.3,
-      "articles": 1,
-      "latest_headline": "Trump says Exxon and Chevron made 'too much money' off high oil prices during Ir",
-      "updated": "2026-08-04T18:33:52.185955"
+      "score": 0.247,
+      "articles": 2,
+      "latest_headline": "Refiners Can\u2019t Deliver Gas Price Relief Trump Wants, Says Stephen Schork",
+      "updated": "2026-08-04T20:46:56.482380"
     },
     "CVX": {
-      "score": 0.3,
-      "articles": 1,
-      "latest_headline": "Trump says Exxon and Chevron made 'too much money' off high oil prices during Ir",
-      "updated": "2026-08-04T18:33:52.185957"
+      "score": 0.247,
+      "articles": 2,
+      "latest_headline": "Refiners Can\u2019t Deliver Gas Price Relief Trump Wants, Says Stephen Schork",
+      "updated": "2026-08-04T20:46:56.482427"
     },
     "AAPL": {
-      "score": 0.1,
-      "articles": 2,
-      "latest_headline": "Apple launches fresh legal challenge against UK encrypted data access demand",
-      "updated": "2026-08-04T18:33:52.185959"
+      "score": 0.154,
+      "articles": 4,
+      "latest_headline": "Key Options Trade Displays Abnormal Pattern With India Auction",
+      "updated": "2026-08-05T13:03:31.768376"
     },
     "BRK.B": {
       "score": 0.094,
@@ -61,22 +61,22 @@
       "updated": "2026-08-04T18:33:52.185961"
     },
     "SPY": {
-      "score": 0.025,
-      "articles": 3,
-      "latest_headline": "Berkshire Hathaway shares hit eight-month high",
-      "updated": "2026-08-04T18:33:52.185963"
+      "score": 0.607,
+      "articles": 9,
+      "latest_headline": "The stock market soars. 5 reasons behind the big surge Tuesday",
+      "updated": "2026-08-05T04:36:09.272186"
     },
     "META": {
-      "score": 0.15,
-      "articles": 1,
-      "latest_headline": "Meta likely to highlight smart glasses, avoid social media policy on upcoming ea",
-      "updated": "2026-08-04T18:33:52.185965"
+      "score": 0.078,
+      "articles": 5,
+      "latest_headline": "Iran War Exposes US Military Aluminum Risk Shown in Pentagon War Game",
+      "updated": "2026-08-05T18:02:16.712508"
     },
     "TSLA": {
-      "score": 0.013,
-      "articles": 6,
-      "latest_headline": "SpaceX has now lost the equivalent of a full Tesla in market capitalization",
-      "updated": "2026-08-04T18:33:52.185967"
+      "score": 0.305,
+      "articles": 18,
+      "latest_headline": "Elon Musk addresses memory-chip stock concerns with one simple observation",
+      "updated": "2026-08-05T17:48:10.622411"
     },
     "NFLX": {
       "score": 0.225,
@@ -85,10 +85,10 @@
       "updated": "2026-08-04T18:33:52.185969"
     },
     "GS": {
-      "score": -0.15,
-      "articles": 2,
-      "latest_headline": "Brent crude tops $100 a barrel. How the next stop could be $120",
-      "updated": "2026-08-04T18:33:52.185971"
+      "score": -0.001,
+      "articles": 6,
+      "latest_headline": "Goldman Sachs' Keung on Chinese AI Models",
+      "updated": "2026-08-05T12:31:28.829033"
     },
     "NVDA": {
       "score": -0.27,
@@ -115,24 +115,84 @@
       "updated": "2026-08-04T18:33:52.185978"
     },
     "INTC": {
-      "score": 0.075,
-      "articles": 2,
-      "latest_headline": "BlackRock\u2019s Li Says AI Overweight Intact Despite Higher Risks",
-      "updated": "2026-08-04T18:33:52.185980"
+      "score": 0.862,
+      "articles": 12,
+      "latest_headline": "SoftBank jumps 13% as Asia tech stocks track Wall Street AI rally",
+      "updated": "2026-08-05T16:13:20.845609"
     },
     "C": {
-      "score": 0.05,
-      "articles": 1,
-      "latest_headline": "Risk Demand Grows for Europe as AI Woes Hit US, Citi\u2019s Chew Says",
-      "updated": "2026-08-04T18:33:52.185981"
+      "score": 0.351,
+      "articles": 4,
+      "latest_headline": "Novo Nordisk Slides as Forecast Boost Fails to Impress",
+      "updated": "2026-08-05T01:28:47.383169"
     },
     "GOOGL": {
+      "score": 0.228,
+      "articles": 7,
+      "latest_headline": "India's Inflation Cushion 'Thinner' Than It Seems",
+      "updated": "2026-08-05T14:06:47.220773"
+    },
+    "MRK": {
+      "score": 0.0,
+      "articles": 1,
+      "latest_headline": "Merck hikes revenue outlook as new drug sales grow, but cuts profit guidance due",
+      "updated": "2026-08-04T18:37:34.374392"
+    },
+    "PFE": {
+      "score": -0.05,
+      "articles": 1,
+      "latest_headline": "Pfizer tops estimates, hikes low end of revenue guidance on strength of Eliquis,",
+      "updated": "2026-08-04T19:40:32.230815"
+    },
+    "LLY": {
+      "score": 0.123,
+      "articles": 4,
+      "latest_headline": "Novo Nordisk CEO defends economics of Wegovy pill as lower prices weigh on sales",
+      "updated": "2026-08-05T16:44:58.965901"
+    },
+    "CAT": {
+      "score": 0.55,
+      "articles": 4,
+      "latest_headline": "Caterpillar\u2019s stock gives the Dow a 200-point boost as data-center demand drives",
+      "updated": "2026-08-04T22:52:33.007734"
+    },
+    "AMD": {
+      "score": 0.505,
+      "articles": 5,
+      "latest_headline": "AMD plummets 8% in premarket trading despite beating expectations",
+      "updated": "2026-08-05T17:48:10.622456"
+    },
+    "V": {
+      "score": 0.207,
+      "articles": 3,
+      "latest_headline": "US Revokes Brazilian Ambassador\u2019s Visa Amid Diplomatic Spat",
+      "updated": "2026-08-05T05:07:34.268355"
+    },
+    "ABBV": {
+      "score": 0.105,
+      "articles": 3,
+      "latest_headline": "AbbVie Sees Strong Demand for Its $10 Billion M&A Bond Sale",
+      "updated": "2026-08-05T04:05:00.279912"
+    },
+    "WFC": {
+      "score": 0.0,
+      "articles": 1,
+      "latest_headline": "AI Boom Is \u2018Trickling Down\u2019 to Old-Line Stocks, Wells Fargo Says",
+      "updated": "2026-08-05T03:33:41.904188"
+    },
+    "DIS": {
+      "score": 0.15,
+      "articles": 1,
+      "latest_headline": "Here's what to expect when Disney reports earnings before the bell",
+      "updated": "2026-08-05T17:16:44.194158"
+    },
+    "QQQ": {
       "score": 0.3,
-      "articles": 2,
-      "latest_headline": "Savary: Dollar Dominance to Remain for Decades",
-      "updated": "2026-08-04T18:33:52.185983"
+      "articles": 1,
+      "latest_headline": "Tech Melt-Up Drives $3.5 Trillion Nasdaq 100 Rally in Four Days",
+      "updated": "2026-08-05T17:48:10.622471"
     }
   },
-  "macro": -0.4,
-  "updated": "2026-08-04T18:33:52.186089"
+  "macro": -0.633,
+  "updated": "2026-08-05T18:02:16.712653"
 }

@@ -339,7 +339,11 @@ class ShadowAccount:
         # 硬性现金下限
         if action == "BUY":
             min_cash = self.total_equity * self.min_cash_pct
-            estimated_cost = price * shares + max(self.min_commission, shares * self.commission_per_share)
+            try:
+                from atos.core.fee_model import futu_buy_fee
+                estimated_cost = price * shares + futu_buy_fee(shares, price)
+            except ImportError:
+                estimated_cost = price * shares + max(self.min_commission, shares * self.commission_per_share)
             if self.cash - estimated_cost < min_cash:
                 affordable = int((self.cash - min_cash) / (price * 1.001))
                 if affordable <= 0:
@@ -377,7 +381,12 @@ class ShadowAccount:
         dynamic_slip = max(0.0005, min(0.005, daily_vol * 0.25))
         slip = price * dynamic_slip
         fill = price + slip if action == "BUY" else price - slip
-        comm = max(self.min_commission, shares * self.commission_per_share)
+        # v28: Futu 真实费用模型
+        try:
+            from atos.core.fee_model import futu_buy_fee, futu_sell_fee
+            comm = futu_buy_fee(shares, fill) if action == "BUY" else futu_sell_fee(shares, fill)
+        except ImportError:
+            comm = max(self.min_commission, shares * self.commission_per_share)
         pnl = 0.0  # Fix: 声明在外层，log_trade 可以访问
 
         if action == "BUY":
