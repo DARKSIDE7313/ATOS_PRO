@@ -653,14 +653,10 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
         q = batch_quality_factors(symbols)
         factor_result = combine(signals, v, m, q, regime["regime"], use_v3_signals=True)
         top_picks = get_top_picks(factor_result, n=10)
-        # v26: IC方向自适应 — 因子反向时反转选股
-        if getattr(run_shadow_cycle, '_ic_inverted', False):
-            # 反转: 从底部选取（低分股反而涨）
-            all_picks = sorted(factor_result.get("scores", {}).items(), key=lambda x: x[1])
-            inverted_picks = [{"symbol": s, "score": sc} for s, sc in all_picks[:10] if sc > 0]
-            if inverted_picks:
-                top_picks = inverted_picks
-                logger.info(f"🔄 IC反转选股: {[p['symbol'] for p in top_picks[:5]]}")
+        # v27: IC方向自适应 — 负IC时不反转选股(避免选到垃圾股)，而是标记降仓
+        _ic_neg = getattr(run_shadow_cycle, '_ic_inverted', False)
+        if _ic_neg:
+            logger.info(f"⚠️ IC负值({getattr(run_shadow_cycle, '_ic_ema', 0):.3f}) → 维持正常选股但降仓50%")
     except Exception as e:
         logger.error(f"因子失败: {e}")
 
@@ -1093,27 +1089,35 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
                 bd = pick.get("breakdown", {})
                 factor_score = pick.get("score", 0)
 
-                # 多维度质量评估 (业内标准: 因子质量 + 动量确认 + 趋势 + RSI)
-                quality_factors = sum(1 for k in ["value","momentum","quality","technical"] if bd.get(k, 0) > 0.4)
-                macd_ok = sig.get("macd_hist", 0) > 0.001  # 🆕 必须严格>0（不是>-0.01）
+                # v27: 趋势自适应质量门控 — 与入场过滤对齐
+                quality_factors = sum(1 for k in ["value","momentum","quality","technical"] if bd.get(k, 0) > 0.2)
+                if spy_trend == "BULL":
+                    macd_ok = sig.get("macd_hist", 0) > -3.0
+                    rsi_ok = 25 < sig.get("rsi", 50) < 78
+                elif spy_trend == "CAUTIOUS":
+                    macd_ok = sig.get("macd_hist", 0) > -1.5
+                    rsi_ok = 30 < sig.get("rsi", 50) < 72
+                else:
+                    macd_ok = sig.get("macd_hist", 0) > 0.001
+                    rsi_ok = 35 < sig.get("rsi", 50) < 68
                 trend_ok = sig.get("trend", "") in ("UP", "WEAK_UP")
-                rsi_ok = 35 < sig.get("rsi", 50) < 72  # 🆕 收紧RSI范围 35-72（原30-75）
 
                 quality_score = (
-                    quality_factors * 20 +     # 🆕 最多80分（从18提到20）
+                    quality_factors * 20 +
                     (10 if macd_ok else 0) +
                     (10 if trend_ok else 0) +
                     (5 if rsi_ok else 0) -
-                    (30 if factor_score < 0.35 else 0)  # 🆕 低分惩罚加重（-30从-25）
+                    (30 if factor_score < 0.30 else 0)
                 )
 
-                if quality_score < 40:  # 🆕 从68降到40（因子分低时放宽门控）
+                veto_threshold = 25 if spy_trend == "BULL" else (35 if spy_trend == "CAUTIOUS" else 50)
+                if quality_score < veto_threshold:
                     ai_veto_map[sym] = True
-                    logger.info(f"🚫 否决 {sym}: Q={quality_score}/105 (因子{quality_factors}/4 macd={macd_ok} trend={trend_ok} rsi={rsi_ok})")
+                    logger.info(f"🚫 否决 {sym}: Q={quality_score} (因子{quality_factors}/4 macd={macd_ok} trend={trend_ok} rsi={rsi_ok}) [{spy_trend}]")
                 else:
                     ai_veto_map[sym] = False
             vetoed_count = sum(1 for v in ai_veto_map.values() if v)
-            logger.info(f"🎯 质量门控: {len(ai_veto_map)}候选中 {vetoed_count}否决 {len(ai_veto_map)-vetoed_count}通过")
+            logger.info(f"🎯 质量门控({spy_trend}): {len(ai_veto_map)}候选中 {vetoed_count}否决 {len(ai_veto_map)-vetoed_count}通过")
         except Exception as e:
             logger.warning(f"质量门控跳过: {e}")
 
@@ -1725,6 +1729,11 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
         target_pct = kd["adjusted_kelly"]
         if kd["scale"] < 1.0:
             logger.info(f"📉 回撤减仓: {sym} DD={current_dd:.1%} scale={kd['scale']:.0%} → {target_pct:.2%}")
+
+        # ── v27: IC 负值降仓 — 因子不可信时缩小仓位 ──
+        if getattr(run_shadow_cycle, '_ic_inverted', False):
+            target_pct *= 0.5
+            logger.info(f"⚠️ IC降仓: {sym} → {target_pct:.1%} (因子IC为负)")
 
         # ── v24: Bridgewater Risk Parity — 连续波动率仓位调整 ──
         # 目标: 每只持仓贡献相同的风险（等风险贡献）
