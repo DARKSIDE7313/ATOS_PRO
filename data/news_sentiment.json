@@ -7,10 +7,10 @@
       "updated": "2026-08-04T18:33:52.185909"
     },
     "MSFT": {
-      "score": 0.103,
-      "articles": 11,
-      "latest_headline": "Microsoft\u2019s stock is on a run not seen in 26 years \u2014 erasing its year-to-date lo",
-      "updated": "2026-08-04T18:33:52.185943"
+      "score": 0.072,
+      "articles": 12,
+      "latest_headline": "Anthropic's Mythos created fake identities to fool humans in new cyber incident",
+      "updated": "2026-08-05T18:33:35.937391"
     },
     "AMZN": {
       "score": -0.021,
@@ -145,10 +145,10 @@
       "updated": "2026-08-04T19:40:32.230815"
     },
     "LLY": {
-      "score": 0.123,
-      "articles": 4,
-      "latest_headline": "Novo Nordisk CEO defends economics of Wegovy pill as lower prices weigh on sales",
-      "updated": "2026-08-05T16:44:58.965901"
+      "score": 0.236,
+      "articles": 5,
+      "latest_headline": "CVS blows past estimates, hikes guidance as insurance unit continues to improve",
+      "updated": "2026-08-05T18:33:35.937375"
     },
     "CAT": {
       "score": 0.55,
@@ -181,10 +181,10 @@
       "updated": "2026-08-05T03:33:41.904188"
     },
     "DIS": {
-      "score": 0.15,
-      "articles": 1,
-      "latest_headline": "Here's what to expect when Disney reports earnings before the bell",
-      "updated": "2026-08-05T17:16:44.194158"
+      "score": 0.255,
+      "articles": 2,
+      "latest_headline": "Disney tops earnings estimates as parks and streaming offer a boost",
+      "updated": "2026-08-05T18:33:35.937348"
     },
     "QQQ": {
       "score": 0.3,
@@ -193,6 +193,6 @@
       "updated": "2026-08-05T17:48:10.622471"
     }
   },
-  "macro": -0.633,
-  "updated": "2026-08-05T18:02:16.712653"
+  "macro": -0.543,
+  "updated": "2026-08-05T18:33:35.937510"
 }

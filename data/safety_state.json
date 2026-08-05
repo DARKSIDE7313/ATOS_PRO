@@ -1,0 +1,9 @@
+{
+  "consecutive_loss_days": 0,
+  "last_loss_date": null,
+  "trading_halted_until": null,
+  "monthly_trade_count": 0,
+  "monthly_reset_date": "2026-08",
+  "circuit_breaker_triggered": true,
+  "circuit_breaker_date": "2026-08-05T18:33:37.005498"
+}

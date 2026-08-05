@@ -548,6 +548,43 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
     market_ok, market_reason = is_safe_to_trade()
     is_market_hours = market_ok  # 仅在交易时段开新仓
 
+    # ---- v28: 多层安全检查 ----
+    try:
+        from atos.core.safety_layer import full_safety_check
+        _vix = None
+        try:
+            import yfinance as yf
+            _vix = yf.Ticker("^VIX").history(period="1d")["Close"].iloc[-1]
+        except Exception:
+            pass
+        _safety = full_safety_check(
+            equity=account.total_equity,
+            peak_equity=account.peak_equity,
+            positions=account.positions,
+            cash=account.cash,
+            vix_level=_vix,
+            spy_above_ma50=True,  # 简化，下面 regime 会精确判断
+            daily_returns=getattr(account, '_daily_returns', None),
+        )
+        if _safety['action'] == 'LIQUIDATE':
+            logger.critical(f"🚨 安全层清仓: {_safety['reasons']}")
+            # 卖光所有持仓
+            for _sym in list(account.positions.keys()):
+                _pos = account.positions[_sym]
+                _qty = _pos.get("qty", _pos.get("shares", 0))
+                if _qty > 0:
+                    _price = signals.get(_sym, {}).get("price", _pos.get("last_price", 0)) if 'signals' in dir() else _pos.get("last_price", 0)
+                    if _price > 0:
+                        account.execute(_sym, "SELL", _qty, _price, reason=f"安全层清仓: {_safety['reasons'][0]}")
+            return
+        elif _safety['action'] == 'HALT':
+            logger.warning(f"🛑 安全层暂停: {_safety['reasons']}")
+            is_market_hours = False  # 禁止开新仓
+        elif _safety['exposure'] < 1.0:
+            logger.warning(f"⚠️ 安全层减仓: {_safety['reasons']} exposure={_safety['exposure']:.0%}")
+    except Exception as e:
+        logger.debug(f"安全层检查跳过: {e}")
+
     # ---- v26: 定时抓取新闻情绪（每30分钟一次）----
     import time as _time
     _last_news = getattr(run_shadow_cycle, '_last_news_fetch', 0)

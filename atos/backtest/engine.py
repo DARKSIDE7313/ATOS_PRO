@@ -45,32 +45,32 @@ UNIVERSE = [
     "SPY", "QQQ", "IWM", "TLT", "GLD", "IBB",
 ]
 
-# ── 策略参数（v28 优化目标）──
+# ── 策略参数（v28 优化: 少交易 + 高胜率 + 趋势跟随）──
 PARAMS = {
-    # 入场
-    'rsi_oversold': 35,          # RSI < 此值 = 超卖
-    'rsi_overbought': 72,        # RSI > 此值 = 超买
-    'momentum_lookback': 20,     # 动量回看天数
-    'ma_fast': 20,               # 快速均线
-    'ma_slow': 50,               # 慢速均线
-    'volume_ratio_min': 0.5,     # 最低量比
-    'score_threshold': 0.30,     # 最低综合分
+    # 入场 — 更严格
+    'rsi_oversold': 30,          # RSI < 30 = 超卖
+    'rsi_overbought': 70,        # RSI > 70 = 超买
+    'momentum_lookback': 20,
+    'ma_fast': 20,
+    'ma_slow': 50,
+    'volume_ratio_min': 0.8,     # 最低量比（提高）
+    'score_threshold': 0.35,     # 更高门槛
 
-    # 出场
-    'take_profit': 0.08,         # 止盈 8%
-    'stop_loss': 0.04,           # 止损 4%
-    'trailing_stop': 0.05,       # 移动止损 5%
-    'max_hold_days': 20,         # 最大持有天数
+    # 出场 — 让利润跑
+    'take_profit': 0.15,         # 止盈 15%（从8%提高）
+    'stop_loss': 0.05,           # 止损 5%（从4%稍宽）
+    'trailing_stop': 0.07,       # 移动止损 7%（从5%放宽）
+    'max_hold_days': 60,         # 最长持有 60 天（从20天大幅放宽）
 
-    # 仓位
-    'max_positions': 12,         # 最大持仓数
-    'single_position_pct': 0.10, # 单仓最大 10%
-    'min_cash_pct': 0.05,        # 最低现金 5%
+    # 仓位 — 集中火力
+    'max_positions': 8,          # 最多 8 只（从12减少，集中）
+    'single_position_pct': 0.12, # 单仓最大 12%
+    'min_cash_pct': 0.05,
 
     # 风控
-    'max_drawdown_exit': 0.15,   # 最大回撤 15% 清仓
-    'vix_high': 25,              # VIX > 此值减仓
-    'spy_ma_trend': 50,          # SPY 趋势均线
+    'max_drawdown_exit': 0.15,
+    'vix_high': 25,
+    'spy_ma_trend': 50,
 
     # 费用
     'use_fees': True,
@@ -110,20 +110,22 @@ def compute_signals(df):
     tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
     df['atr'] = tr.rolling(14).mean()
 
-    # 综合评分 (简化版 ATOS 因子模型)
+    # 综合评分 (v28: 趋势跟随为主 + 动量确认为辅)
     df['score'] = 0.0
-    # 动量分: 价格 > MA20 > MA50 = 多头
-    df.loc[(df['Close'] > df['ma20']) & (df['ma20'] > df['ma50']), 'score'] += 0.15
-    # RSI 超卖回调: RSI 30-45 + 价格 > MA50 = 买入机会
+    # 核心: 多头排列 (价格 > MA20 > MA50) — 最重要信号
+    df.loc[(df['Close'] > df['ma20']) & (df['ma20'] > df['ma50']), 'score'] += 0.25
+    # RSI 超卖回调: RSI 30-45 + 价格 > MA50 = 最佳买入点
     df.loc[(df['rsi'] >= 30) & (df['rsi'] <= 45) & (df['Close'] > df['ma50']), 'score'] += 0.15
-    # MACD 正向
+    # MACD 正向交叉
     df.loc[df['macd_hist'] > 0, 'score'] += 0.10
     # 量能配合
-    df.loc[df['vol_ratio'] > 1.2, 'score'] += 0.05
-    # 接近20日高点
-    df.loc[df['Close'] >= df['high_20d'] * 0.98, 'score'] += 0.05
-    # 均线上方
-    df.loc[df['Close'] > df['ma50'], 'score'] += 0.10
+    df.loc[df['vol_ratio'] > 1.0, 'score'] += 0.05
+    # 接近20日高点（强势股）
+    df.loc[df['Close'] >= df['high_20d'] * 0.97, 'score'] += 0.10
+    # 中期动量正向
+    df.loc[df['momentum'] > 0.02, 'score'] += 0.10
+    # RSI 不超买
+    df.loc[df['rsi'] < 65, 'score'] += 0.05
 
     return df
 
@@ -290,8 +292,8 @@ def run_backtest(start_date='2018-01-01', end_date='2026-08-01', initial_capital
                 })
                 del positions[sym]
 
-        # ── 买入检查（每周检查一次，避免过度交易）──
-        if i % 5 != 0:  # 每 5 天检查一次买入
+        # ── 买入检查（每 10 天检查一次，减少交易频率）──
+        if i % 10 != 0:
             equity_curve.append((date, port_value))
             continue
 
@@ -312,25 +314,26 @@ def run_backtest(start_date='2018-01-01', end_date='2026-08-01', initial_capital
 
             # 趋势过滤
             if trend == "BULL":
-                if row['rsi'] > PARAMS['rsi_overbought']:
+                # BULL: 宽松入场，让趋势带你赚钱
+                if row['rsi'] > 72:
                     continue
-                if row['vol_ratio'] < 0.3:
-                    continue
+                if row['Close'] < row['ma50'] * 0.95:
+                    continue  # 必须在MA50附近或上方
             elif trend == "CAUTIOUS":
-                if row['rsi'] > 65 or row['rsi'] < 30:
+                if row['rsi'] > 65 or row['rsi'] < 28:
                     continue
                 if row['vol_ratio'] < 0.5:
                     continue
-                if row['macd_hist'] < -1.0:
+                if row['Close'] < row['ma50']:
                     continue
             else:  # BEAR
-                if row['rsi'] > 55:
+                if row['rsi'] > 50:
                     continue
                 if row['Close'] < row['ma50']:
                     continue
                 if row['macd_hist'] < 0:
                     continue
-                score *= 1.2  # BEAR 市要求更高分
+                score *= 1.3  # BEAR 市要求更高分
 
             if score < PARAMS['score_threshold']:
                 continue
@@ -407,7 +410,7 @@ def run_backtest(start_date='2018-01-01', end_date='2026-08-01', initial_capital
     avg_loss = np.mean([abs(t['pnl_pct']) for t in sell_trades if t.get('pnl_pct', 0) <= 0]) if any(t.get('pnl_pct', 0) <= 0 for t in sell_trades) else 1
     profit_factor = avg_win / avg_loss if avg_loss > 0 else 0
 
-    beats_spy = annual_ret > spy_annual
+    beats_spy = bool(annual_ret > spy_annual)
 
     result = {
         'timestamp': datetime.now().isoformat(),

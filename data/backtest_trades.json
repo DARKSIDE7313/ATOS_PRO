@@ -1,0 +1,802 @@
+[
+  {
+    "date": "2022-12-06",
+    "sym": "GLD",
+    "action": "SELL",
+    "price": 164.84,
+    "reason": "DD>15%",
+    "shares": 269
+  },
+  {
+    "date": "2022-12-06",
+    "sym": "ADBE",
+    "action": "SELL",
+    "price": 331.15,
+    "reason": "DD>15%",
+    "shares": 132
+  },
+  {
+    "date": "2023-01-04",
+    "sym": "V",
+    "action": "BUY",
+    "price": 207.0,
+    "score": 0.715,
+    "shares": 213
+  },
+  {
+    "date": "2023-01-04",
+    "sym": "TMO",
+    "action": "BUY",
+    "price": 555.82,
+    "score": 0.715,
+    "shares": 79
+  },
+  {
+    "date": "2023-01-04",
+    "sym": "BLK",
+    "action": "BUY",
+    "price": 664.08,
+    "score": 0.715,
+    "shares": 66
+  },
+  {
+    "date": "2023-01-05",
+    "sym": "V",
+    "action": "SELL",
+    "price": 205.54,
+    "reason": "DD>15%",
+    "shares": 213
+  },
+  {
+    "date": "2023-01-05",
+    "sym": "TMO",
+    "action": "SELL",
+    "price": 550.9,
+    "reason": "DD>15%",
+    "shares": 79
+  },
+  {
+    "date": "2023-01-05",
+    "sym": "BLK",
+    "action": "SELL",
+    "price": 645.07,
+    "reason": "DD>15%",
+    "shares": 66
+  },
+  {
+    "date": "2023-02-02",
+    "sym": "GS",
+    "action": "BUY",
+    "price": 339.37,
+    "score": 0.455,
+    "shares": 129
+  },
+  {
+    "date": "2023-02-03",
+    "sym": "GS",
+    "action": "SELL",
+    "price": 339.81,
+    "reason": "DD>15%",
+    "shares": 129
+  },
+  {
+    "date": "2023-03-17",
+    "sym": "ABBV",
+    "action": "BUY",
+    "price": 136.26,
+    "score": 0.845,
+    "shares": 323
+  },
+  {
+    "date": "2023-03-20",
+    "sym": "ABBV",
+    "action": "SELL",
+    "price": 137.94,
+    "reason": "DD>15%",
+    "shares": 323
+  },
+  {
+    "date": "2023-05-01",
+    "sym": "MU",
+    "action": "BUY",
+    "price": 61.55,
+    "score": 0.65,
+    "shares": 716
+  },
+  {
+    "date": "2023-05-02",
+    "sym": "MU",
+    "action": "SELL",
+    "price": 61.1,
+    "reason": "DD>15%",
+    "shares": 716
+  },
+  {
+    "date": "2023-05-15",
+    "sym": "COST",
+    "action": "BUY",
+    "price": 481.56,
+    "score": 0.65,
+    "shares": 91
+  },
+  {
+    "date": "2023-05-16",
+    "sym": "COST",
+    "action": "SELL",
+    "price": 475.92,
+    "reason": "DD>15%",
+    "shares": 91
+  },
+  {
+    "date": "2023-08-10",
+    "sym": "NKE",
+    "action": "BUY",
+    "price": 102.43,
+    "score": 0.715,
+    "shares": 429
+  },
+  {
+    "date": "2023-08-11",
+    "sym": "NKE",
+    "action": "SELL",
+    "price": 101.55,
+    "reason": "DD>15%",
+    "shares": 429
+  },
+  {
+    "date": "2023-10-06",
+    "sym": "GOOGL",
+    "action": "BUY",
+    "price": 136.37,
+    "score": 0.715,
+    "shares": 322
+  },
+  {
+    "date": "2023-10-06",
+    "sym": "TSLA",
+    "action": "BUY",
+    "price": 260.53,
+    "score": 0.65,
+    "shares": 168
+  },
+  {
+    "date": "2023-10-09",
+    "sym": "GOOGL",
+    "action": "SELL",
+    "price": 137.2,
+    "reason": "DD>15%",
+    "shares": 322
+  },
+  {
+    "date": "2023-10-09",
+    "sym": "TSLA",
+    "action": "SELL",
+    "price": 259.67,
+    "reason": "DD>15%",
+    "shares": 168
+  },
+  {
+    "date": "2023-11-03",
+    "sym": "AVGO",
+    "action": "BUY",
+    "price": 85.6,
+    "score": 0.975,
+    "shares": 513
+  },
+  {
+    "date": "2023-11-03",
+    "sym": "DIS",
+    "action": "BUY",
+    "price": 82.48,
+    "score": 0.845,
+    "shares": 533
+  },
+  {
+    "date": "2023-11-03",
+    "sym": "AAPL",
+    "action": "BUY",
+    "price": 174.44,
+    "score": 0.39,
+    "shares": 252
+  },
+  {
+    "date": "2023-11-06",
+    "sym": "AVGO",
+    "action": "SELL",
+    "price": 85.43,
+    "reason": "DD>15%",
+    "shares": 513
+  },
+  {
+    "date": "2023-11-06",
+    "sym": "DIS",
+    "action": "SELL",
+    "price": 81.46,
+    "reason": "DD>15%",
+    "shares": 533
+  },
+  {
+    "date": "2023-11-06",
+    "sym": "AAPL",
+    "action": "SELL",
+    "price": 176.99,
+    "reason": "DD>15%",
+    "shares": 252
+  },
+  {
+    "date": "2023-12-18",
+    "sym": "GOOGL",
+    "action": "BUY",
+    "price": 134.61,
+    "score": 0.715,
+    "shares": 326
+  },
+  {
+    "date": "2023-12-19",
+    "sym": "GOOGL",
+    "action": "SELL",
+    "price": 135.45,
+    "reason": "DD>15%",
+    "shares": 326
+  },
+  {
+    "date": "2024-04-01",
+    "sym": "PFE",
+    "action": "BUY",
+    "price": 23.51,
+    "score": 0.975,
+    "shares": 1870
+  },
+  {
+    "date": "2024-04-02",
+    "sym": "PFE",
+    "action": "SELL",
+    "price": 23.37,
+    "reason": "DD>15%",
+    "shares": 1870
+  },
+  {
+    "date": "2024-04-29",
+    "sym": "JPM",
+    "action": "BUY",
+    "price": 184.46,
+    "score": 0.845,
+    "shares": 238
+  },
+  {
+    "date": "2024-04-29",
+    "sym": "MS",
+    "action": "BUY",
+    "price": 86.68,
+    "score": 0.65,
+    "shares": 507
+  },
+  {
+    "date": "2024-04-29",
+    "sym": "BAC",
+    "action": "BUY",
+    "price": 35.65,
+    "score": 0.65,
+    "shares": 1232
+  },
+  {
+    "date": "2024-04-30",
+    "sym": "JPM",
+    "action": "SELL",
+    "price": 182.99,
+    "reason": "DD>15%",
+    "shares": 238
+  },
+  {
+    "date": "2024-04-30",
+    "sym": "MS",
+    "action": "SELL",
+    "price": 85.48,
+    "reason": "DD>15%",
+    "shares": 507
+  },
+  {
+    "date": "2024-04-30",
+    "sym": "BAC",
+    "action": "SELL",
+    "price": 35.14,
+    "reason": "DD>15%",
+    "shares": 1232
+  },
+  {
+    "date": "2024-05-13",
+    "sym": "BAC",
+    "action": "BUY",
+    "price": 36.28,
+    "score": 0.78,
+    "shares": 1206
+  },
+  {
+    "date": "2024-05-14",
+    "sym": "BAC",
+    "action": "SELL",
+    "price": 36.55,
+    "reason": "DD>15%",
+    "shares": 1206
+  },
+  {
+    "date": "2024-06-11",
+    "sym": "IBB",
+    "action": "BUY",
+    "price": 136.09,
+    "score": 0.65,
+    "shares": 321
+  },
+  {
+    "date": "2024-06-12",
+    "sym": "IBB",
+    "action": "SELL",
+    "price": 137.09,
+    "reason": "DD>15%",
+    "shares": 321
+  },
+  {
+    "date": "2024-06-26",
+    "sym": "TLT",
+    "action": "BUY",
+    "price": 84.82,
+    "score": 0.845,
+    "shares": 516
+  },
+  {
+    "date": "2024-06-26",
+    "sym": "IBB",
+    "action": "BUY",
+    "price": 137.2,
+    "score": 0.78,
+    "shares": 319
+  },
+  {
+    "date": "2024-06-27",
+    "sym": "TLT",
+    "action": "SELL",
+    "price": 85.16,
+    "reason": "DD>15%",
+    "shares": 516
+  },
+  {
+    "date": "2024-06-27",
+    "sym": "IBB",
+    "action": "SELL",
+    "price": 137.19,
+    "reason": "DD>15%",
+    "shares": 319
+  },
+  {
+    "date": "2024-07-25",
+    "sym": "CRM",
+    "action": "BUY",
+    "price": 252.88,
+    "score": 1.04,
+    "shares": 173
+  },
+  {
+    "date": "2024-07-26",
+    "sym": "CRM",
+    "action": "SELL",
+    "price": 258.98,
+    "reason": "DD>15%",
+    "shares": 173
+  },
+  {
+    "date": "2024-08-22",
+    "sym": "TLT",
+    "action": "BUY",
+    "price": 89.59,
+    "score": 0.78,
+    "shares": 490
+  },
+  {
+    "date": "2024-08-23",
+    "sym": "TLT",
+    "action": "SELL",
+    "price": 90.18,
+    "reason": "DD>15%",
+    "shares": 490
+  },
+  {
+    "date": "2024-09-20",
+    "sym": "GS",
+    "action": "BUY",
+    "price": 481.39,
+    "score": 0.91,
+    "shares": 91
+  },
+  {
+    "date": "2024-09-20",
+    "sym": "NFLX",
+    "action": "BUY",
+    "price": 70.1,
+    "score": 0.715,
+    "shares": 627
+  },
+  {
+    "date": "2024-09-20",
+    "sym": "IBB",
+    "action": "BUY",
+    "price": 147.2,
+    "score": 0.715,
+    "shares": 298
+  },
+  {
+    "date": "2024-09-23",
+    "sym": "GS",
+    "action": "SELL",
+    "price": 480.4,
+    "reason": "DD>15%",
+    "shares": 91
+  },
+  {
+    "date": "2024-09-23",
+    "sym": "NFLX",
+    "action": "SELL",
+    "price": 70.54,
+    "reason": "DD>15%",
+    "shares": 627
+  },
+  {
+    "date": "2024-09-23",
+    "sym": "IBB",
+    "action": "SELL",
+    "price": 144.82,
+    "reason": "DD>15%",
+    "shares": 298
+  },
+  {
+    "date": "2024-12-02",
+    "sym": "UNH",
+    "action": "BUY",
+    "price": 583.73,
+    "score": 0.975,
+    "shares": 75
+  },
+  {
+    "date": "2024-12-03",
+    "sym": "UNH",
+    "action": "SELL",
+    "price": 580.57,
+    "reason": "DD>15%",
+    "shares": 75
+  },
+  {
+    "date": "2025-02-14",
+    "sym": "CVX",
+    "action": "BUY",
+    "price": 147.3,
+    "score": 0.65,
+    "shares": 298
+  },
+  {
+    "date": "2025-02-18",
+    "sym": "CVX",
+    "action": "SELL",
+    "price": 148.08,
+    "reason": "DD>15%",
+    "shares": 298
+  },
+  {
+    "date": "2025-06-26",
+    "sym": "HD",
+    "action": "BUY",
+    "price": 354.09,
+    "score": 0.52,
+    "shares": 124
+  },
+  {
+    "date": "2025-06-27",
+    "sym": "HD",
+    "action": "SELL",
+    "price": 359.19,
+    "reason": "DD>15%",
+    "shares": 124
+  },
+  {
+    "date": "2025-07-25",
+    "sym": "BAC",
+    "action": "BUY",
+    "price": 47.42,
+    "score": 0.78,
+    "shares": 928
+  },
+  {
+    "date": "2025-07-25",
+    "sym": "WMT",
+    "action": "BUY",
+    "price": 96.66,
+    "score": 0.52,
+    "shares": 455
+  },
+  {
+    "date": "2025-07-28",
+    "sym": "BAC",
+    "action": "SELL",
+    "price": 47.2,
+    "reason": "DD>15%",
+    "shares": 928
+  },
+  {
+    "date": "2025-07-28",
+    "sym": "WMT",
+    "action": "SELL",
+    "price": 96.8,
+    "reason": "DD>15%",
+    "shares": 455
+  },
+  {
+    "date": "2025-08-08",
+    "sym": "GLD",
+    "action": "BUY",
+    "price": 313.05,
+    "score": 0.715,
+    "shares": 140
+  },
+  {
+    "date": "2025-08-11",
+    "sym": "GLD",
+    "action": "SELL",
+    "price": 308.55,
+    "reason": "DD>15%",
+    "shares": 140
+  },
+  {
+    "date": "2025-09-08",
+    "sym": "COST",
+    "action": "BUY",
+    "price": 966.21,
+    "score": 0.65,
+    "shares": 45
+  },
+  {
+    "date": "2025-09-08",
+    "sym": "NFLX",
+    "action": "BUY",
+    "price": 124.48,
+    "score": 0.455,
+    "shares": 352
+  },
+  {
+    "date": "2025-09-09",
+    "sym": "COST",
+    "action": "SELL",
+    "price": 973.57,
+    "reason": "DD>15%",
+    "shares": 45
+  },
+  {
+    "date": "2025-09-09",
+    "sym": "NFLX",
+    "action": "SELL",
+    "price": 126.32,
+    "reason": "DD>15%",
+    "shares": 352
+  },
+  {
+    "date": "2025-11-17",
+    "sym": "MCD",
+    "action": "BUY",
+    "price": 299.37,
+    "score": 0.65,
+    "shares": 147
+  },
+  {
+    "date": "2025-11-18",
+    "sym": "MCD",
+    "action": "SELL",
+    "price": 299.06,
+    "reason": "DD>15%",
+    "shares": 147
+  },
+  {
+    "date": "2025-12-02",
+    "sym": "PFE",
+    "action": "BUY",
+    "price": 23.92,
+    "score": 0.78,
+    "shares": 1840
+  },
+  {
+    "date": "2025-12-02",
+    "sym": "SBUX",
+    "action": "BUY",
+    "price": 84.16,
+    "score": 0.78,
+    "shares": 523
+  },
+  {
+    "date": "2025-12-02",
+    "sym": "JPM",
+    "action": "BUY",
+    "price": 303.57,
+    "score": 0.715,
+    "shares": 145
+  },
+  {
+    "date": "2025-12-03",
+    "sym": "PFE",
+    "action": "SELL",
+    "price": 24.31,
+    "reason": "DD>15%",
+    "shares": 1840
+  },
+  {
+    "date": "2025-12-03",
+    "sym": "SBUX",
+    "action": "SELL",
+    "price": 86.05,
+    "reason": "DD>15%",
+    "shares": 523
+  },
+  {
+    "date": "2025-12-03",
+    "sym": "JPM",
+    "action": "SELL",
+    "price": 307.76,
+    "reason": "DD>15%",
+    "shares": 145
+  },
+  {
+    "date": "2025-12-16",
+    "sym": "PFE",
+    "action": "BUY",
+    "price": 24.28,
+    "score": 0.585,
+    "shares": 1824
+  },
+  {
+    "date": "2025-12-17",
+    "sym": "PFE",
+    "action": "SELL",
+    "price": 23.81,
+    "reason": "DD>15%",
+    "shares": 1824
+  },
+  {
+    "date": "2025-12-31",
+    "sym": "BLK",
+    "action": "BUY",
+    "price": 1058.45,
+    "score": 0.65,
+    "shares": 41
+  },
+  {
+    "date": "2026-01-02",
+    "sym": "BLK",
+    "action": "SELL",
+    "price": 1073.01,
+    "reason": "DD>15%",
+    "shares": 41
+  },
+  {
+    "date": "2026-01-15",
+    "sym": "QQQ",
+    "action": "BUY",
+    "price": 620.32,
+    "score": 0.715,
+    "shares": 71
+  },
+  {
+    "date": "2026-01-16",
+    "sym": "QQQ",
+    "action": "SELL",
+    "price": 619.8,
+    "reason": "DD>15%",
+    "shares": 71
+  },
+  {
+    "date": "2026-01-30",
+    "sym": "AMZN",
+    "action": "BUY",
+    "price": 239.3,
+    "score": 0.91,
+    "shares": 184
+  },
+  {
+    "date": "2026-01-30",
+    "sym": "QQQ",
+    "action": "BUY",
+    "price": 620.41,
+    "score": 0.39,
+    "shares": 71
+  },
+  {
+    "date": "2026-02-02",
+    "sym": "AMZN",
+    "action": "SELL",
+    "price": 242.96,
+    "reason": "DD>15%",
+    "shares": 184
+  },
+  {
+    "date": "2026-02-02",
+    "sym": "QQQ",
+    "action": "SELL",
+    "price": 624.67,
+    "reason": "DD>15%",
+    "shares": 71
+  },
+  {
+    "date": "2026-05-12",
+    "sym": "IBB",
+    "action": "BUY",
+    "price": 172.26,
+    "score": 0.65,
+    "shares": 257
+  },
+  {
+    "date": "2026-05-13",
+    "sym": "IBB",
+    "action": "SELL",
+    "price": 172.63,
+    "reason": "DD>15%",
+    "shares": 257
+  },
+  {
+    "date": "2026-05-27",
+    "sym": "IBB",
+    "action": "BUY",
+    "price": 169.86,
+    "score": 0.845,
+    "shares": 261
+  },
+  {
+    "date": "2026-05-27",
+    "sym": "BAC",
+    "action": "BUY",
+    "price": 50.84,
+    "score": 0.455,
+    "shares": 872
+  },
+  {
+    "date": "2026-05-28",
+    "sym": "IBB",
+    "action": "SELL",
+    "price": 172.22,
+    "reason": "DD>15%",
+    "shares": 261
+  },
+  {
+    "date": "2026-05-28",
+    "sym": "BAC",
+    "action": "SELL",
+    "price": 50.51,
+    "reason": "DD>15%",
+    "shares": 872
+  },
+  {
+    "date": "2026-06-10",
+    "sym": "CVX",
+    "action": "BUY",
+    "price": 189.8,
+    "score": 0.39,
+    "shares": 234
+  },
+  {
+    "date": "2026-06-11",
+    "sym": "CVX",
+    "action": "SELL",
+    "price": 185.82,
+    "reason": "DD>15%",
+    "shares": 234
+  },
+  {
+    "date": "2026-07-10",
+    "sym": "BLK",
+    "action": "BUY",
+    "price": 1036.11,
+    "score": 0.455,
+    "shares": 42
+  },
+  {
+    "date": "2026-07-13",
+    "sym": "BLK",
+    "action": "SELL",
+    "price": 1031.56,
+    "reason": "DD>15%",
+    "shares": 42
+  }
+]
