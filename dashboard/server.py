@@ -666,6 +666,13 @@ class H(http.server.BaseHTTPRequestHandler):
                     with open(hp) as f: self._j(json.load(f))
                 else: self._j({'error':'no health data'})
             except: self._j({'error':'read failed'})
+        elif p.path=='/api/backtest':
+            try:
+                bt_file = os.path.join(BASE, 'data', 'backtest_v4_result.json')
+                if os.path.exists(bt_file):
+                    with open(bt_file) as f: self._j(json.load(f))
+                else: self._j({'error':'no backtest data'})
+            except: self._j({'error':'read failed'})
         elif p.path=='/api/refresh':
             threading.Thread(target=refresh_all_prices,daemon=True).start()
             self._j({'ok':True})
