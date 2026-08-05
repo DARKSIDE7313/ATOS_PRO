@@ -1,0 +1,82 @@
+{
+  "timestamp": "2026-08-05T18:42:33.096486",
+  "period": "2016-01-01 \u2192 2026-08-01",
+  "years": 10.6,
+  "spy_annual": 15.09,
+  "qqq_annual": 19.87,
+  "strategies": {
+    "QQQ_100": {
+      "desc": "100% QQQ",
+      "annual": 0.1996,
+      "total_ret": 5.825,
+      "final": 2047506.3833,
+      "max_dd": 0.3514,
+      "sharpe": 0.9649,
+      "trades": 81,
+      "fees": 4185.08,
+      "beats_spy": true,
+      "beats_qqq": true
+    },
+    "QQQ80_alpha2": {
+      "desc": "80% QQQ + 2 alpha",
+      "annual": 0.2429,
+      "total_ret": 8.9193,
+      "final": 2975801.0956,
+      "max_dd": 0.3708,
+      "sharpe": 1.0987,
+      "trades": 205,
+      "fees": 9221.22,
+      "beats_spy": true,
+      "beats_qqq": true
+    },
+    "QQQ80_alpha3": {
+      "desc": "80% QQQ + 3 alpha",
+      "annual": 0.2325,
+      "total_ret": 8.0735,
+      "final": 2722044.6217,
+      "max_dd": 0.3872,
+      "sharpe": 1.0467,
+      "trades": 288,
+      "fees": 9331.65,
+      "beats_spy": true,
+      "beats_qqq": true
+    },
+    "QQQ70_alpha3": {
+      "desc": "70% QQQ + 3 alpha",
+      "annual": 0.249,
+      "total_ret": 9.447,
+      "final": 3134094.7235,
+      "max_dd": 0.3949,
+      "sharpe": 1.0812,
+      "trades": 284,
+      "fees": 12314.29,
+      "beats_spy": true,
+      "beats_qqq": true
+    },
+    "QQQ60_alpha5": {
+      "desc": "60% QQQ + 5 alpha",
+      "annual": 0.2681,
+      "total_ret": 11.2618,
+      "final": 3678533.1203,
+      "max_dd": 0.3944,
+      "sharpe": 1.1297,
+      "trades": 460,
+      "fees": 13169.28,
+      "beats_spy": true,
+      "beats_qqq": true
+    },
+    "QQQ80_NVDA_only": {
+      "desc": "80% QQQ + NVDA",
+      "annual": 0.1752,
+      "total_ret": 4.495,
+      "final": 1648506.7659,
+      "max_dd": 0.358,
+      "sharpe": 0.8629,
+      "trades": 132,
+      "fees": 6201.87,
+      "beats_spy": true,
+      "beats_qqq": false
+    }
+  },
+  "recommendation": "QQQ60_alpha5"
+}

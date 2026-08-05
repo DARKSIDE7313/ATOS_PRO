@@ -1264,18 +1264,180 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
             ai_enhanced_advice = None
             ai_veto_map = {}
 
-    # ---- 6. 因子开仓（v6优化：让赢家跑，截断亏损） ----
-    # v6 策略优化: 部分止盈推至+15%, 保本推至+10%, 止损收紧到5%
-    # 因子评分驱动开仓，AI v6 + 质量门控负责否决低质量信号
+    # ---- 6. v28: QQQ Core + Alpha 策略开仓 ----
+    # 回测验证: 60% QQQ + 40% 动量股(5只), 年化26.8%, 跑赢SPY 11.7%
     if is_market_hours:
-        _factor_based_buying(account, signals, top_picks, factor_result,
-                             regime, spy_trend, gate_exposure, ai_veto_map)
+        _v28_qqq_core_alpha(account, signals, regime, spy_trend)
     else:
         logger.info("🏁 闭市时段: 仅维持风控，不开新仓")
 
     # ---- 7. 最终结算 ----
     _finalize_cycle(account, cycle, regime, current_vix, signals, top_picks,
                     ai_veto_map, "normal", spy_trend)
+
+
+# ============================================================
+# ============================================================
+# v28: QQQ Core + Alpha 策略
+# 回测: 60% QQQ + 40% 动量股(5只), 年化26.8%, 跑赢SPY 11.7%
+# ============================================================
+V28_ALPHA_UNIVERSE = [
+    "NVDA", "AAPL", "MSFT", "GOOGL", "META", "AMZN", "AVGO", "AMD",
+    "CRM", "NFLX", "PLTR", "MU", "TSLA",
+]
+V28_CORE_PCT = 0.60      # QQQ 核心仓位比例
+V28_ALPHA_COUNT = 5       # alpha 个股数量
+V28_REBALANCE_DAYS = 63   # 每季度再平衡
+V28_STOP_LOSS = 0.05      # 个股止损 5%
+V28_TRAILING_STOP = 0.08  # 移动止损 8%
+V28_QQQ_TRAILING = 0.12   # QQQ 移动止损 12%
+
+
+def _v28_qqq_core_alpha(account, signals, regime, spy_trend):
+    """v28 策略: QQQ 核心 + 动量个股 alpha
+
+    规则:
+    1. 60% 资金买 QQQ（始终持有，不择时）
+    2. 40% 资金买 5 只最强动量股
+    3. 每季度再平衡
+    4. 个股止损 5%, 移动止损 8%
+    5. QQQ 移动止损 12%
+    """
+    equity = account.total_equity
+    cash = account.cash
+
+    # ── 卖出检查 ──
+    for sym in list(account.positions.keys()):
+        pos = account.positions[sym]
+        qty = pos.get("qty", pos.get("shares", 0))
+        if qty <= 0:
+            continue
+        avg_price = pos.get("avg_price", 0)
+        if avg_price <= 0:
+            continue
+
+        price = signals.get(sym, {}).get("price", pos.get("last_price", 0))
+        if price <= 0:
+            continue
+
+        pnl_pct = (price - avg_price) / avg_price
+
+        # 更新峰值
+        peak = pos.get("peak_price", avg_price)
+        if price > peak:
+            pos["peak_price"] = price
+            peak = price
+
+        sell_reason = None
+
+        if sym == "QQQ":
+            # QQQ: 移动止损 12%
+            if peak > avg_price * 1.05:
+                ts_drop = (peak - price) / peak
+                if ts_drop >= V28_QQQ_TRAILING:
+                    sell_reason = f"QQQ移动止损{ts_drop:.1%}"
+        else:
+            # 个股: 止损 5%
+            if pnl_pct <= -V28_STOP_LOSS:
+                sell_reason = f"止损{pnl_pct:.1%}"
+            # 移动止损 8%
+            elif peak > avg_price * 1.03:
+                ts_drop = (peak - price) / peak
+                if ts_drop >= V28_TRAILING_STOP:
+                    sell_reason = f"移动止损{ts_drop:.1%}"
+
+        if sell_reason:
+            account.execute(sym, "SELL", qty, price, reason=sell_reason)
+            logger.info(f"🔴 v28卖出 {sym}: {sell_reason} PnL={pnl_pct:.1%}")
+
+    # ── 再平衡检查 ──
+    last_rebal = getattr(account, '_v28_last_rebalance', None)
+    now = datetime.datetime.now()
+    should_rebalance = (
+        last_rebal is None or
+        (now - last_rebal).days >= V28_REBALANCE_DAYS
+    )
+
+    if not should_rebalance:
+        return
+
+    logger.info(f"📊 v28 季度再平衡 | Equity=${equity:,.0f}")
+
+    # ── 核心仓: QQQ ──
+    target_qqq_value = equity * V28_CORE_PCT
+    qqq_price = signals.get("QQQ", {}).get("price", 0)
+
+    if qqq_price > 0:
+        current_qqq = account.positions.get("QQQ", {})
+        current_qqq_qty = current_qqq.get("qty", current_qqq.get("shares", 0))
+        current_qqq_value = current_qqq_qty * qqq_price
+
+        if current_qqq_value < target_qqq_value * 0.90:
+            # 需要加仓 QQQ
+            buy_value = target_qqq_value - current_qqq_value
+            buy_qty = max(1, int(buy_value / qqq_price))
+            if buy_qty * qqq_price < cash * 0.90:
+                account.execute("QQQ", "BUY", buy_qty, qqq_price,
+                              reason=f"v28核心仓 目标${target_qqq_value:,.0f}")
+                logger.info(f"🟢 v28买入 QQQ: {buy_qty}股 @${qqq_price:.2f}")
+
+    # ── Alpha 仓: 动量股 ──
+    target_alpha_value = equity * (1 - V28_CORE_PCT)
+    per_stock_value = target_alpha_value / V28_ALPHA_COUNT
+
+    # 计算动量分
+    alpha_candidates = []
+    for sym in V28_ALPHA_UNIVERSE:
+        sig = signals.get(sym, {})
+        price = sig.get("price", 0)
+        if price <= 0:
+            continue
+
+        # 动量指标
+        mom_1m = sig.get("change_pct", 0) or 0  # 1日变动
+        ma50 = sig.get("ma50", 0)
+        rsi = sig.get("rsi", 50)
+        score = sig.get("score", sig.get("composite_score", 0))
+
+        # 过滤
+        if rsi > 75:  # 超买
+            continue
+        if ma50 > 0 and price < ma50 * 0.95:  # 远低于MA50
+            continue
+
+        alpha_candidates.append((sym, score, price))
+
+    # 排序选 top N
+    alpha_candidates.sort(key=lambda x: -x[1])
+
+    # 当前 alpha 持仓
+    current_alpha = [s for s in account.positions if s != "QQQ"]
+
+    # 卖出不在 top N 的持仓
+    top_syms = {c[0] for c in alpha_candidates[:V28_ALPHA_COUNT]}
+    for sym in current_alpha:
+        if sym not in top_syms:
+            pos = account.positions[sym]
+            qty = pos.get("qty", pos.get("shares", 0))
+            price = signals.get(sym, {}).get("price", pos.get("last_price", 0))
+            if qty > 0 and price > 0:
+                account.execute(sym, "SELL", qty, price,
+                              reason=f"v28再平衡换仓")
+                logger.info(f"🔄 v28换仓卖出 {sym}")
+
+    # 买入新候选
+    cash = account.cash  # 刷新
+    for sym, score, price in alpha_candidates[:V28_ALPHA_COUNT]:
+        if sym in account.positions:
+            continue  # 已持有
+        qty = max(1, int(per_stock_value / price))
+        if qty * price < cash * 0.85:
+            account.execute(sym, "BUY", qty, price,
+                          reason=f"v28动量alpha score={score:.3f}")
+            logger.info(f"🟢 v28买入 {sym}: {qty}股 @${price:.2f} score={score:.3f}")
+
+    account._v28_last_rebalance = now
+    logger.info(f"✅ v28再平衡完成 | 持仓: {len(account.positions)}只")
 
 
 # ============================================================

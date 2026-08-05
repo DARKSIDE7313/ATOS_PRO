@@ -1,0 +1,23 @@
+{
+  "timestamp": "2026-08-05T18:39:25.192096",
+  "strategy": "Trend Momentum v2 (60% QQQ core + 40% alpha)",
+  "period": "2018-01-01 \u2192 2026-08-01",
+  "years": 8.6,
+  "initial": 300000,
+  "final": 748104.95,
+  "total_return": 149.37,
+  "annual_return": 11.27,
+  "spy_annual": 14.42,
+  "qqq_annual": 19.48,
+  "beats_spy": false,
+  "beats_qqq": false,
+  "excess_vs_spy": -3.15,
+  "sharpe": 0.37,
+  "max_drawdown": 22.87,
+  "total_trades": 442,
+  "win_rate": 38.5,
+  "avg_win": 15.98,
+  "avg_loss": 4.58,
+  "total_fees": 3453.03,
+  "fee_drag_pct": 1.151
+}
