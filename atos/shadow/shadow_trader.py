@@ -1510,15 +1510,18 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
             continue
         
         # ── v23: 入场质量确认 — 多指标对齐才开仓 ──
-        # 1. MACD 确认: 不能深度负值 (允许小幅回调, 但不买崩跌)
+        # v27: 趋势自适应阈值 — BULL市放宽，BEAR市收紧
+        # 1. MACD 确认: BULL=-3.0, CAUTIOUS=-1.5, BEAR=-0.5
         macd_hist = signals.get(sym, {}).get("macd_hist", 0)
-        if macd_hist < -0.5:
-            logger.info(f"⏭ {sym} MACD={macd_hist:.3f}<-0.5 深度负值，等企稳")
+        macd_min = -3.0 if spy_trend == "BULL" else (-1.5 if spy_trend == "CAUTIOUS" else -0.5)
+        if macd_hist < macd_min:
+            logger.info(f"⏭ {sym} MACD={macd_hist:.3f}<{macd_min} 深度负值({spy_trend})，等企稳")
             continue
-        # 2. 成交量确认: 不能极度缩量 (无量上涨是假突破)
+        # 2. 成交量确认: BULL=0.1, CAUTIOUS=0.2, BEAR=0.3
         vol_ratio = signals.get(sym, {}).get("volume_ratio", 1.0)
-        if vol_ratio < 0.3:
-            logger.info(f"⏭ {sym} 量比={vol_ratio:.2f}<0.3 极度缩量，等放量")
+        vol_min = 0.1 if spy_trend == "BULL" else (0.2 if spy_trend == "CAUTIOUS" else 0.3)
+        if vol_ratio < vol_min:
+            logger.info(f"⏭ {sym} 量比={vol_ratio:.2f}<{vol_min} 缩量({spy_trend})，等放量")
             continue
         # 3. RSI 不能超卖区反弹无力 (RSI<30的弱势股不接飞刀)
         rsi = signals.get(sym, {}).get("rsi", 50)
@@ -1629,14 +1632,16 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
             continue
 
         # 🏦 v21: 近期回调幅度过滤器（只买回调股，不追高）
+        # v27: BULL市放宽 — 允许在高点附近买入强势突破股
         high_20d = signals.get(sym, {}).get("high_20d", 0) or price
         if high_20d > 0:
             pullback = (price - high_20d) / high_20d
-            if pullback > -0.01:  # 距20日高点不到1% — 太接近高点
-                # 仅在有强烈动量信号时允许
+            near_high_limit = 0.005 if spy_trend == "BULL" else -0.01  # BULL允许在高点0.5%以内
+            if pullback > near_high_limit:
                 mom_score = signals.get(sym, {}).get("score_momentum", 0)
-                if mom_score < 0.6:
-                    logger.info(f"⏭ {sym} 距20日高仅{pullback:+.1%} 动量{mom_score:.0%}不足 — 等回调")
+                mom_min = 0.4 if spy_trend == "BULL" else 0.6
+                if mom_score < mom_min:
+                    logger.info(f"⏭ {sym} 距20日高{pullback:+.1%} 动量{mom_score:.0%}<{mom_min:.0%}({spy_trend}) — 等回调")
                     continue
 
         # v9: 允许加仓 — 包括小幅浮亏 (<5%)
