@@ -920,86 +920,88 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
             logger.info(f"🛑 Triple-Barrier止损: {sym} PnL={pnl_pct:+.2%}")
             continue
 
-        # ── v23: 利润保护 — 更早保本 + 分批止盈 ──
-        # 0. v25: Renaissance 快速剥头皮 — 持仓<1天且盈利>2% → 快速锁利
-        # Medallion风格: 高频小利累积, 不贪心
-        buy_time_str = pos.get("buy_time", "")
-        if buy_time_str:
-            try:
-                bought_dt = datetime.datetime.fromisoformat(str(buy_time_str))
-                hours_held = (datetime.datetime.now() - bought_dt).total_seconds() / 3600
-                if hours_held < 24 and pnl_pct >= 0.02:
-                    account.execute(sym, "SELL", pos["qty"], price, reason=f"快速剥头皮 +{pnl_pct:.1%} ({hours_held:.0f}h)")
-                    logger.info(f"⚡ 剥头皮: {sym} +{pnl_pct:.1%} {hours_held:.0f}h → 全卖")
-                    continue
-            except (ValueError, TypeError):
-                pass
+        # ── v28: 跳过旧止盈/保本/剥头皮规则 — v28 有自己的卖出逻辑 ──
+        # v28: 只用硬止损(5%) + 移动止损(8%) + 季度再平衡，不做分批止盈
+        _v28_position = sym in ("QQQ",) or sym in V28_ALPHA_UNIVERSE
+        if not _v28_position:
+            # ── v23: 利润保护 — 更早保本 + 分批止盈 ──
+            # 0. v25: Renaissance 快速剥头皮 — 持仓<1天且盈利>2% → 快速锁利
+            buy_time_str = pos.get("buy_time", "")
+            if buy_time_str:
+                try:
+                    bought_dt = datetime.datetime.fromisoformat(str(buy_time_str))
+                    hours_held = (datetime.datetime.now() - bought_dt).total_seconds() / 3600
+                    if hours_held < 24 and pnl_pct >= 0.02:
+                        account.execute(sym, "SELL", pos["qty"], price, reason=f"快速剥头皮 +{pnl_pct:.1%} ({hours_held:.0f}h)")
+                        logger.info(f"⚡ 剥头皮: {sym} +{pnl_pct:.1%} {hours_held:.0f}h → 全卖")
+                        continue
+                except (ValueError, TypeError):
+                    pass
 
-        # 1. +3%: 止损提到成本价（保本）— 高胜率策略: 让浮盈≥3%的持仓不亏
-        if pnl_pct >= 0.03 and sym in account.trailing_stops:
-            ts = account.trailing_stops[sym]
-            if ts.activation_price is None or ts.activation_price < pos["avg_price"] * 1.001:
-                ts.activation_price = pos["avg_price"] * 1.001
-        # 2. 分批止盈 — v23: +5%卖1/3, +10%再卖1/3, +18%清仓
-        # ── v25: 三层分批止盈 — 100%胜率策略，更频繁锁利 ──
-        # 数据证明: 分批止盈26笔100%胜率 +$6,331。增加层级提高频率
-        recent_partials = sum(
-            1 for t in account.trade_history[-10:]
-            if t.get("symbol") == sym and "止盈" in t.get("reason", "")
-        )
-        # Tier1: +3% 卖1/4 (最早锁利)
-        if pnl_pct >= 0.03 and recent_partials == 0:
-            quarter = max(1, pos["qty"] // 4)
-            account.execute(sym, "SELL", quarter, price, reason=f"Tier1止盈 +{pnl_pct:.1%} (卖1/4锁利@3%)")
-            logger.info(f"💰 Tier1止盈: {sym} +{pnl_pct:.1%} 卖{quarter}股")
-            continue
-        # Tier2: +5% 再卖1/4
-        if pnl_pct >= 0.05 and recent_partials == 1:
-            quarter = max(1, pos["qty"] // 4)
-            account.execute(sym, "SELL", quarter, price, reason=f"Tier2止盈 +{pnl_pct:.1%} (卖1/4锁利@5%)")
-            logger.info(f"💰 Tier2止盈: {sym} +{pnl_pct:.1%} 卖{quarter}股")
-            continue
-        # Tier3: +8% 再卖1/4
-        if pnl_pct >= 0.08 and recent_partials == 2:
-            quarter = max(1, pos["qty"] // 4)
-            account.execute(sym, "SELL", quarter, price, reason=f"Tier3止盈 +{pnl_pct:.1%} (卖1/4锁利@8%)")
-            logger.info(f"💰 Tier3止盈: {sym} +{pnl_pct:.1%} 卖{quarter}股")
-            continue
-        # 3. 自适应止盈（v19回测优化: BULL=22%, CAUTIOUS=18%, BEAR=12%）
-        tp_level = 0.22 if spy_trend == "BULL" else (0.18 if spy_trend == "CAUTIOUS" else 0.12)
-        if pnl_pct >= tp_level:
-            account.execute(sym, "SELL", pos["qty"], price, reason=f"止盈 +{pnl_pct:.1%}")
-            logger.info(f"💰 止盈: {sym} +{pnl_pct:.1%}")
-            continue
-        # 3b. v24: Citadel超买主动止盈 — RSI>80且盈利>2% → 锁定利润
-        rsi_sell = signals.get(sym, {}).get("rsi", 50)
-        if rsi_sell > 80 and pnl_pct > 0.02:
-            half = max(1, pos["qty"] // 2)
-            account.execute(sym, "SELL", half, price, reason=f"超买止盈 RSI={rsi_sell:.0f} PnL={pnl_pct:+.1%}")
-            logger.info(f"📈 Citadel超买止盈: {sym} RSI={rsi_sell:.0f} PnL={pnl_pct:+.1%} 卖{half}股")
-            continue
-        # 4. 🏦 v21: ATR动态止损（替代固定6%，适应不同波动率）
-        # v25: 加上限4% — 任何情况不允许单仓亏损超过4%（SBUX -$764教训）
+            # 1. +3%: 止损提到成本价（保本）
+            if pnl_pct >= 0.03 and sym in account.trailing_stops:
+                ts = account.trailing_stops[sym]
+                if ts.activation_price is None or ts.activation_price < pos["avg_price"] * 1.001:
+                    ts.activation_price = pos["avg_price"] * 1.001
+            # 2. 分批止盈
+            recent_partials = sum(
+                1 for t in account.trade_history[-10:]
+                if t.get("symbol") == sym and "止盈" in t.get("reason", "")
+            )
+            if pnl_pct >= 0.03 and recent_partials == 0:
+                quarter = max(1, pos["qty"] // 4)
+                account.execute(sym, "SELL", quarter, price, reason=f"Tier1止盈 +{pnl_pct:.1%} (卖1/4锁利@3%)")
+                logger.info(f"💰 Tier1止盈: {sym} +{pnl_pct:.1%} 卖{quarter}股")
+                continue
+            if pnl_pct >= 0.05 and recent_partials == 1:
+                quarter = max(1, pos["qty"] // 4)
+                account.execute(sym, "SELL", quarter, price, reason=f"Tier2止盈 +{pnl_pct:.1%} (卖1/4锁利@5%)")
+                logger.info(f"💰 Tier2止盈: {sym} +{pnl_pct:.1%} 卖{quarter}股")
+                continue
+            if pnl_pct >= 0.08 and recent_partials == 2:
+                quarter = max(1, pos["qty"] // 4)
+                account.execute(sym, "SELL", quarter, price, reason=f"Tier3止盈 +{pnl_pct:.1%} (卖1/4锁利@8%)")
+                logger.info(f"💰 Tier3止盈: {sym} +{pnl_pct:.1%} 卖{quarter}股")
+                continue
+            # 3. 自适应止盈
+            tp_level = 0.22 if spy_trend == "BULL" else (0.18 if spy_trend == "CAUTIOUS" else 0.12)
+            if pnl_pct >= tp_level:
+                account.execute(sym, "SELL", pos["qty"], price, reason=f"止盈 +{pnl_pct:.1%}")
+                logger.info(f"💰 止盈: {sym} +{pnl_pct:.1%}")
+                continue
+            # 3b. Citadel超买主动止盈
+            rsi_sell = signals.get(sym, {}).get("rsi", 50)
+            if rsi_sell > 80 and pnl_pct > 0.02:
+                half = max(1, pos["qty"] // 2)
+                account.execute(sym, "SELL", half, price, reason=f"超买止盈 RSI={rsi_sell:.0f} PnL={pnl_pct:+.1%}")
+                logger.info(f"📈 Citadel超买止盈: {sym} RSI={rsi_sell:.0f} PnL={pnl_pct:+.1%} 卖{half}股")
+                continue
+        # 4. 🏦 v28: ATR动态止损 — 与 v28 策略对齐
         atr = signals.get(sym, {}).get("atr", 0)
         if atr > 0 and price > 0:
             atr_pct_stop = atr / price
             if spy_trend == "BULL":
-                sl_mult = 2.5
+                sl_mult = 3.0
             elif spy_trend == "CAUTIOUS":
-                sl_mult = 2.0
+                sl_mult = 2.5
             else:
-                sl_mult = 1.5
+                sl_mult = 2.0
             sl_atr = sl_mult * atr_pct_stop
-            sl_level = max(0.03, min(0.04, sl_atr))  # v25: clamp [3%, 4%] 更紧
+            # v28: QQQ 用 12% 止损，个股用 5%
+            if sym == "QQQ":
+                sl_level = max(0.08, min(0.12, sl_atr))
+            else:
+                sl_level = max(0.04, min(0.05, sl_atr))
         else:
-            sl_level = 0.04  # v25: 默认4%硬上限
+            sl_level = 0.12 if sym == "QQQ" else 0.05
         if pnl_pct <= -sl_level:
             account.execute(sym, "SELL", pos["qty"], price, reason=f"硬止损 {pnl_pct:.1%} (上限{sl_level:.0%})")
             logger.info(f"🛑 止损: {sym} {pnl_pct:.1%} (上限{sl_level:.0%})")
             continue
 
         # 🏦 v22: Flat 持仓清理 — 持有7天以上且不涨不跌(-2%~+2%) → 卖出释放资金
-        if hold_days >= 7 and abs(pnl_pct) < 0.02:
+        # v28: 跳过 — v28 持仓按季度再平衡，不做Flat清理
+        if not _v28_position and hold_days >= 7 and abs(pnl_pct) < 0.02:
             # 但如果有高因子分数(>0.6)或强MACD，则保留
             score = signals.get(sym, {}).get("score", 0)
             macd_h = signals.get(sym, {}).get("macd_hist", 0)

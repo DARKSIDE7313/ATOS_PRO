@@ -1,22 +1,22 @@
 {
   "stocks": {
     "MS": {
-      "score": 0.15,
-      "articles": 1,
-      "latest_headline": "AI displacement in the workplace is increasing \u2013 and affecting young people most",
-      "updated": "2026-08-04T18:33:52.185909"
+      "score": 0.03,
+      "articles": 2,
+      "latest_headline": "SpaceX\u2019s stock falls as Wall Street gets spooked by the extent of AI spending",
+      "updated": "2026-08-06T00:29:39.026099"
     },
     "MSFT": {
-      "score": 0.072,
-      "articles": 12,
-      "latest_headline": "Anthropic's Mythos created fake identities to fool humans in new cyber incident",
-      "updated": "2026-08-05T18:33:35.937391"
+      "score": 0.2,
+      "articles": 13,
+      "latest_headline": "Trump's Hormuz Update, OpenAI & Anthropic AI Alarms | The Pulse 8/5/2026",
+      "updated": "2026-08-05T19:47:56.957011"
     },
     "AMZN": {
-      "score": -0.021,
-      "articles": 10,
-      "latest_headline": "Malaysia Says Investment Pipeline Holds Despite Political Angst",
-      "updated": "2026-08-05T17:16:44.194184"
+      "score": 0.423,
+      "articles": 16,
+      "latest_headline": "Japan\u2019s Kishida On Growth Strategy and Yen Intervention",
+      "updated": "2026-08-06T08:18:15.283723"
     },
     "TLT": {
       "score": -0.075,
@@ -25,10 +25,10 @@
       "updated": "2026-08-04T18:33:52.185949"
     },
     "BA": {
-      "score": -0.05,
-      "articles": 3,
-      "latest_headline": "Moody\u2019s places all of Boeing\u2019s ratings on review for a downgrade",
-      "updated": "2026-08-04T18:33:52.185951"
+      "score": -0.035,
+      "articles": 4,
+      "latest_headline": "Boeing-Lockheed Rocket Joint Venture Taps Private Bond Market",
+      "updated": "2026-08-06T02:03:17.166922"
     },
     "MCD": {
       "score": 0.136,
@@ -49,10 +49,10 @@
       "updated": "2026-08-04T20:46:56.482427"
     },
     "AAPL": {
-      "score": 0.154,
-      "articles": 4,
-      "latest_headline": "Key Options Trade Displays Abnormal Pattern With India Auction",
-      "updated": "2026-08-05T13:03:31.768376"
+      "score": 0.408,
+      "articles": 5,
+      "latest_headline": "Bank of America spends $250 million a year on GLP-1 drugs for its employees, CEO",
+      "updated": "2026-08-05T22:55:40.867132"
     },
     "BRK.B": {
       "score": 0.094,
@@ -61,22 +61,22 @@
       "updated": "2026-08-04T18:33:52.185961"
     },
     "SPY": {
-      "score": 0.607,
-      "articles": 9,
-      "latest_headline": "The stock market soars. 5 reasons behind the big surge Tuesday",
-      "updated": "2026-08-05T04:36:09.272186"
+      "score": 0.768,
+      "articles": 20,
+      "latest_headline": "Aggressive options trading helped drive the S&P 500\u2019s latest rally. What that me",
+      "updated": "2026-08-06T05:10:31.946291"
     },
     "META": {
-      "score": 0.078,
-      "articles": 5,
-      "latest_headline": "Iran War Exposes US Military Aluminum Risk Shown in Pentagon War Game",
-      "updated": "2026-08-05T18:02:16.712508"
+      "score": -0.245,
+      "articles": 6,
+      "latest_headline": "SpaceX moon crash is a perfect metaphor for rocket maker\u2019s share price, analysts",
+      "updated": "2026-08-05T23:58:15.358111"
     },
     "TSLA": {
-      "score": 0.305,
-      "articles": 18,
-      "latest_headline": "Elon Musk addresses memory-chip stock concerns with one simple observation",
-      "updated": "2026-08-05T17:48:10.622411"
+      "score": 0.392,
+      "articles": 37,
+      "latest_headline": "Jim Cramer says investors should consider buying SpaceX for their kids",
+      "updated": "2026-08-06T06:44:38.048439"
     },
     "NFLX": {
       "score": 0.225,
@@ -91,10 +91,10 @@
       "updated": "2026-08-05T12:31:28.829033"
     },
     "NVDA": {
-      "score": -0.27,
-      "articles": 2,
-      "latest_headline": "Stocks Sink in Broad AI Rout Sparked by China's DeepSeek",
-      "updated": "2026-08-04T18:33:52.185973"
+      "score": 0.653,
+      "articles": 10,
+      "latest_headline": "Stocks Edge Lower as Rate Hike Rumbles Offset Nvidia\u2019s Rally",
+      "updated": "2026-08-06T04:39:26.002951"
     },
     "AVGO": {
       "score": -0.15,
@@ -103,34 +103,34 @@
       "updated": "2026-08-04T18:33:52.185974"
     },
     "JPM": {
-      "score": 0.0,
-      "articles": 1,
-      "latest_headline": "Trump Adds Fuel to Claims That Big Banks Discriminate Against Conservatives",
-      "updated": "2026-08-04T18:33:52.185976"
+      "score": -0.15,
+      "articles": 2,
+      "latest_headline": "Tech Trade May See Bigger Retail Influence After July Rout, JPMorgan Says",
+      "updated": "2026-08-06T06:44:38.048476"
     },
     "BAC": {
-      "score": 0.0,
-      "articles": 1,
-      "latest_headline": "Trump Adds Fuel to Claims That Big Banks Discriminate Against Conservatives",
-      "updated": "2026-08-04T18:33:52.185978"
+      "score": 0.4,
+      "articles": 4,
+      "latest_headline": "Yen Seen Gaining 6% Against Dollar by End of 2026, Bank of America Says",
+      "updated": "2026-08-06T05:10:31.946329"
     },
     "INTC": {
-      "score": 0.862,
-      "articles": 12,
-      "latest_headline": "SoftBank jumps 13% as Asia tech stocks track Wall Street AI rally",
-      "updated": "2026-08-05T16:13:20.845609"
+      "score": 0.426,
+      "articles": 22,
+      "latest_headline": "China\u2019s Cheap AI Is Shifting Investors\u2019 Focus to Internet Stocks",
+      "updated": "2026-08-06T07:15:32.439486"
     },
     "C": {
-      "score": 0.351,
-      "articles": 4,
-      "latest_headline": "Novo Nordisk Slides as Forecast Boost Fails to Impress",
-      "updated": "2026-08-05T01:28:47.383169"
+      "score": 0.396,
+      "articles": 5,
+      "latest_headline": "Trump's Hormuz Update, OpenAI & Anthropic AI Alarms | The Pulse 8/5/2026",
+      "updated": "2026-08-05T19:47:56.957015"
     },
     "GOOGL": {
-      "score": 0.228,
-      "articles": 7,
-      "latest_headline": "India's Inflation Cushion 'Thinner' Than It Seems",
-      "updated": "2026-08-05T14:06:47.220773"
+      "score": -0.046,
+      "articles": 14,
+      "latest_headline": "Expedia, Block, Western Digital, & Sandisk All Report Results | Closing Bell",
+      "updated": "2026-08-06T04:39:26.002938"
     },
     "MRK": {
       "score": 0.0,
@@ -145,10 +145,10 @@
       "updated": "2026-08-04T19:40:32.230815"
     },
     "LLY": {
-      "score": 0.236,
-      "articles": 5,
-      "latest_headline": "CVS blows past estimates, hikes guidance as insurance unit continues to improve",
-      "updated": "2026-08-05T18:33:35.937375"
+      "score": 0.039,
+      "articles": 12,
+      "latest_headline": "We're increasing our Eli Lilly price target after another beat-and-raise quarter",
+      "updated": "2026-08-06T04:08:02.668566"
     },
     "CAT": {
       "score": 0.55,
@@ -157,10 +157,10 @@
       "updated": "2026-08-04T22:52:33.007734"
     },
     "AMD": {
-      "score": 0.505,
-      "articles": 5,
-      "latest_headline": "AMD plummets 8% in premarket trading despite beating expectations",
-      "updated": "2026-08-05T17:48:10.622456"
+      "score": 0.103,
+      "articles": 11,
+      "latest_headline": "Lisa Su brushes off Musk's Nvidia commitment as AMD stock sinks after earnings",
+      "updated": "2026-08-05T23:58:15.358126"
     },
     "V": {
       "score": 0.207,
@@ -181,18 +181,36 @@
       "updated": "2026-08-05T03:33:41.904188"
     },
     "DIS": {
-      "score": 0.255,
-      "articles": 2,
-      "latest_headline": "Disney tops earnings estimates as parks and streaming offer a boost",
-      "updated": "2026-08-05T18:33:35.937348"
+      "score": 0.638,
+      "articles": 10,
+      "latest_headline": "MNTN CEO on Disney\u2019s Ad Business, Streaming Wars Outlook",
+      "updated": "2026-08-06T06:13:02.498067"
     },
     "QQQ": {
-      "score": 0.3,
+      "score": 0.51,
+      "articles": 2,
+      "latest_headline": "Stock bears obliterated as Nasdaq 100 logs top 10 bullish stat of past decade",
+      "updated": "2026-08-05T20:50:31.628310"
+    },
+    "LMT": {
+      "score": 0.0,
       "articles": 1,
-      "latest_headline": "Tech Melt-Up Drives $3.5 Trillion Nasdaq 100 Rally in Four Days",
-      "updated": "2026-08-05T17:48:10.622471"
+      "latest_headline": "Boeing-Lockheed Rocket Joint Venture Taps Private Bond Market",
+      "updated": "2026-08-06T02:03:17.166954"
+    },
+    "BMY": {
+      "score": 0.0,
+      "articles": 1,
+      "latest_headline": "AstraZeneca Is Said to Have Explored Bristol Myers Merger",
+      "updated": "2026-08-06T02:34:50.053688"
+    },
+    "CRM": {
+      "score": -0.3,
+      "articles": 1,
+      "latest_headline": "Marc Benioff gets a new operating chief, as Salesforce promotes Miguel Milano",
+      "updated": "2026-08-06T04:39:26.002910"
     }
   },
-  "macro": -0.543,
-  "updated": "2026-08-05T18:33:35.937510"
+  "macro": -1.018,
+  "updated": "2026-08-06T08:18:15.292387"
 }
