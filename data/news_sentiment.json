@@ -7,22 +7,22 @@
       "updated": "2026-08-06T00:29:39.026099"
     },
     "MSFT": {
-      "score": 0.2,
-      "articles": 13,
-      "latest_headline": "Trump's Hormuz Update, OpenAI & Anthropic AI Alarms | The Pulse 8/5/2026",
-      "updated": "2026-08-05T19:47:56.957011"
+      "score": 0.279,
+      "articles": 21,
+      "latest_headline": "OpenAI Models Joined Forces Months Ahead of Hugging Face Hack",
+      "updated": "2026-08-07T02:15:43.564479"
     },
     "AMZN": {
-      "score": 0.423,
-      "articles": 16,
-      "latest_headline": "Japan\u2019s Kishida On Growth Strategy and Yen Intervention",
-      "updated": "2026-08-06T08:18:15.283723"
+      "score": -0.147,
+      "articles": 21,
+      "latest_headline": "Follow the Money All the Way to Carney's Canada",
+      "updated": "2026-08-07T06:25:51.533999"
     },
     "TLT": {
-      "score": -0.075,
-      "articles": 1,
-      "latest_headline": "U.S. stock futures and bond yields drop on reports Putin has updated nuclear doc",
-      "updated": "2026-08-04T18:33:52.185949"
+      "score": 0.012,
+      "articles": 3,
+      "latest_headline": "Stocks Churn Before Before Jobs Data as Oil Rises: Markets Wrap",
+      "updated": "2026-08-06T22:36:46.732817"
     },
     "BA": {
       "score": -0.035,
@@ -49,10 +49,10 @@
       "updated": "2026-08-04T20:46:56.482427"
     },
     "AAPL": {
-      "score": 0.408,
-      "articles": 5,
-      "latest_headline": "Bank of America spends $250 million a year on GLP-1 drugs for its employees, CEO",
-      "updated": "2026-08-05T22:55:40.867132"
+      "score": 0.136,
+      "articles": 6,
+      "latest_headline": "Bain Capital to acquire bubble tea chain Gong cha as rival MBK grapples with reg",
+      "updated": "2026-08-06T13:40:56.162390"
     },
     "BRK.B": {
       "score": 0.094,
@@ -61,28 +61,28 @@
       "updated": "2026-08-04T18:33:52.185961"
     },
     "SPY": {
-      "score": 0.768,
-      "articles": 20,
-      "latest_headline": "Aggressive options trading helped drive the S&P 500\u2019s latest rally. What that me",
-      "updated": "2026-08-06T05:10:31.946291"
+      "score": 0.793,
+      "articles": 24,
+      "latest_headline": "How to use options to trade stocks around an earnings announcement",
+      "updated": "2026-08-07T04:52:05.267735"
     },
     "META": {
-      "score": -0.245,
-      "articles": 6,
-      "latest_headline": "SpaceX moon crash is a perfect metaphor for rocket maker\u2019s share price, analysts",
-      "updated": "2026-08-05T23:58:15.358111"
+      "score": 0.106,
+      "articles": 13,
+      "latest_headline": "Meta ordered to pay $567 million into abatement fund as remedy to child harms ca",
+      "updated": "2026-08-07T08:31:22.967875"
     },
     "TSLA": {
-      "score": 0.392,
-      "articles": 37,
-      "latest_headline": "Jim Cramer says investors should consider buying SpaceX for their kids",
-      "updated": "2026-08-06T06:44:38.048439"
+      "score": -0.114,
+      "articles": 47,
+      "latest_headline": "GAO finds Elon Musk's DOGE inflated claims of $110 billion in savings for federa",
+      "updated": "2026-08-07T06:57:26.708829"
     },
     "NFLX": {
-      "score": 0.225,
-      "articles": 2,
-      "latest_headline": "Netflix woes setting up for a Hollywood ending, says trader Mike Khouw",
-      "updated": "2026-08-04T18:33:52.185969"
+      "score": 0.158,
+      "articles": 3,
+      "latest_headline": "\u2018India\u2019s Top Gun\u2019 Is Netflix\u2019s Most Ambitious Local Production",
+      "updated": "2026-08-06T22:04:29.064767"
     },
     "GS": {
       "score": -0.001,
@@ -91,10 +91,10 @@
       "updated": "2026-08-05T12:31:28.829033"
     },
     "NVDA": {
-      "score": 0.653,
-      "articles": 10,
-      "latest_headline": "Stocks Edge Lower as Rate Hike Rumbles Offset Nvidia\u2019s Rally",
-      "updated": "2026-08-06T04:39:26.002951"
+      "score": 0.757,
+      "articles": 11,
+      "latest_headline": "CNBC Daily Open: Iran, Oman in talks on Hormuz; SpaceX is loyal to Nvidia on AI",
+      "updated": "2026-08-06T09:28:09.608946"
     },
     "AVGO": {
       "score": -0.15,
@@ -103,10 +103,10 @@
       "updated": "2026-08-04T18:33:52.185974"
     },
     "JPM": {
-      "score": -0.15,
-      "articles": 2,
-      "latest_headline": "Tech Trade May See Bigger Retail Influence After July Rout, JPMorgan Says",
-      "updated": "2026-08-06T06:44:38.048476"
+      "score": 0.404,
+      "articles": 7,
+      "latest_headline": "Expect Hikes If Inflation Climbs: Aronov",
+      "updated": "2026-08-07T03:18:17.612933"
     },
     "BAC": {
       "score": 0.4,
@@ -115,22 +115,22 @@
       "updated": "2026-08-06T05:10:31.946329"
     },
     "INTC": {
-      "score": 0.426,
-      "articles": 22,
-      "latest_headline": "China\u2019s Cheap AI Is Shifting Investors\u2019 Focus to Internet Stocks",
-      "updated": "2026-08-06T07:15:32.439486"
+      "score": -0.055,
+      "articles": 33,
+      "latest_headline": "OpenAI Models Joined Forces Months Ahead of Hugging Face Hack",
+      "updated": "2026-08-07T02:15:43.564514"
     },
     "C": {
-      "score": 0.396,
-      "articles": 5,
-      "latest_headline": "Trump's Hormuz Update, OpenAI & Anthropic AI Alarms | The Pulse 8/5/2026",
-      "updated": "2026-08-05T19:47:56.957015"
+      "score": 0.277,
+      "articles": 6,
+      "latest_headline": "Singapore's DBS CEO Sees AI Costs Falling in \u2018Token Paradox\u2019",
+      "updated": "2026-08-07T08:00:08.810751"
     },
     "GOOGL": {
-      "score": -0.046,
-      "articles": 14,
-      "latest_headline": "Expedia, Block, Western Digital, & Sandisk All Report Results | Closing Bell",
-      "updated": "2026-08-06T04:39:26.002938"
+      "score": -0.088,
+      "articles": 28,
+      "latest_headline": "Alphabet Raises $25 Billion From Sought-After Bond Sale",
+      "updated": "2026-08-07T05:23:13.701257"
     },
     "MRK": {
       "score": 0.0,
@@ -145,10 +145,10 @@
       "updated": "2026-08-04T19:40:32.230815"
     },
     "LLY": {
-      "score": 0.039,
-      "articles": 12,
-      "latest_headline": "We're increasing our Eli Lilly price target after another beat-and-raise quarter",
-      "updated": "2026-08-06T04:08:02.668566"
+      "score": 0.027,
+      "articles": 13,
+      "latest_headline": "The divide between Eli Lilly and Novo Nordisk is widening after their latest ear",
+      "updated": "2026-08-06T22:04:29.064718"
     },
     "CAT": {
       "score": 0.55,
@@ -157,10 +157,10 @@
       "updated": "2026-08-04T22:52:33.007734"
     },
     "AMD": {
-      "score": 0.103,
-      "articles": 11,
-      "latest_headline": "Lisa Su brushes off Musk's Nvidia commitment as AMD stock sinks after earnings",
-      "updated": "2026-08-05T23:58:15.358126"
+      "score": 0.272,
+      "articles": 12,
+      "latest_headline": "AMD buys chip startup that hardwires AI models into its silicon",
+      "updated": "2026-08-07T04:20:36.239366"
     },
     "V": {
       "score": 0.207,
@@ -187,10 +187,10 @@
       "updated": "2026-08-06T06:13:02.498067"
     },
     "QQQ": {
-      "score": 0.51,
-      "articles": 2,
-      "latest_headline": "Stock bears obliterated as Nasdaq 100 logs top 10 bullish stat of past decade",
-      "updated": "2026-08-05T20:50:31.628310"
+      "score": 0.54,
+      "articles": 4,
+      "latest_headline": "New ETFs to Watch: Nasdaq 100 Challenger and Multi-Token Launch",
+      "updated": "2026-08-06T22:04:29.064783"
     },
     "LMT": {
       "score": 0.0,
@@ -199,18 +199,36 @@
       "updated": "2026-08-06T02:03:17.166954"
     },
     "BMY": {
-      "score": 0.0,
-      "articles": 1,
-      "latest_headline": "AstraZeneca Is Said to Have Explored Bristol Myers Merger",
-      "updated": "2026-08-06T02:34:50.053688"
+      "score": 0.3,
+      "articles": 2,
+      "latest_headline": "AstraZeneca may buck a decade of pharma strategy to buy U.S. scale",
+      "updated": "2026-08-06T17:52:45.392393"
     },
     "CRM": {
       "score": -0.3,
       "articles": 1,
       "latest_headline": "Marc Benioff gets a new operating chief, as Salesforce promotes Miguel Milano",
       "updated": "2026-08-06T04:39:26.002910"
+    },
+    "HON": {
+      "score": -0.584,
+      "articles": 3,
+      "latest_headline": "Honeywell Aerospace lands in Wall Street\u2019s \u2018penalty box\u2019 after gloomy guidance t",
+      "updated": "2026-08-07T04:52:05.267694"
+    },
+    "GLD": {
+      "score": 0.15,
+      "articles": 1,
+      "latest_headline": "Gold prices are breaking higher after a tough stretch. Could fresh records be wi",
+      "updated": "2026-08-07T05:23:13.701228"
+    },
+    "IWM": {
+      "score": 0.0,
+      "articles": 1,
+      "latest_headline": "Japan Small Caps Face Survival Race as Topix Cull Looms",
+      "updated": "2026-08-07T07:28:29.094372"
     }
   },
-  "macro": -1.018,
-  "updated": "2026-08-06T08:18:15.292387"
+  "macro": -0.484,
+  "updated": "2026-08-07T08:31:22.968095"
 }

@@ -1355,10 +1355,21 @@ def _v28_qqq_core_alpha(account, signals, regime, spy_trend):
     # ── 再平衡检查 ──
     last_rebal = getattr(account, '_v28_last_rebalance', None)
     now = datetime.datetime.now()
-    should_rebalance = (
-        last_rebal is None or
-        (now - last_rebal).days >= V28_REBALANCE_DAYS
-    )
+    days_since = (now - last_rebal).days if last_rebal else 999
+
+    # v28c: 如果 QQQ 配比远低于目标，每天都再平衡直到到位
+    qqq_pos = account.positions.get("QQQ", {})
+    qqq_qty = qqq_pos.get("qty", qqq_pos.get("shares", 0))
+    qqq_px = signals.get("QQQ", {}).get("price", 0)
+    qqq_val = qqq_qty * qqq_px if qqq_px > 0 else 0
+    qqq_pct = qqq_val / equity if equity > 0 else 0
+
+    if qqq_pct < V28_CORE_PCT * 0.80:
+        should_rebalance = True  # QQQ 严重不足，立即再平衡
+        if days_since > 0:
+            logger.info(f"📊 v28 QQQ配比{qqq_pct:.0%} << 目标{V28_CORE_PCT:.0%} — 加速再平衡")
+    else:
+        should_rebalance = days_since >= V28_REBALANCE_DAYS
 
     if not should_rebalance:
         return
@@ -1375,13 +1386,16 @@ def _v28_qqq_core_alpha(account, signals, regime, spy_trend):
         current_qqq_value = current_qqq_qty * qqq_price
 
         if current_qqq_value < target_qqq_value * 0.90:
-            # 需要加仓 QQQ
+            # 需要加仓 QQQ — 允许多批次买入直到达到目标
             buy_value = target_qqq_value - current_qqq_value
-            buy_qty = max(1, int(buy_value / qqq_price))
-            if buy_qty * qqq_price < cash * 0.90:
+            # 刷新现金（可能刚卖了其他持仓）
+            cash = account.cash
+            max_affordable = int(cash * 0.95 / qqq_price)
+            buy_qty = max(1, min(int(buy_value / qqq_price), max_affordable))
+            if buy_qty > 0 and buy_qty * qqq_price < cash * 0.98:
                 account.execute("QQQ", "BUY", buy_qty, qqq_price,
                               reason=f"v28核心仓 目标${target_qqq_value:,.0f}")
-                logger.info(f"🟢 v28买入 QQQ: {buy_qty}股 @${qqq_price:.2f}")
+                logger.info(f"🟢 v28买入 QQQ: {buy_qty}股 @${qqq_price:.2f} (现有{current_qqq_qty}股)")
 
     # ── Alpha 仓: 动量股 ──
     target_alpha_value = equity * (1 - V28_CORE_PCT)
