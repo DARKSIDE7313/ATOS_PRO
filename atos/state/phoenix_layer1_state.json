@@ -39,6 +39,16 @@
       "pe": 26.5,
       "multiple": 1.0,
       "date": "2026-07-24"
+    },
+    {
+      "action": "buy",
+      "symbol": "VOO",
+      "amount": 30000.0,
+      "shares": 42.24,
+      "price": 710.16,
+      "pe": 27.8,
+      "multiple": 1.0,
+      "date": "2026-08-08"
     }
   ],
   "last_rebalance": "2026-07-23"

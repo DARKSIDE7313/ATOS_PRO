@@ -7,22 +7,22 @@
       "updated": "2026-08-06T00:29:39.026099"
     },
     "MSFT": {
-      "score": 0.279,
-      "articles": 21,
-      "latest_headline": "OpenAI Models Joined Forces Months Ahead of Hugging Face Hack",
-      "updated": "2026-08-07T02:15:43.564479"
+      "score": 0.395,
+      "articles": 25,
+      "latest_headline": "These analysts say Elon Musk\u2019s ambitious AI plans for SpaceX should be taken ser",
+      "updated": "2026-08-10T17:28:57.907598"
     },
     "AMZN": {
-      "score": -0.147,
-      "articles": 21,
-      "latest_headline": "Follow the Money All the Way to Carney's Canada",
-      "updated": "2026-08-07T06:25:51.533999"
+      "score": 0.095,
+      "articles": 31,
+      "latest_headline": "From \u2018Billionaire Bunker\u2019 to Beverly Hills: The properties that make up Jeff Bez",
+      "updated": "2026-08-10T17:05:42.269967"
     },
     "TLT": {
-      "score": 0.012,
-      "articles": 3,
-      "latest_headline": "Stocks Churn Before Before Jobs Data as Oil Rises: Markets Wrap",
-      "updated": "2026-08-06T22:36:46.732817"
+      "score": 0.195,
+      "articles": 12,
+      "latest_headline": "Behind Bessent Moves, Wall Street Sees Sign of Bond-Market Angst",
+      "updated": "2026-08-09T21:50:14.397873"
     },
     "BA": {
       "score": -0.035,
@@ -37,46 +37,46 @@
       "updated": "2026-08-05T05:38:49.674865"
     },
     "XOM": {
-      "score": 0.247,
-      "articles": 2,
-      "latest_headline": "Refiners Can\u2019t Deliver Gas Price Relief Trump Wants, Says Stephen Schork",
-      "updated": "2026-08-04T20:46:56.482380"
+      "score": 0.098,
+      "articles": 3,
+      "latest_headline": "Trump says oil supermajors are making too much money. What will they do with it?",
+      "updated": "2026-08-10T13:07:58.091365"
     },
     "CVX": {
-      "score": 0.247,
-      "articles": 2,
-      "latest_headline": "Refiners Can\u2019t Deliver Gas Price Relief Trump Wants, Says Stephen Schork",
-      "updated": "2026-08-04T20:46:56.482427"
+      "score": -0.059,
+      "articles": 4,
+      "latest_headline": "Trump says oil supermajors are making too much money. What will they do with it?",
+      "updated": "2026-08-10T13:07:58.091399"
     },
     "AAPL": {
-      "score": 0.136,
-      "articles": 6,
-      "latest_headline": "Bain Capital to acquire bubble tea chain Gong cha as rival MBK grapples with reg",
-      "updated": "2026-08-06T13:40:56.162390"
+      "score": -0.473,
+      "articles": 10,
+      "latest_headline": "U.S. stock futures dip as investors await inflation data, grapple with more Iran",
+      "updated": "2026-08-10T06:49:27.027070"
     },
     "BRK.B": {
-      "score": 0.094,
-      "articles": 3,
-      "latest_headline": "Berkshire Hathaway shares hit eight-month high",
-      "updated": "2026-08-04T18:33:52.185961"
+      "score": 0.545,
+      "articles": 9,
+      "latest_headline": "Berkshire Hathaway finally started spending its nearly $400 billion in cash \u2014 on",
+      "updated": "2026-08-10T16:23:24.847201"
     },
     "SPY": {
-      "score": 0.793,
-      "articles": 24,
-      "latest_headline": "How to use options to trade stocks around an earnings announcement",
-      "updated": "2026-08-07T04:52:05.267735"
+      "score": 0.616,
+      "articles": 32,
+      "latest_headline": "Wall Street\u2019s biggest bank just raised its expectations for the stock market",
+      "updated": "2026-08-10T17:21:34.750843"
     },
     "META": {
-      "score": 0.106,
-      "articles": 13,
-      "latest_headline": "Meta ordered to pay $567 million into abatement fund as remedy to child harms ca",
-      "updated": "2026-08-07T08:31:22.967875"
+      "score": 0.423,
+      "articles": 27,
+      "latest_headline": "Copper Holds $14,000 as Weaker US Rate Outlook Boosts Metals",
+      "updated": "2026-08-10T12:55:15.690233"
     },
     "TSLA": {
-      "score": -0.114,
-      "articles": 47,
-      "latest_headline": "GAO finds Elon Musk's DOGE inflated claims of $110 billion in savings for federa",
-      "updated": "2026-08-07T06:57:26.708829"
+      "score": 0.339,
+      "articles": 54,
+      "latest_headline": "These analysts say Elon Musk\u2019s ambitious AI plans for SpaceX should be taken ser",
+      "updated": "2026-08-10T17:28:57.907632"
     },
     "NFLX": {
       "score": 0.158,
@@ -85,16 +85,16 @@
       "updated": "2026-08-06T22:04:29.064767"
     },
     "GS": {
-      "score": -0.001,
-      "articles": 6,
-      "latest_headline": "Goldman Sachs' Keung on Chinese AI Models",
-      "updated": "2026-08-05T12:31:28.829033"
+      "score": 0.149,
+      "articles": 7,
+      "latest_headline": "Goldman Skeptical of Dollar-Dominance Threats After Yen Support",
+      "updated": "2026-08-07T12:49:13.334408"
     },
     "NVDA": {
-      "score": 0.757,
-      "articles": 11,
-      "latest_headline": "CNBC Daily Open: Iran, Oman in talks on Hormuz; SpaceX is loyal to Nvidia on AI",
-      "updated": "2026-08-06T09:28:09.608946"
+      "score": 0.731,
+      "articles": 13,
+      "latest_headline": "SpaceX\u2019s Nvidia deal could be bad news for neoclouds like CoreWeave and Nebius, ",
+      "updated": "2026-08-08T19:13:06.957690"
     },
     "AVGO": {
       "score": -0.15,
@@ -103,34 +103,34 @@
       "updated": "2026-08-04T18:33:52.185974"
     },
     "JPM": {
-      "score": 0.404,
-      "articles": 7,
-      "latest_headline": "Expect Hikes If Inflation Climbs: Aronov",
-      "updated": "2026-08-07T03:18:17.612933"
+      "score": 0.198,
+      "articles": 9,
+      "latest_headline": "Wall Street\u2019s biggest bank just raised its expectations for the stock market",
+      "updated": "2026-08-10T17:21:34.750804"
     },
     "BAC": {
-      "score": 0.4,
-      "articles": 4,
-      "latest_headline": "Yen Seen Gaining 6% Against Dollar by End of 2026, Bank of America Says",
-      "updated": "2026-08-06T05:10:31.946329"
+      "score": 0.174,
+      "articles": 7,
+      "latest_headline": "Bloomberg This Weekend 8/08/2026",
+      "updated": "2026-08-09T01:47:01.373979"
     },
     "INTC": {
-      "score": -0.055,
-      "articles": 33,
-      "latest_headline": "OpenAI Models Joined Forces Months Ahead of Hugging Face Hack",
-      "updated": "2026-08-07T02:15:43.564514"
+      "score": 0.492,
+      "articles": 43,
+      "latest_headline": "Shein Valued at $22 Billion to $25 Billion Ahead of IPO, BI Says",
+      "updated": "2026-08-10T13:02:40.115115"
     },
     "C": {
-      "score": 0.277,
-      "articles": 6,
-      "latest_headline": "Singapore's DBS CEO Sees AI Costs Falling in \u2018Token Paradox\u2019",
-      "updated": "2026-08-07T08:00:08.810751"
+      "score": 0.7,
+      "articles": 9,
+      "latest_headline": "Airbnb Jumps After Raising Its 2026 Revenue Outlook Again",
+      "updated": "2026-08-07T21:48:13.532938"
     },
     "GOOGL": {
-      "score": -0.088,
-      "articles": 28,
-      "latest_headline": "Alphabet Raises $25 Billion From Sought-After Bond Sale",
-      "updated": "2026-08-07T05:23:13.701257"
+      "score": 0.443,
+      "articles": 38,
+      "latest_headline": "Inflation Data Keeps Fed Rate Hike in Play",
+      "updated": "2026-08-09T22:38:49.762614"
     },
     "MRK": {
       "score": 0.0,
@@ -157,10 +157,10 @@
       "updated": "2026-08-04T22:52:33.007734"
     },
     "AMD": {
-      "score": 0.272,
-      "articles": 12,
-      "latest_headline": "AMD buys chip startup that hardwires AI models into its silicon",
-      "updated": "2026-08-07T04:20:36.239366"
+      "score": 0.19,
+      "articles": 13,
+      "latest_headline": "NYC Deputy Mayor on Jobs, Taxes, Grocery Stores",
+      "updated": "2026-08-08T03:33:30.737472"
     },
     "V": {
       "score": 0.207,
@@ -223,12 +223,12 @@
       "updated": "2026-08-07T05:23:13.701228"
     },
     "IWM": {
-      "score": 0.0,
-      "articles": 1,
-      "latest_headline": "Japan Small Caps Face Survival Race as Topix Cull Looms",
-      "updated": "2026-08-07T07:28:29.094372"
+      "score": 0.51,
+      "articles": 3,
+      "latest_headline": "Rotation From Leveraged ETFs Fuels 30% Jump in Korea Small Caps",
+      "updated": "2026-08-10T13:04:47.726715"
     }
   },
-  "macro": -0.484,
-  "updated": "2026-08-07T08:31:22.968095"
+  "macro": -1.087,
+  "updated": "2026-08-10T17:29:59.714254"
 }

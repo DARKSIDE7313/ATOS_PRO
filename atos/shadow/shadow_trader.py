@@ -270,6 +270,9 @@ class ShadowAccount:
         return 0.12          # v19: 单仓上限 12%（从 20% 降低，专业基金标准 ≤12%，
                               # 防止单票黑天鹅事件造成过度集中损失）
 
+    # v28: ETF 单仓上限（QQQ/SPY 是分散化ETF，不是单票）
+    ETF_MAX_PCT = 0.65       # QQQ 可以到 65%
+
     @property
     def min_cash_pct(self) -> float:
         return {"VERY_AGGRESSIVE": 0.02, "AGGRESSIVE": 0.02, "MODERATE": 0.05, "CONSERVATIVE": 0.03}[self.mode]
@@ -351,18 +354,23 @@ class ShadowAccount:
                 shares = affordable
 
         # 单仓上限（硬约束，不允许超过）
-        max_single_val = self.total_equity * self.max_single_pct
+        # v28: ETF (QQQ/SPY/TLT/GLD/IWM) 用更高的上限 — ETF 是分散化的
+        _ETF_SYMBOLS = {"QQQ", "SPY", "TLT", "GLD", "IWM", "SLV", "USO", "IBB"}
+        if symbol in _ETF_SYMBOLS:
+            max_single_val = self.total_equity * self.ETF_MAX_PCT
+        else:
+            max_single_val = self.total_equity * self.max_single_pct
         current_val = self.positions[symbol]["qty"] * price if symbol in self.positions else 0
         max_buy = max_single_val - current_val
         if max_buy <= 0 and action == "BUY":
             logger.debug(f"  {symbol} 已达单仓上限 (${max_single_val:,.0f})")
             return False
 
-        # 总仓位上限（防止所有仓位加起来超过85%总资产）
+        # 总仓位上限（v28: 满仓策略 98%，留 2% 现金缓冲）
         if action == "BUY" or action == "ADD":
             total_pos_val = sum(p["qty"] * (p.get("last_price", p["avg_price"])) for p in self.positions.values())
             estimated_buy = price * shares
-            max_total_pos = self.total_equity * 0.85
+            max_total_pos = self.total_equity * 0.98
             if total_pos_val + estimated_buy > max_total_pos:
                 available = max_total_pos - total_pos_val
                 if available <= 0:
@@ -1393,9 +1401,12 @@ def _v28_qqq_core_alpha(account, signals, regime, spy_trend):
             max_affordable = int(cash * 0.95 / qqq_price)
             buy_qty = max(1, min(int(buy_value / qqq_price), max_affordable))
             if buy_qty > 0 and buy_qty * qqq_price < cash * 0.98:
-                account.execute("QQQ", "BUY", buy_qty, qqq_price,
+                ok = account.execute("QQQ", "BUY", buy_qty, qqq_price,
                               reason=f"v28核心仓 目标${target_qqq_value:,.0f}")
-                logger.info(f"🟢 v28买入 QQQ: {buy_qty}股 @${qqq_price:.2f} (现有{current_qqq_qty}股)")
+                if ok:
+                    logger.info(f"🟢 v28买入 QQQ: {buy_qty}股 @${qqq_price:.2f} (现有{current_qqq_qty}股)")
+                else:
+                    logger.warning(f"⚠️ v28 QQQ买入被拒绝: {buy_qty}股 @${qqq_price:.2f} — 检查单仓/总仓上限")
 
     # ── Alpha 仓: 动量股 ──
     target_alpha_value = equity * (1 - V28_CORE_PCT)
