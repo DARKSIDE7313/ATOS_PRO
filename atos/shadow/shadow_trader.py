@@ -275,7 +275,7 @@ class ShadowAccount:
 
     @property
     def min_cash_pct(self) -> float:
-        return {"VERY_AGGRESSIVE": 0.02, "AGGRESSIVE": 0.02, "MODERATE": 0.05, "CONSERVATIVE": 0.03}[self.mode]
+        return 0.02  # v28: 满仓策略，最低现金 2%
 
     def get_state(self) -> dict:
         pos_val = sum(
@@ -1398,7 +1398,7 @@ def _v28_qqq_core_alpha(account, signals, regime, spy_trend):
             buy_value = target_qqq_value - current_qqq_value
             # 刷新现金（可能刚卖了其他持仓）
             cash = account.cash
-            max_affordable = int(cash * 0.95 / qqq_price)
+            max_affordable = int(cash * 0.98 / qqq_price)
             buy_qty = max(1, min(int(buy_value / qqq_price), max_affordable))
             if buy_qty > 0 and buy_qty * qqq_price < cash * 0.98:
                 ok = account.execute("QQQ", "BUY", buy_qty, qqq_price,
