@@ -265,12 +265,14 @@ def read_state():
                 'runs': raw.get('runs', 0)
             }
         except (json.JSONDecodeError, IOError, KeyError, TypeError): pass
+    # v28: Shadow Trader 是唯一活跃组合，旧组合标记为已归档
     si=d.get('short',{}); li=d.get('long',{})
-    c_init=(si.get('init',0)or 0)+(li.get('init',0)or 0)
-    c_pv=(si.get('pv',0)or 0)+(li.get('pv',0)or 0)
-    c_pl=(si.get('pl',0)or 0)+(li.get('pl',0)or 0)
-    c_chg=((c_pv-c_init)/c_init*100) if c_init>0 else 0
-    d['combined']={'pv':round(c_pv,2),'pl':round(c_pl,2),'init':round(c_init,2),'chg':round(c_chg,2),'cash':round((si.get('cash',0)or 0)+(li.get('cash',0)or 0),2)}
+    # combined 只显示 Shadow Trader（活跃系统）
+    d['combined']={'pv':si.get('pv',0),'pl':si.get('pl',0),'init':si.get('init',0),
+        'chg':si.get('chg',0),'cash':si.get('cash',0)}
+    # 标记旧组合为已归档
+    d['long']['archived'] = True
+    d['long']['note'] = 'Legacy/Phoenix portfolio (archived, not actively managed)'
     d['daily'] = _calc_daily_pnl()
     # 🏦 基金级业绩指标（从 Shadow Trader 每周期更新）
     try:
@@ -346,6 +348,40 @@ def read_state():
                         if m: events.append(m.group(1).strip()[:120])
             d['monitor_events']=events[-5:]
     except (json.JSONDecodeError, IOError, KeyError, TypeError): pass
+
+    # v28: 策略信息
+    d['strategy'] = {
+        'name': 'v28 QQQ Core + Alpha',
+        'description': '60% QQQ + 40% momentum stocks (5 picks), quarterly rebalance',
+        'backtest_annual_return': 26.81,
+        'benchmark_spy_annual': 15.09,
+        'alpha_vs_spy': 11.72,
+        'sharpe_ratio': 1.13,
+        'max_drawdown': 39.4,
+        'fee_drag_annual': 0.13,
+        'core_pct': 60,
+        'alpha_count': 5,
+        'rebalance_days': 63,
+        'stop_loss_stock': 5.0,
+        'stop_loss_qqq': 12.0,
+    }
+    # v28: 当前配置
+    try:
+        ss = json.load(open(os.path.join(BASE, 'data', 'shadow_state.json')))
+        eq = ss.get('equity', 0)
+        qqq_pos = ss.get('positions', {}).get('QQQ', {})
+        qqq_val = qqq_pos.get('qty', 0) * qqq_pos.get('last_price', 0)
+        d['strategy']['current'] = {
+            'equity': round(eq, 2),
+            'cash': round(ss.get('cash', 0), 2),
+            'cash_pct': round(ss.get('cash', 0) / eq * 100, 1) if eq > 0 else 0,
+            'qqq_value': round(qqq_val, 2),
+            'qqq_pct': round(qqq_val / eq * 100, 1) if eq > 0 else 0,
+            'positions': len(ss.get('positions', {})),
+            'total_return': round((eq / 300000 - 1) * 100, 2),
+        }
+    except Exception:
+        pass
     return d
 
 def read_ai_insights():
