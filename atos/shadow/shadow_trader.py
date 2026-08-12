@@ -822,7 +822,10 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
     # ── v24: 两阶段部分止盈 — 基于 GS 成功模式优化 ──
     # GS 实证: 7次分批止盈各~9%, 共+$2,212 → 提前到+5%首次锁利
     # Renaissance 核心: 让利润跑但分阶段锁定
+    # v28: 跳过 — v28 持仓不做分批止盈，让利润充分奔跑
     for sym, pos in list(account.positions.items()):
+        if sym in ("QQQ",) or sym in V28_ALPHA_UNIVERSE:
+            continue  # v28 持仓跳过
         qty_now = pos.get("shares", pos.get("qty", 0))
         px = signals.get(sym, {}).get("price", pos.get("avg_price", 0))
         if px <= 0: continue
@@ -1567,7 +1570,9 @@ def _factor_based_buying(account, signals, top_picks, factor_result, regime, spy
 
     # ── v23: 行业再平衡 — 超限行业自动卖最弱持仓 ──
     # v24 FIX: 1) exposure改用总权益做分母 2) 每周期最多卖1次防级联
-    if sector_exposure and account.positions:
+    # v28: 跳过 — v28 策略有意集中持仓科技股，不做行业再平衡
+    _has_v28 = any(s in V28_ALPHA_UNIVERSE or s == "QQQ" for s in account.positions)
+    if sector_exposure and account.positions and not _has_v28:
         try:
             from atos.portfolio.correlation import SECTOR_MAP
             # 用总权益重新计算各行业敞口（而不是占总投资的百分比）
