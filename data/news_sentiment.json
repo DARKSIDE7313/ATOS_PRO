@@ -19,16 +19,16 @@
       "updated": "2026-08-12T14:22:05.340692"
     },
     "TLT": {
-      "score": 0.222,
-      "articles": 19,
-      "latest_headline": "Korea\u2019s 30-Year Bond Yield Hits Record on Oil, Rate Hike Bets",
-      "updated": "2026-08-12T11:01:13.256234"
+      "score": 0.118,
+      "articles": 22,
+      "latest_headline": "Pimco\u2019s Seidner Says Angst Over Fed Credibility Is Unwarranted",
+      "updated": "2026-08-12T18:24:02.901172"
     },
     "BA": {
-      "score": 0.415,
-      "articles": 8,
-      "latest_headline": "Archer strikes deal with Boeing in latest bid to transform aviation through AI",
-      "updated": "2026-08-11T01:25:39.182498"
+      "score": 0.29,
+      "articles": 9,
+      "latest_headline": "China\u2019s answer to Boeing and Airbus makes first international flight \u2014 could COM",
+      "updated": "2026-08-12T18:27:18.216806"
     },
     "MCD": {
       "score": -0.444,
@@ -67,10 +67,10 @@
       "updated": "2026-08-12T01:09:19.837994"
     },
     "META": {
-      "score": 0.476,
-      "articles": 37,
-      "latest_headline": "Radiant World Offers $150 Million Aluminum Stash for Sale",
-      "updated": "2026-08-12T00:27:03.143997"
+      "score": 0.333,
+      "articles": 38,
+      "latest_headline": "Lloyds Metals Allowed to Ready Restart of Giant PNG Copper Mine",
+      "updated": "2026-08-12T17:18:30.633284"
     },
     "TSLA": {
       "score": 0.422,
@@ -115,10 +115,10 @@
       "updated": "2026-08-12T02:39:09.337526"
     },
     "INTC": {
-      "score": 0.742,
-      "articles": 71,
-      "latest_headline": "Stocks Rise on CoreWeave Results, Oil Rally Builds: Markets Wrap",
-      "updated": "2026-08-12T14:00:54.432449"
+      "score": 0.521,
+      "articles": 73,
+      "latest_headline": "Most Electricity Sought for AI Data Centers in US Will Never Materialize",
+      "updated": "2026-08-12T17:47:09.612887"
     },
     "C": {
       "score": 0.614,
@@ -229,6 +229,6 @@
       "updated": "2026-08-11T19:52:12.194053"
     }
   },
-  "macro": -1.167,
-  "updated": "2026-08-12T16:38:22.822969"
+  "macro": -0.592,
+  "updated": "2026-08-12T18:50:32.905457"
 }

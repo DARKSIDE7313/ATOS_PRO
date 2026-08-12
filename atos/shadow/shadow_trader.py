@@ -1424,7 +1424,7 @@ def _v28_qqq_core_alpha(account, signals, regime, spy_trend):
     target_alpha_value = equity * (1 - V28_CORE_PCT)
     per_stock_value = target_alpha_value / V28_ALPHA_COUNT
 
-    # 计算动量分
+    # 计算动量分 (v28i: 行业动量 — 1日变动 + 距20日高点距离)
     alpha_candidates = []
     for sym in V28_ALPHA_UNIVERSE:
         sig = signals.get(sym, {})
@@ -1433,15 +1433,21 @@ def _v28_qqq_core_alpha(account, signals, regime, spy_trend):
             continue
 
         # 动量指标
-        mom_1m = sig.get("change_pct", 0) or 0  # 1日变动
+        mom_1d = sig.get("change_pct", 0) or 0  # 1日变动
+        dist_high = sig.get("dist_20d_high", -10) or -10  # 距20日高点 (负数, 越近0越强)
         ma50 = sig.get("ma50", 0)
         rsi = sig.get("rsi", 50)
-        score = sig.get("score", sig.get("composite_score", 0))
+
+        # v28i: 行业动量评分 = 40% 短期动量 + 60% 趋势强度(距高点)
+        # dist_high 范围约 -20~0, 转换为 0~1 分数 (越近高点越高分)
+        trend_score = max(0, 1 + dist_high / 20)  # -20→0, 0→1
+        mom_score = max(0, min(1, (mom_1d + 5) / 10))  # -5%→0, +5%→1
+        score = mom_score * 0.4 + trend_score * 0.6
 
         # 过滤
-        if rsi > 75:  # 超买
+        if rsi > 78:  # 超买
             continue
-        if ma50 > 0 and price < ma50 * 0.95:  # 远低于MA50
+        if ma50 > 0 and price < ma50 * 0.92:  # 远低于MA50
             continue
 
         alpha_candidates.append((sym, score, price))

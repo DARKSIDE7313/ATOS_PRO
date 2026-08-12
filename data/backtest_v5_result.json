@@ -1,0 +1,104 @@
+{
+  "timestamp": "2026-08-12 18:49:12.388158",
+  "results": [
+    {
+      "name": "E: \u884c\u4e1a\u52a8\u91cf (1\u6708+3\u6708)",
+      "annual": 26.23,
+      "total": 870.7,
+      "max_dd": -42.4,
+      "sharpe": 1.03,
+      "trades": 315,
+      "fees": 3477,
+      "fee_pct": 0.12,
+      "final": 2912109
+    },
+    {
+      "name": "A: v28 \u539f\u7248 (60%QQQ+\u52a8\u91cf)",
+      "annual": 25.37,
+      "total": 807.9,
+      "max_dd": -42.6,
+      "sharpe": 1.01,
+      "trades": 307,
+      "fees": 3011,
+      "fee_pct": 0.1,
+      "final": 2723562
+    },
+    {
+      "name": "H: 70%QQQ+3\u53eaRS",
+      "annual": 25.29,
+      "total": 802.7,
+      "max_dd": -40.0,
+      "sharpe": 1.0,
+      "trades": 215,
+      "fees": 2857,
+      "fee_pct": 0.1,
+      "final": 2708214
+    },
+    {
+      "name": "B: \u76f8\u5bf9\u5f3a\u5ea6 (RS>SPY)",
+      "annual": 25.08,
+      "total": 788.1,
+      "max_dd": -40.6,
+      "sharpe": 1.0,
+      "trades": 277,
+      "fees": 3189,
+      "fee_pct": 0.11,
+      "final": 2664385
+    },
+    {
+      "name": "F: RS+\u6ce2\u52a8\u7387\u52a0\u6743",
+      "annual": 23.6,
+      "total": 690.7,
+      "max_dd": -40.2,
+      "sharpe": 0.98,
+      "trades": 277,
+      "fees": 2895,
+      "fee_pct": 0.1,
+      "final": 2372217
+    },
+    {
+      "name": "C: \u6ce2\u52a8\u7387\u52a0\u6743",
+      "annual": 23.09,
+      "total": 659.1,
+      "max_dd": -42.1,
+      "sharpe": 0.96,
+      "trades": 304,
+      "fees": 2714,
+      "fee_pct": 0.09,
+      "final": 2277353
+    },
+    {
+      "name": "D: \u53cc\u52a8\u91cf (QQQ/TLT\u5207\u6362)",
+      "annual": 21.88,
+      "total": 589.7,
+      "max_dd": -41.6,
+      "sharpe": 0.98,
+      "trades": 323,
+      "fees": 4503,
+      "fee_pct": 0.15,
+      "final": 2069055
+    },
+    {
+      "name": "I: 80%QQQ+3\u53eaRS+\u6ce2\u52a8\u7387",
+      "annual": 21.69,
+      "total": 578.9,
+      "max_dd": -38.5,
+      "sharpe": 0.94,
+      "trades": 210,
+      "fees": 1784,
+      "fee_pct": 0.06,
+      "final": 2036580
+    },
+    {
+      "name": "G: \u53cc\u52a8\u91cf+RS+\u6ce2\u52a8\u7387",
+      "annual": 20.3,
+      "total": 507.1,
+      "max_dd": -37.9,
+      "sharpe": 0.95,
+      "trades": 293,
+      "fees": 4240,
+      "fee_pct": 0.14,
+      "final": 1821382
+    }
+  ]
+}
