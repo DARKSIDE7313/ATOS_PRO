@@ -331,11 +331,13 @@ class ShadowAccount:
         if shares > 100000:
             logger.error(f"数量异常: {shares}股")
             return False
-        if is_duplicate_order(symbol, action, shares):
+        # v28: 跳过冷却和重复检查（v28 是季度再平衡策略，不需要这些限制）
+        _is_v28 = reason.startswith("v28")
+        if not _is_v28 and is_duplicate_order(symbol, action, shares):
             return False
 
         # BUGFIX P1: 执行层冷却拦截 — 任何 BUY/ADD 先查冷却
-        if action in ("BUY", "ADD") and self.is_cooling_off(symbol):
+        if not _is_v28 and action in ("BUY", "ADD") and self.is_cooling_off(symbol):
             logger.debug(f"🚫 冷却拦截: {action} {symbol} (执行层)")
             return False
 
@@ -1019,6 +1021,10 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
                 logger.info(f"🗑 Flat清理: {sym} 持有{hold_days:.0f}天不涨 释放资金")
                 continue
 
+        # v28: 不设置 trailing stop — v28 有自己的卖出逻辑
+        if _v28_position:
+            continue
+
         if sym not in account.trailing_stops:
             if not use_trailing:
                 continue
@@ -1061,6 +1067,9 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
     _MOMENTUM_EXIT_THRESHOLD = 0.015  # 1.5%以内算"不涨不跌"
     for sym, pos in list(account.positions.items()):
         if sym not in account.positions:
+            continue
+        # v28: 跳过动量退出 — v28 持仓按季度再平衡
+        if sym in ("QQQ",) or sym in V28_ALPHA_UNIVERSE:
             continue
         buy_date_str = pos.get("buy_date", "")
         if not buy_date_str:
