@@ -689,13 +689,17 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
     try:
         from atos.live.realtime_feeds import get_feed
         feed = get_feed()
-        cache_stats = feed.cache.stats
-        max_age = cache_stats.get("max_age_sec", 0)
-        if max_age > 60:
-            logger.warning(f"⏰ Futu数据过期: 最旧{max_age:.0f}秒 — 强制重连!")
-            feed.reconnect()
-        elif max_age > 3:
-            logger.debug(f"Futu数据年龄: 最旧{max_age:.1f}秒")
+        # v28i: FutuOpenD 不可用时跳过重连（避免阻塞）
+        if feed._fallback:
+            pass  # 已降级到 yfinance，不重连
+        else:
+            cache_stats = feed.cache.stats
+            max_age = cache_stats.get("max_age_sec", 0)
+            if max_age > 60:
+                logger.warning(f"⏰ Futu数据过期: 最旧{max_age:.0f}秒 — 强制重连!")
+                feed.reconnect()
+            elif max_age > 3:
+                logger.debug(f"Futu数据年龄: 最旧{max_age:.1f}秒")
     except Exception:
         pass
 
@@ -2212,6 +2216,10 @@ def _finalize_cycle(account, cycle, regime, current_vix, signals, top_picks,
         day_data = {}
         # 尝试从 Futu OpenD 批量获取日内涨跌
         try:
+            # v28i: 先 TCP 检查，避免 OpenQuoteContext 内部重试阻塞
+            import socket as _sock
+            _s = _sock.create_connection(('127.0.0.1', 11111), timeout=2)
+            _s.close()
             from futu import OpenQuoteContext, RET_OK
             pos_syms = [s for s in account.positions if isinstance(account.positions.get(s), dict)]
             if pos_syms:
