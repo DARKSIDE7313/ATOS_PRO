@@ -206,6 +206,18 @@ class FutuRealtimeFeed:
         self._ws_handler_set = False
         self._reconnect_attempts = 0   # v5: 重连退避计数
         self._last_reconnect_time = 0  # v5: 上次重连时间
+        self._futu_disabled = False    # v28j: 永久禁用标记
+
+        # v28j: 快速 TCP 检查 — 如果端口不通直接禁用 FutuOpenD
+        import socket as _sock
+        try:
+            _s = _sock.create_connection((host, port), timeout=2)
+            _s.close()
+        except Exception:
+            logger.warning(f"FutuOpenD 端口 {host}:{port} 不可达 — 永久禁用，使用 yfinance")
+            self._futu_disabled = True
+            self._fallback = True
+            return
 
         # 启动时尝试连接
         self._connect()

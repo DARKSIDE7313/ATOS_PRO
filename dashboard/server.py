@@ -679,8 +679,18 @@ class H(http.server.BaseHTTPRequestHandler):
             try:
                 nf = os.path.join(BASE, 'data', 'news_sentiment.json')
                 if os.path.exists(nf):
-                    with open(nf) as f: self._j(json.load(f))
-                else: self._j({'stocks': {}, 'macro': 0.0, 'updated': 'never'})
+                    with open(nf) as f:
+                        raw = json.load(f)
+                    # v28i: 统一 key 名 — stocks→sentiments, macro→macro_sentiment
+                    stocks = raw.get('stocks', raw.get('sentiments', {}))
+                    macro = raw.get('macro', raw.get('macro_sentiment', 0))
+                    self._j({
+                        'sentiments': stocks,
+                        'macro_sentiment': macro,
+                        'updated': raw.get('updated', ''),
+                        'count': len(stocks),
+                    })
+                else: self._j({'sentiments': {}, 'macro_sentiment': 0.0, 'updated': 'never', 'count': 0})
             except Exception as e: self._j({'error': str(e)})
         elif p.path=='/api/daily':
             try:
@@ -704,11 +714,31 @@ class H(http.server.BaseHTTPRequestHandler):
             except: self._j({'error':'read failed'})
         elif p.path=='/api/backtest':
             try:
-                bt_file = os.path.join(BASE, 'data', 'backtest_v4_result.json')
-                if os.path.exists(bt_file):
-                    with open(bt_file) as f: self._j(json.load(f))
+                # v28i: 优先读 v5（最新），fallback v4
+                bt5 = os.path.join(BASE, 'data', 'backtest_v5_result.json')
+                bt4 = os.path.join(BASE, 'data', 'backtest_v4_result.json')
+                if os.path.exists(bt5):
+                    with open(bt5) as f:
+                        raw = json.load(f)
+                    results = raw.get('results', [])
+                    best = max(results, key=lambda x: x.get('annual', 0)) if results else {}
+                    self._j({
+                        'best_strategy': {
+                            'name': best.get('name', ''),
+                            'annual_return': best.get('annual', 0),
+                            'max_drawdown': best.get('max_dd', 0),
+                            'sharpe': best.get('sharpe', 0),
+                            'fee_pct': best.get('fee_pct', 0),
+                        },
+                        'spy_annual': 15.09,
+                        'alpha': round(best.get('annual', 0) - 15.09, 2),
+                        'all_strategies': results,
+                        'timestamp': raw.get('timestamp', ''),
+                    })
+                elif os.path.exists(bt4):
+                    with open(bt4) as f: self._j(json.load(f))
                 else: self._j({'error':'no backtest data'})
-            except: self._j({'error':'read failed'})
+            except Exception as e: self._j({'error':str(e)})
         elif p.path=='/api/refresh':
             threading.Thread(target=refresh_all_prices,daemon=True).start()
             self._j({'ok':True})
