@@ -1,0 +1,75 @@
+{
+  "timestamp": "2026-08-13 14:45:06.093361",
+  "results": [
+    {
+      "label": "A: v28i (60/40/0)",
+      "annual": 22.23,
+      "max_dd": -40.1,
+      "sharpe": 0.93,
+      "trades": 298,
+      "fees": 2913,
+      "fee_yr": 0.1,
+      "final": 2126856
+    },
+    {
+      "label": "F: balanced (50/40/10)",
+      "annual": 20.48,
+      "max_dd": -37.4,
+      "sharpe": 0.94,
+      "trades": 303,
+      "fees": 2747,
+      "fee_yr": 0.09,
+      "final": 1848371
+    },
+    {
+      "label": "D: aggressive (55/35/10)",
+      "annual": 19.92,
+      "max_dd": -36.7,
+      "sharpe": 0.93,
+      "trades": 297,
+      "fees": 2387,
+      "fee_yr": 0.08,
+      "final": 1766102
+    },
+    {
+      "label": "E: diversified 7 (60/30/10)",
+      "annual": 19.58,
+      "max_dd": -37.4,
+      "sharpe": 0.93,
+      "trades": 350,
+      "fees": 1814,
+      "fee_yr": 0.06,
+      "final": 1716948
+    },
+    {
+      "label": "B: v29 unified (60/30/10)",
+      "annual": 19.36,
+      "max_dd": -36.1,
+      "sharpe": 0.92,
+      "trades": 295,
+      "fees": 2052,
+      "fee_yr": 0.07,
+      "final": 1687317
+    },
+    {
+      "label": "C: defensive (65/25/10)",
+      "annual": 18.79,
+      "max_dd": -35.4,
+      "sharpe": 0.91,
+      "trades": 290,
+      "fees": 1725,
+      "fee_yr": 0.06,
+      "final": 1610081
+    },
+    {
+      "label": "G: conservative (70/20/10)",
+      "annual": 18.23,
+      "max_dd": -34.8,
+      "sharpe": 0.9,
+      "trades": 282,
+      "fees": 1409,
+      "fee_yr": 0.05,
+      "final": 1536880
+    }
+  ]
+}

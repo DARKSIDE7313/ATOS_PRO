@@ -3,7 +3,7 @@
 // 部署后得到固定 URL: https://atos-dashboard.darkside7313.workers.dev
 
 // ⚡ 这个 URL 由 tools/tunnel_url_watchdog.py 自动更新，不要手动改
-const TUNNEL_ORIGIN = "https://kurt-persons-trainer-farm.trycloudflare.com";
+const TUNNEL_ORIGIN = "https://literature-printer-sri-sharon.trycloudflare.com";
 
 // 最后一份成功获取的数据缓存（Tunnel 断连时用）
 let lastGoodData = null;

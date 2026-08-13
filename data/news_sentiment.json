@@ -13,10 +13,10 @@
       "updated": "2026-08-12T13:16:32.153488"
     },
     "AMZN": {
-      "score": -0.125,
-      "articles": 35,
-      "latest_headline": "New Zealand PM Survives Leadership Challenge as Election Looms",
-      "updated": "2026-08-12T14:22:05.340692"
+      "score": 0.051,
+      "articles": 41,
+      "latest_headline": "Zaman: Rise in Japanese Long Yields Could Support Yen",
+      "updated": "2026-08-13T14:37:42.620422"
     },
     "TLT": {
       "score": 0.118,
@@ -49,10 +49,10 @@
       "updated": "2026-08-10T13:07:58.091399"
     },
     "AAPL": {
-      "score": -0.307,
-      "articles": 14,
-      "latest_headline": "Don't let a Wall Street analyst's downgrade of Apple scare you out of the stock",
-      "updated": "2026-08-11T02:23:44.572284"
+      "score": 0.307,
+      "articles": 18,
+      "latest_headline": "Rio Tinto Australia Aluminum Plant Gets $1.8 Billion Bailout",
+      "updated": "2026-08-13T08:10:00.441702"
     },
     "BRK.B": {
       "score": 0.625,
@@ -61,22 +61,22 @@
       "updated": "2026-08-10T22:38:40.904787"
     },
     "SPY": {
-      "score": 0.605,
-      "articles": 41,
-      "latest_headline": "S&P 500 Falls as Oil Climbs Before Inflation Data: Markets Wrap",
-      "updated": "2026-08-12T01:09:19.837994"
+      "score": 0.278,
+      "articles": 49,
+      "latest_headline": "S&P 500 Closes Near Record High on Tame Inflation: Markets Wrap",
+      "updated": "2026-08-13T05:36:35.775622"
     },
     "META": {
-      "score": 0.333,
-      "articles": 38,
-      "latest_headline": "Lloyds Metals Allowed to Ready Restart of Giant PNG Copper Mine",
-      "updated": "2026-08-12T17:18:30.633284"
+      "score": 0.24,
+      "articles": 43,
+      "latest_headline": "Aluminum Extends Fall From Seven-Week High as Supply Fears Ease",
+      "updated": "2026-08-13T13:00:37.869015"
     },
     "TSLA": {
-      "score": 0.422,
-      "articles": 63,
-      "latest_headline": "World's largest sovereign wealth fund posts record $184 billion profit as it rev",
-      "updated": "2026-08-12T15:11:45.471328"
+      "score": -0.15,
+      "articles": 68,
+      "latest_headline": "SpaceX short sellers are running out of bullets as stock rebounds more than 40% ",
+      "updated": "2026-08-13T02:34:32.680127"
     },
     "NFLX": {
       "score": 0.158,
@@ -85,16 +85,16 @@
       "updated": "2026-08-06T22:04:29.064767"
     },
     "GS": {
-      "score": 0.104,
-      "articles": 9,
-      "latest_headline": "Three reasons Goldman's co-head of global banking and markets says to stay inves",
-      "updated": "2026-08-11T00:40:10.471707"
+      "score": 0.634,
+      "articles": 16,
+      "latest_headline": "Goldman says Japan's $1 trillion of reserves leaves 'plenty of capacity' for fur",
+      "updated": "2026-08-13T09:15:34.509157"
     },
     "NVDA": {
-      "score": 0.027,
-      "articles": 34,
-      "latest_headline": "Nvidia\u2019s Show of Financial Force Soothes Credit Markets",
-      "updated": "2026-08-12T09:33:28.961066"
+      "score": 0.133,
+      "articles": 39,
+      "latest_headline": "AI Cloud Provider Lambda Prices Loan for Nvidia-Tied Chip Deal",
+      "updated": "2026-08-13T04:51:06.470418"
     },
     "AVGO": {
       "score": -0.15,
@@ -103,10 +103,10 @@
       "updated": "2026-08-04T18:33:52.185974"
     },
     "JPM": {
-      "score": 0.251,
-      "articles": 17,
-      "latest_headline": "JPMorgan Boosts Singapore Stocks Target as Economic Growth Holds",
-      "updated": "2026-08-12T12:09:57.561984"
+      "score": -0.092,
+      "articles": 20,
+      "latest_headline": "JPMorgan, Goldman, Invesco Test Blockchain Across Wall Street",
+      "updated": "2026-08-12T22:54:28.254373"
     },
     "BAC": {
       "score": 0.072,
@@ -115,22 +115,22 @@
       "updated": "2026-08-12T02:39:09.337526"
     },
     "INTC": {
-      "score": 0.665,
-      "articles": 74,
-      "latest_headline": "Market\u2019s Momentum Darlings Resurface as Optical Stocks Take Off",
-      "updated": "2026-08-12T19:00:58.278039"
+      "score": 0.503,
+      "articles": 81,
+      "latest_headline": "This Chinese firm has topped Micron and Kioxia in shipments of crucial NAND memo",
+      "updated": "2026-08-13T11:02:26.047247"
     },
     "C": {
-      "score": 0.601,
-      "articles": 14,
-      "latest_headline": "Citi's Hollenhorst Sees Trend Toward Cooling Inflation",
-      "updated": "2026-08-12T19:09:28.033464"
+      "score": 0.617,
+      "articles": 16,
+      "latest_headline": "AI Earnings Boost Stock Futures; CPI Data Looms | Bloomberg Brief 08/12/2026",
+      "updated": "2026-08-12T21:45:43.979350"
     },
     "GOOGL": {
-      "score": 0.332,
-      "articles": 44,
-      "latest_headline": "Google\u2019s new AI boss inherits a race to catch OpenAI and Anthropic",
-      "updated": "2026-08-12T13:16:32.153528"
+      "score": 0.131,
+      "articles": 52,
+      "latest_headline": "Zaman: Rise in Japanese Long Yields Could Support Yen",
+      "updated": "2026-08-13T14:37:42.620375"
     },
     "MRK": {
       "score": 0.0,
@@ -145,10 +145,10 @@
       "updated": "2026-08-04T19:40:32.230815"
     },
     "LLY": {
-      "score": -0.497,
-      "articles": 15,
-      "latest_headline": "Eli Lilly takes weight-loss pill battle global with first Foundayo approval in E",
-      "updated": "2026-08-11T22:20:12.005241"
+      "score": -0.828,
+      "articles": 18,
+      "latest_headline": "Eli Lilly is suing pharmacies and peptide vendors over sale of its next big weig",
+      "updated": "2026-08-12T21:13:58.729595"
     },
     "CAT": {
       "score": 0.55,
@@ -181,10 +181,10 @@
       "updated": "2026-08-05T03:33:41.904188"
     },
     "DIS": {
-      "score": 0.638,
-      "articles": 10,
-      "latest_headline": "MNTN CEO on Disney\u2019s Ad Business, Streaming Wars Outlook",
-      "updated": "2026-08-06T06:13:02.498067"
+      "score": 0.747,
+      "articles": 11,
+      "latest_headline": "Bob Iger, Joshua Kushner buy Los Angeles Lakers at a $12.5 billion valuation, so",
+      "updated": "2026-08-12T23:12:27.028191"
     },
     "QQQ": {
       "score": 0.54,
@@ -193,10 +193,10 @@
       "updated": "2026-08-06T22:04:29.064783"
     },
     "LMT": {
-      "score": 0.0,
-      "articles": 1,
-      "latest_headline": "Boeing-Lockheed Rocket Joint Venture Taps Private Bond Market",
-      "updated": "2026-08-06T02:03:17.166954"
+      "score": 0.075,
+      "articles": 2,
+      "latest_headline": "Firefly CEO Says Launch Demand Is Surging",
+      "updated": "2026-08-12T23:42:03.459215"
     },
     "BMY": {
       "score": 0.3,
@@ -217,18 +217,24 @@
       "updated": "2026-08-07T04:52:05.267694"
     },
     "GLD": {
-      "score": 0.15,
-      "articles": 1,
-      "latest_headline": "Gold prices are breaking higher after a tough stretch. Could fresh records be wi",
-      "updated": "2026-08-07T05:23:13.701228"
+      "score": 0.416,
+      "articles": 5,
+      "latest_headline": "Where gold price is headed next as Fed rate hike and inflation odds change direc",
+      "updated": "2026-08-13T05:20:44.395943"
     },
     "IWM": {
       "score": 0.034,
       "articles": 8,
       "latest_headline": "These 11 midcaps are popular right now among investment newsletters but not beca",
       "updated": "2026-08-11T19:52:12.194053"
+    },
+    "HD": {
+      "score": 0.0,
+      "articles": 1,
+      "latest_headline": "Home Depot CEO taking temporary medical leave, two top execs to run the retailer",
+      "updated": "2026-08-12T21:42:31.261357"
     }
   },
-  "macro": -0.717,
-  "updated": "2026-08-12T19:26:09.916411"
+  "macro": -1.016,
+  "updated": "2026-08-13T14:44:57.100915"
 }

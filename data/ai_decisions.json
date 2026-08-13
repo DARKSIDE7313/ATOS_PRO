@@ -1,150 +1,6 @@
 {
   "decisions": [
     {
-      "time": "2026-08-07T07:35:56.180190",
-      "symbol": "CVX",
-      "verdict": "BUY",
-      "confidence": 0.599,
-      "reason": "\u7efc\u5408\u4fe1\u5fc30.60 (\u56e0\u5b500.41)",
-      "regime": "BULL_STRONG",
-      "outcome": null
-    },
-    {
-      "time": "2026-08-07T07:35:56.181295",
-      "symbol": "V",
-      "verdict": "BUY",
-      "confidence": 0.541,
-      "reason": "\u7efc\u5408\u4fe1\u5fc30.54 (\u56e0\u5b500.39)",
-      "regime": "BULL_STRONG",
-      "outcome": null
-    },
-    {
-      "time": "2026-08-07T07:35:56.182404",
-      "symbol": "ABBV",
-      "verdict": "BUY",
-      "confidence": 0.567,
-      "reason": "\u7efc\u5408\u4fe1\u5fc30.57 (\u56e0\u5b500.38)",
-      "regime": "BULL_STRONG",
-      "outcome": null
-    },
-    {
-      "time": "2026-08-07T07:35:56.183503",
-      "symbol": "GE",
-      "verdict": "BUY",
-      "confidence": 0.584,
-      "reason": "\u7efc\u5408\u4fe1\u5fc30.58 (\u56e0\u5b500.38)",
-      "regime": "BULL_STRONG",
-      "outcome": null
-    },
-    {
-      "time": "2026-08-07T08:26:11.672323",
-      "symbol": "GOOGL",
-      "verdict": "BUY",
-      "confidence": 0.623,
-      "reason": "\u7efc\u5408\u4fe1\u5fc30.62 (\u56e0\u5b500.47)",
-      "regime": "BULL_STRONG",
-      "outcome": null
-    },
-    {
-      "time": "2026-08-07T08:26:11.675733",
-      "symbol": "AAPL",
-      "verdict": "BUY",
-      "confidence": 0.606,
-      "reason": "\u7efc\u5408\u4fe1\u5fc30.61 (\u56e0\u5b500.46)",
-      "regime": "BULL_STRONG",
-      "outcome": null
-    },
-    {
-      "time": "2026-08-07T08:26:11.678430",
-      "symbol": "JNJ",
-      "verdict": "BUY",
-      "confidence": 0.602,
-      "reason": "\u7efc\u5408\u4fe1\u5fc30.60 (\u56e0\u5b500.42)",
-      "regime": "BULL_STRONG",
-      "outcome": null
-    },
-    {
-      "time": "2026-08-07T08:26:11.680063",
-      "symbol": "JPM",
-      "verdict": "BUY",
-      "confidence": 0.6,
-      "reason": "\u7efc\u5408\u4fe1\u5fc30.60 (\u56e0\u5b500.41)",
-      "regime": "BULL_STRONG",
-      "outcome": null
-    },
-    {
-      "time": "2026-08-07T08:26:11.681490",
-      "symbol": "CVX",
-      "verdict": "BUY",
-      "confidence": 0.599,
-      "reason": "\u7efc\u5408\u4fe1\u5fc30.60 (\u56e0\u5b500.41)",
-      "regime": "BULL_STRONG",
-      "outcome": null
-    },
-    {
-      "time": "2026-08-07T08:26:11.682956",
-      "symbol": "V",
-      "verdict": "BUY",
-      "confidence": 0.54,
-      "reason": "\u7efc\u5408\u4fe1\u5fc30.54 (\u56e0\u5b500.39)",
-      "regime": "BULL_STRONG",
-      "outcome": null
-    },
-    {
-      "time": "2026-08-07T08:26:11.684317",
-      "symbol": "ABBV",
-      "verdict": "BUY",
-      "confidence": 0.567,
-      "reason": "\u7efc\u5408\u4fe1\u5fc30.57 (\u56e0\u5b500.38)",
-      "regime": "BULL_STRONG",
-      "outcome": null
-    },
-    {
-      "time": "2026-08-07T08:26:11.685633",
-      "symbol": "GE",
-      "verdict": "BUY",
-      "confidence": 0.584,
-      "reason": "\u7efc\u5408\u4fe1\u5fc30.58 (\u56e0\u5b500.38)",
-      "regime": "BULL_STRONG",
-      "outcome": null
-    },
-    {
-      "time": "2026-08-07T09:14:40.148111",
-      "symbol": "GOOGL",
-      "verdict": "BUY",
-      "confidence": 0.679,
-      "reason": "\u7efc\u5408\u4fe1\u5fc30.68 (\u56e0\u5b500.48)",
-      "regime": "BULL_STRONG",
-      "outcome": null
-    },
-    {
-      "time": "2026-08-07T09:14:40.155551",
-      "symbol": "AAPL",
-      "verdict": "BUY",
-      "confidence": 0.661,
-      "reason": "\u7efc\u5408\u4fe1\u5fc30.66 (\u56e0\u5b500.48)",
-      "regime": "BULL_STRONG",
-      "outcome": null
-    },
-    {
-      "time": "2026-08-07T09:14:40.160417",
-      "symbol": "JNJ",
-      "verdict": "BUY",
-      "confidence": 0.697,
-      "reason": "\u7efc\u5408\u4fe1\u5fc30.70 (\u56e0\u5b500.43)",
-      "regime": "BULL_STRONG",
-      "outcome": null
-    },
-    {
-      "time": "2026-08-07T09:14:40.164244",
-      "symbol": "JPM",
-      "verdict": "BUY",
-      "confidence": 0.656,
-      "reason": "\u7efc\u5408\u4fe1\u5fc30.66 (\u56e0\u5b500.43)",
-      "regime": "BULL_STRONG",
-      "outcome": null
-    },
-    {
       "time": "2026-08-07T09:14:40.167476",
       "symbol": "CVX",
       "verdict": "BUY",
@@ -1797,6 +1653,150 @@
       "verdict": "BUY",
       "confidence": 0.695,
       "reason": "\u7efc\u5408\u4fe1\u5fc30.69 (\u56e0\u5b500.41)",
+      "regime": "BULL_STRONG",
+      "outcome": null
+    },
+    {
+      "time": "2026-08-13T12:47:53.216426",
+      "symbol": "JNJ",
+      "verdict": "BUY",
+      "confidence": 0.615,
+      "reason": "\u7efc\u5408\u4fe1\u5fc30.61 (\u56e0\u5b500.45)",
+      "regime": "BULL_STRONG",
+      "outcome": null
+    },
+    {
+      "time": "2026-08-13T12:47:53.219729",
+      "symbol": "MS",
+      "verdict": "BUY",
+      "confidence": 0.612,
+      "reason": "\u7efc\u5408\u4fe1\u5fc30.61 (\u56e0\u5b500.44)",
+      "regime": "BULL_STRONG",
+      "outcome": null
+    },
+    {
+      "time": "2026-08-13T12:47:53.222281",
+      "symbol": "AVGO",
+      "verdict": "BUY",
+      "confidence": 0.608,
+      "reason": "\u7efc\u5408\u4fe1\u5fc30.61 (\u56e0\u5b500.43)",
+      "regime": "BULL_STRONG",
+      "outcome": null
+    },
+    {
+      "time": "2026-08-13T12:47:53.224847",
+      "symbol": "NVDA",
+      "verdict": "BUY",
+      "confidence": 0.607,
+      "reason": "\u7efc\u5408\u4fe1\u5fc30.61 (\u56e0\u5b500.43)",
+      "regime": "BULL_STRONG",
+      "outcome": null
+    },
+    {
+      "time": "2026-08-13T12:47:53.227344",
+      "symbol": "V",
+      "verdict": "BUY",
+      "confidence": 0.6,
+      "reason": "\u7efc\u5408\u4fe1\u5fc30.60 (\u56e0\u5b500.41)",
+      "regime": "BULL_STRONG",
+      "outcome": null
+    },
+    {
+      "time": "2026-08-13T12:47:53.229514",
+      "symbol": "ABBV",
+      "verdict": "BUY",
+      "confidence": 0.595,
+      "reason": "\u7efc\u5408\u4fe1\u5fc30.59 (\u56e0\u5b500.40)",
+      "regime": "BULL_STRONG",
+      "outcome": null
+    },
+    {
+      "time": "2026-08-13T12:47:53.231820",
+      "symbol": "GE",
+      "verdict": "BUY",
+      "confidence": 0.594,
+      "reason": "\u7efc\u5408\u4fe1\u5fc30.59 (\u56e0\u5b500.40)",
+      "regime": "BULL_STRONG",
+      "outcome": null
+    },
+    {
+      "time": "2026-08-13T12:47:53.233833",
+      "symbol": "XOM",
+      "verdict": "BUY",
+      "confidence": 0.585,
+      "reason": "\u7efc\u5408\u4fe1\u5fc30.58 (\u56e0\u5b500.38)",
+      "regime": "BULL_STRONG",
+      "outcome": null
+    },
+    {
+      "time": "2026-08-13T13:47:46.931095",
+      "symbol": "JNJ",
+      "verdict": "BUY",
+      "confidence": 0.615,
+      "reason": "\u7efc\u5408\u4fe1\u5fc30.61 (\u56e0\u5b500.45)",
+      "regime": "BULL_STRONG",
+      "outcome": null
+    },
+    {
+      "time": "2026-08-13T13:47:46.934408",
+      "symbol": "MS",
+      "verdict": "BUY",
+      "confidence": 0.612,
+      "reason": "\u7efc\u5408\u4fe1\u5fc30.61 (\u56e0\u5b500.44)",
+      "regime": "BULL_STRONG",
+      "outcome": null
+    },
+    {
+      "time": "2026-08-13T13:47:46.938477",
+      "symbol": "AVGO",
+      "verdict": "BUY",
+      "confidence": 0.608,
+      "reason": "\u7efc\u5408\u4fe1\u5fc30.61 (\u56e0\u5b500.43)",
+      "regime": "BULL_STRONG",
+      "outcome": null
+    },
+    {
+      "time": "2026-08-13T13:47:46.941636",
+      "symbol": "NVDA",
+      "verdict": "BUY",
+      "confidence": 0.607,
+      "reason": "\u7efc\u5408\u4fe1\u5fc30.61 (\u56e0\u5b500.43)",
+      "regime": "BULL_STRONG",
+      "outcome": null
+    },
+    {
+      "time": "2026-08-13T13:47:46.944474",
+      "symbol": "V",
+      "verdict": "BUY",
+      "confidence": 0.6,
+      "reason": "\u7efc\u5408\u4fe1\u5fc30.60 (\u56e0\u5b500.41)",
+      "regime": "BULL_STRONG",
+      "outcome": null
+    },
+    {
+      "time": "2026-08-13T13:47:46.946957",
+      "symbol": "ABBV",
+      "verdict": "BUY",
+      "confidence": 0.598,
+      "reason": "\u7efc\u5408\u4fe1\u5fc30.60 (\u56e0\u5b500.41)",
+      "regime": "BULL_STRONG",
+      "outcome": null
+    },
+    {
+      "time": "2026-08-13T13:47:46.949230",
+      "symbol": "GE",
+      "verdict": "BUY",
+      "confidence": 0.594,
+      "reason": "\u7efc\u5408\u4fe1\u5fc30.59 (\u56e0\u5b500.40)",
+      "regime": "BULL_STRONG",
+      "outcome": null
+    },
+    {
+      "time": "2026-08-13T13:47:46.951336",
+      "symbol": "XOM",
+      "verdict": "BUY",
+      "confidence": 0.585,
+      "reason": "\u7efc\u5408\u4fe1\u5fc30.58 (\u56e0\u5b500.38)",
       "regime": "BULL_STRONG",
       "outcome": null
     }
