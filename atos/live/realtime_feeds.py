@@ -41,7 +41,44 @@ def safe_float(val, default=0.0) -> float:
 
 from atos.core.logging import get_logger
 
-logger = get_logger("realtime_feeds")
+logger = get_logger(__name__)
+
+_LAST_FUTU_FAIL_TS = 0.0  # v28k: 失败冷却时间戳（15分钟）
+
+
+# v28k: OpenQuoteContext 内部在「需要图形验证码/登录过期」时无限重试，
+# 阻塞调用线程（Pattern 92 变体）。用线程超时兜底，超时即降级 yfinance。
+def open_quote_context_with_timeout(host: str = "127.0.0.1", port: int = 11111,
+                                    timeout: float = 10.0):
+    """在 worker 线程中构造 OpenQuoteContext，超时返回 None。
+
+    futu-api 的 OpenQuoteContext 构造函数内部有无限重试循环（登录验证码、
+    网络错误时每 6 秒重试），主线程直接调用会被永久阻塞。
+    ⚠️ 不能用 `with ThreadPoolExecutor` — 其 __exit__ 会 shutdown(wait=True)，
+    等待永不结束的 worker，等效于没有超时。
+    """
+    import concurrent.futures as _cf
+    import time as _time
+
+    global _LAST_FUTU_FAIL_TS
+    # 失败冷却 15 分钟 — 验证码期间每次调用都会泄漏一个无限重试线程
+    if _time.time() - _LAST_FUTU_FAIL_TS < 900:
+        return None
+
+    def _build():
+        from futu import OpenQuoteContext
+        return OpenQuoteContext(host=host, port=port)
+
+    ex = _cf.ThreadPoolExecutor(max_workers=1)
+    fut = ex.submit(_build)
+    try:
+        return fut.result(timeout=timeout)
+    except Exception as e:
+        _LAST_FUTU_FAIL_TS = _time.time()
+        logger.warning(f"FutuOpenD 连接超时/失败 ({e}) — 需在 OpenD GUI 手动登录/过验证码")
+        return None
+    finally:
+        ex.shutdown(wait=False, cancel_futures=True)  # 不等待卡死的 worker
 
 # ============================================================
 # 1. RealtimePriceCache — 线程安全 TTL 缓存
@@ -404,9 +441,13 @@ class FutuRealtimeFeed:
             self._fallback = True
             return
 
-        # 创建 QuoteContext
+        # 创建 QuoteContext（v28k: 线程超时兜底，验证码/登录过期时不再无限阻塞）
         try:
-            ctx = OpenQuoteContext(host=self.host, port=self.port)
+            ctx = open_quote_context_with_timeout(host=self.host, port=self.port, timeout=10.0)
+            if ctx is None:
+                logger.warning("FutuOpenD 连接超时（可能需手动过验证码）→ 降级到 yfinance")
+                self._fallback = True
+                return
             # 验证连接 — 获取市场状态
             ret, data = ctx.get_global_state()
             if ret != RET_OK:

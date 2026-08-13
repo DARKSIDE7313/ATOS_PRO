@@ -2217,13 +2217,17 @@ def _finalize_cycle(account, cycle, regime, current_vix, signals, top_picks,
         # 尝试从 Futu OpenD 批量获取日内涨跌
         try:
             # v28i: 先 TCP 检查，避免 OpenQuoteContext 内部重试阻塞
+            # v28k: 再加线程超时兜底 — TCP 通但需验证码时构造函数仍会无限重试
             import socket as _sock
             _s = _sock.create_connection(('127.0.0.1', 11111), timeout=2)
             _s.close()
-            from futu import OpenQuoteContext, RET_OK
+            from futu import RET_OK
+            from atos.live.realtime_feeds import open_quote_context_with_timeout
             pos_syms = [s for s in account.positions if isinstance(account.positions.get(s), dict)]
             if pos_syms:
-                ctx = OpenQuoteContext('127.0.0.1', 11111)
+                ctx = open_quote_context_with_timeout('127.0.0.1', 11111, timeout=5.0)
+                if ctx is None:
+                    raise RuntimeError("OpenQuoteContext timeout (验证码/登录过期)")
                 ret, data = ctx.get_market_snapshot([f'US.{s}' for s in pos_syms])
                 ctx.close()
                 if ret == RET_OK:

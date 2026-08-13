@@ -26,21 +26,29 @@ CACHE_DB = os.path.join(BASE_DIR, "data", "futu_hist_cache.db")
 
 _FUTU_AVAILABLE = False
 _quote_ctx = None
+_FUTU_FAIL_TS = 0.0
 _lock = threading.Lock()
 
 
 def _init_futu():
-    """初始化Futu连接（线程安全，只连一次）"""
-    global _FUTU_AVAILABLE, _quote_ctx
+    """初始化Futu连接（线程安全，只连一次 + 失败冷却）"""
+    global _FUTU_AVAILABLE, _quote_ctx, _FUTU_FAIL_TS
     if _FUTU_AVAILABLE and _quote_ctx is not None:
         return True
+    # v28k: 验证码/登录过期时每周期重试只会拖慢周期(10s×N)并泄漏线程 → 15分钟冷却
+    if time.time() - _FUTU_FAIL_TS < 900:
+        return False
 
     with _lock:
         if _FUTU_AVAILABLE and _quote_ctx is not None:
             return True
         try:
             from futu import OpenQuoteContext, RET_OK, KLType, AuType
-            _quote_ctx = OpenQuoteContext(host='127.0.0.1', port=11111)
+            from atos.live.realtime_feeds import open_quote_context_with_timeout
+            _quote_ctx = open_quote_context_with_timeout(host='127.0.0.1', port=11111, timeout=10.0)
+            if _quote_ctx is None:
+                logger.warning("Futu初始化超时（可能需手动过验证码）→ 回退 yfinance")
+                return False
             ret, data = _quote_ctx.get_market_state(['US.SPY'])
             if ret == RET_OK:
                 _FUTU_AVAILABLE = True
@@ -54,6 +62,7 @@ def _init_futu():
         except Exception as e:
             logger.warning(f"Futu初始化失败: {e}")
             _FUTU_AVAILABLE = False
+            _FUTU_FAIL_TS = time.time()
             return False
 
 
