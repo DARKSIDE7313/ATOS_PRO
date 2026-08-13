@@ -1,0 +1,93 @@
+{
+  "initial_cash": 1000000.0,
+  "cash": 2574.51,
+  "holdings": {
+    "META": {
+      "shares": 139,
+      "avg_cost": 597.63,
+      "buy_date": "2026-06-03",
+      "composite_score": 72.5,
+      "last_price": 584.59
+    },
+    "CVX": {
+      "shares": 444,
+      "avg_cost": 187.55,
+      "buy_date": "2026-06-03",
+      "composite_score": 68.5,
+      "last_price": 186.76
+    },
+    "MRK": {
+      "shares": 720,
+      "avg_cost": 115.65,
+      "buy_date": "2026-06-03",
+      "composite_score": 66.1,
+      "last_price": 119.6
+    },
+    "DIS": {
+      "shares": 821,
+      "avg_cost": 101.41,
+      "buy_date": "2026-06-03",
+      "composite_score": 65.7,
+      "last_price": 99.33
+    },
+    "BLK": {
+      "shares": 81,
+      "avg_cost": 1018.96,
+      "buy_date": "2026-06-03",
+      "composite_score": 62.6,
+      "last_price": 1011.96
+    },
+    "ABBV": {
+      "shares": 386,
+      "avg_cost": 215.4,
+      "buy_date": "2026-06-03",
+      "composite_score": 59.6,
+      "last_price": 225.42
+    },
+    "JNJ": {
+      "shares": 373,
+      "avg_cost": 222.89,
+      "buy_date": "2026-06-03",
+      "composite_score": 58.9,
+      "last_price": 237.0
+    },
+    "MSFT": {
+      "shares": 188,
+      "avg_cost": 441.31,
+      "buy_date": "2026-06-03",
+      "composite_score": 56.0,
+      "last_price": 403.41
+    },
+    "DHR": {
+      "shares": 473,
+      "avg_cost": 176.11,
+      "buy_date": "2026-06-03",
+      "composite_score": 55.1,
+      "last_price": 188.41
+    },
+    "MCD": {
+      "shares": 301,
+      "avg_cost": 276.36,
+      "buy_date": "2026-06-03",
+      "composite_score": 54.3,
+      "last_price": 282.25
+    },
+    "AMZN": {
+      "shares": 324,
+      "avg_cost": 256.52,
+      "buy_date": "2026-06-03",
+      "composite_score": 52.0,
+      "last_price": 244.19
+    },
+    "HD": {
+      "shares": 267,
+      "avg_cost": 311.52,
+      "buy_date": "2026-06-03",
+      "composite_score": 51.2,
+      "last_price": 321.33
+    }
+  },
+  "history": [],
+  "last_rebalance": "2026-06-03",
+  "total_value": 1006626.7
+}
