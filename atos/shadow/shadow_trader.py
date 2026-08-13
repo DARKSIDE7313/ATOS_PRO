@@ -1304,15 +1304,15 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
 
 # ============================================================
 # ============================================================
-# v28: QQQ Core + Alpha 策略
-# 回测: 60% QQQ + 40% 动量股(5只), 年化26.8%, 跑赢SPY 11.7%
+# v29: QQQ Core + Alpha 策略 (优化: 7只 + 动量权重0.6)
+# 回测v7: 60% QQQ + 40% 动量股(7只), 年化30.7%, 跑赢SPY 15.6%
 # ============================================================
 V28_ALPHA_UNIVERSE = [
     "NVDA", "AAPL", "MSFT", "GOOGL", "META", "AMZN", "AVGO", "AMD",
     "CRM", "NFLX", "PLTR", "MU", "TSLA",
 ]
 V28_CORE_PCT = 0.60      # QQQ 核心仓位比例
-V28_ALPHA_COUNT = 5       # alpha 个股数量
+V28_ALPHA_COUNT = 7       # alpha 个股数量 (v29: 5→7)
 V28_REBALANCE_DAYS = 63   # 每季度再平衡
 V28_STOP_LOSS = 0.05      # 个股止损 5%
 V28_TRAILING_STOP = 0.08  # 移动止损 8%
@@ -1320,11 +1320,11 @@ V28_QQQ_TRAILING = 0.12   # QQQ 移动止损 12%
 
 
 def _v28_qqq_core_alpha(account, signals, regime, spy_trend):
-    """v28 策略: QQQ 核心 + 动量个股 alpha
+    """v29 策略: QQQ 核心 + 动量个股 alpha (优化: 7只 + 动量权重0.6)
 
     规则:
     1. 60% 资金买 QQQ（始终持有，不择时）
-    2. 40% 资金买 5 只最强动量股
+    2. 40% 资金买 7 只最强动量股 (21日动量 + 距20日高点)
     3. 每季度再平衡
     4. 个股止损 5%, 移动止损 8%
     5. QQQ 移动止损 12%
@@ -1436,17 +1436,17 @@ def _v28_qqq_core_alpha(account, signals, regime, spy_trend):
         if price <= 0:
             continue
 
-        # 动量指标
-        mom_1d = sig.get("change_pct", 0) or 0  # 1日变动
-        dist_high = sig.get("dist_20d_high", -10) or -10  # 距20日高点 (负数, 越近0越强)
+        # 动量指标 (v29: 用真实字段 mom_21 + dist_20d_high，修复 phantom-field bug)
+        mom_21 = sig.get("mom_21", 0) or 0        # 21日动量 (%)
+        dist_high = sig.get("dist_20d_high", -10) or -10  # 距20日高点 (%)
         ma50 = sig.get("ma50", 0)
         rsi = sig.get("rsi", 50)
 
-        # v28i: 行业动量评分 = 40% 短期动量 + 60% 趋势强度(距高点)
-        # dist_high 范围约 -20~0, 转换为 0~1 分数 (越近高点越高分)
+        # v29: 行业动量评分 = 60% 21日动量 + 40% 趋势强度(距高点)
+        # 回测v7: 0.6/0.4 权重最优 (30.7% vs 27.4% baseline)
         trend_score = max(0, 1 + dist_high / 20)  # -20→0, 0→1
-        mom_score = max(0, min(1, (mom_1d + 5) / 10))  # -5%→0, +5%→1
-        score = mom_score * 0.4 + trend_score * 0.6
+        mom_score = max(0, min(1, (mom_21 + 5) / 10))  # -5%→0, +5%→1
+        score = mom_score * 0.6 + trend_score * 0.4
 
         # 过滤
         if rsi > 78:  # 超买

@@ -10,9 +10,9 @@ TOTAL_CAPITAL = 1_000_000  # $1M paper trading
 
 # === 资金分配 ===
 ALLOCATION = {
-    "long_term":  600_000,   # Phoenix 长期策略 $60万 (管理迁移持仓)
-    "short_term": 300_000,   # Shadow 短期策略 $30万
-    "reserve":    100_000,   # 现金储备 $10万
+    "short_term": 1_000_000,  # v30: 统一单一策略资金 $100万 (长线已移除)
+    "long_term":  0,           # v30: 长线组合已移除 (v29归档)
+    "reserve":    0,           # v30: 现金储备并入统一资金
 }
 
 # === 单策略限制 ===

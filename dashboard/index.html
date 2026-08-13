@@ -68,37 +68,34 @@ tr:hover td{background:rgba(255,255,255,.03)}
 <nav id="nav">
   <a href="#" class="active" data-page="overview">Overview</a>
   <a href="#" data-page="short">Short-Term</a>
-  <a href="#" data-page="long">Long-Term</a>
   <a href="#" data-page="stops">Stops</a>
   <a href="#" data-page="trades">Trades</a>
+  <a href="#" data-page="daily">Daily Returns</a>
   <a href="#" data-page="ai">AI Insights</a>
   <a href="#" data-page="chat">Chat</a>
 </nav>
 <div id="app">
 <div class="page show" id="p-overview">
   <div class="kpis" id="ov-kpis"></div>
-  <div class="grid2">
-    <div class="card"><h2>Short-Term</h2><div id="ov-short" class="loading">Loading...</div></div>
-    <div class="card"><h2>Long-Term</h2><div id="ov-long" class="loading">Loading...</div></div>
-  </div>
+  <div class="card"><h2>Portfolio</h2><div id="ov-short" class="loading">Loading...</div></div>
   <div class="card"><h2>Activity Log</h2><div id="ov-log" class="loading">Loading...</div></div>
   <div class="card"><h2>🩺 Auto Monitor</h2><div id="ov-health" class="loading">Loading...</div></div>
 </div>
 <div class="page" id="p-short">
   <div class="kpis" id="st-kpis"></div>
+  <div class="card"><h2>Strategy</h2><div id="st-strat" class="loading">Loading...</div></div>
   <div class="card"><h2>Positions</h2><div id="st-table"><div class="loading">Loading...</div></div></div>
   <div class="card"><h2>System</h2><div id="st-sys" class="loading">Loading...</div></div>
-</div>
-<div class="page" id="p-long">
-  <div class="kpis" id="lt-kpis"></div>
-  <div class="card"><h2>Holdings</h2><div id="lt-table"><div class="loading">Loading...</div></div></div>
-  <div class="card"><h2>Strategy</h2><div id="lt-strat" class="loading">Loading...</div></div>
 </div>
 <div class="page" id="p-stops">
   <div class="card"><h2>Trailing Stops</h2><div id="sp-table"><div class="loading">Loading...</div></div></div>
 </div>
 <div class="page" id="p-trades">
   <div class="card"><h2>Trade History</h2><div id="tr-table"><div class="loading">Loading...</div></div></div>
+</div>
+<div class="page" id="p-daily">
+  <div class="kpis" id="dl-kpis"></div>
+  <div class="card"><h2>Daily Return History</h2><div id="dl-table"><div class="loading">Loading...</div></div></div>
 </div>
 <div class="page" id="p-ai">
   <div class="kpis" id="ai-kpis"></div>
@@ -140,16 +137,15 @@ function badge(v){if(!v)return'<span class="badge neutral">?</span>';if(v==='BUL
 var _S=null;
 function load(){
   fetch('/api').then(function(r){return r.json()}).then(function(d){
-  _S=d;renderOverview(d);renderShort(d);renderLong(d);renderStops(d);renderTrades(d);renderHealth(d);
+  _S=d;renderOverview(d);renderShort(d);renderStops(d);renderTrades(d);renderHealth(d);
   }).catch(function(e){var err='<div class="empty" style="color:#ff453a">Error: '+e.message+'</div>';document.querySelectorAll('.loading').forEach(function(el){if(el.classList.contains('loading'))el.innerHTML=err;});});
   fetch('/api/refresh').catch(function(){});
 }
 function renderOverview(d){
   var c=d.combined||{};
-  document.getElementById('ov-kpis').innerHTML=kpi('Combined PV','$'+fmt(c.pv),'Short + Long')+kpi('Combined P&L','$'+fmt(c.pl),c.pl>=0?'Profit':'Loss',cls(c.pl))+kpi('Return',pct(c.chg),'From $'+fmt(c.init),cls(c.chg))+kpi('Total Cash','$'+fmt(c.cash),'Available');
-  var s=d.short||{};var l=d.long||{};
-  document.getElementById('ov-short').innerHTML='<div class="log"><span class="lt">Value</span><span class="lm">$'+fmt(s.pv)+'</span></div><div class="log"><span class="lt">Cash</span><span class="lm">$'+fmt(s.cash)+'</span></div><div class="log"><span class="lt">Return</span><span class="lm" class="'+cls(s.chg)+'">'+pct(s.chg)+'</span></div><div class="log"><span class="lt">Positions</span><span class="lm">'+fmt(s.cnt)+'</span></div><div class="log"><span class="lt">Cycles</span><span class="lm">'+fmt(d.cycle_count)+'</span></div>';
-  document.getElementById('ov-long').innerHTML='<div class="log"><span class="lt">Value</span><span class="lm">$'+fmt(l.pv)+'</span></div><div class="log"><span class="lt">Cash</span><span class="lm">$'+fmt(l.cash)+'</span></div><div class="log"><span class="lt">Return</span><span class="lm" class="'+cls(l.chg)+'">'+pct(l.chg)+'</span></div><div class="log"><span class="lt">Holdings</span><span class="lm">'+fmt(l.cnt)+'</span></div><div class="log"><span class="lt">Rebalance</span><span class="lm">'+(d.long_meta&&d.long_meta.rebalance||'--')+'</span></div>';
+  document.getElementById('ov-kpis').innerHTML=kpi('Fund Value','$'+fmt(c.pv),'Initial $'+fmt(c.init))+kpi('Total P&L','$'+fmt(c.pl),c.pl>=0?'Profit':'Loss',cls(c.pl))+kpi('Return',pct(c.chg),'Since inception',cls(c.chg))+kpi('Cash','$'+fmt(c.cash),'Available');
+  var s=d.short||{};
+  document.getElementById('ov-short').innerHTML='<div class="log"><span class="lt">Value</span><span class="lm">$'+fmt(s.pv)+'</span></div><div class="log"><span class="lt">Cash</span><span class="lm">$'+fmt(s.cash)+'</span></div><div class="log"><span class="lt">Return</span><span class="lm '+cls(s.chg)+'">'+pct(s.chg)+'</span></div><div class="log"><span class="lt">Positions</span><span class="lm">'+fmt(s.cnt)+'</span></div><div class="log"><span class="lt">Cycles</span><span class="lm">'+fmt(d.cycle_count)+'</span></div>';
   var acts=d.activity||[];
   document.getElementById('ov-log').innerHTML=acts.length?acts.map(function(a){return'<div class="log"><span class="lt">'+a.time+'</span><span class="lm">'+a.msg+'</span></div>';}).join(''):'<div class="empty">No activity</div>';
 }
@@ -171,20 +167,38 @@ function renderHealth(d){
 function renderShort(d){
   var s=d.short||{};
   document.getElementById('st-kpis').innerHTML=kpi('Portfolio Value','$'+fmt(s.pv))+kpi('P&L','$'+fmt(s.pl),'',cls(s.pl))+kpi('Return',pct(s.chg),'',cls(s.chg))+kpi('Cash','$'+fmt(s.cash))+kpi('Positions',fmt(s.cnt));
-  var pos=s.pos||[];if(!pos.length){document.getElementById('st-table').innerHTML='<div class="empty">No positions</div>';return;}
-  var h='<table><tr><th>Sym</th><th>Shares</th><th>Avg</th><th>Price</th><th>Value</th><th>P&L</th><th>Return</th><th>Day Chg</th><th>Weight</th></tr>';
-  pos.forEach(function(p){h+='<tr><td class="sym">'+p.sym+'</td><td class="num">'+fmt(p.shares)+'</td><td class="num">$'+fmt(p.avg)+'</td><td class="num">$'+fmt(p.price)+'</td><td class="num">$'+fmt(p.val)+'</td><td class="num '+cls(p.pl)+'">'+(p.pl>=0?'+':'')+fmt(p.pl)+'</td><td class="num '+cls(p.pl_pct)+'">'+pct(p.pl_pct)+'</td><td class="num '+cls(p.day_chg)+'">'+(p.day_chg>=0?'+':'')+fmt(p.day_chg)+' ('+(p.day_pct>=0?'+':'')+p.day_pct.toFixed(2)+'%)</td><td class="num">'+p.wt+'%</td></tr>';});
-  h+='</table>';document.getElementById('st-table').innerHTML=h;
+  var str=d.strategy||{};var st='';
+  if(str&&str.name){
+    st='<div class="log"><span class="lt">Strategy</span><span class="lm">'+str.name+'</span></div>';
+    st+='<div class="log"><span class="lt">Description</span><span class="lm">'+str.description+'</span></div>';
+    st+='<div class="log"><span class="lt">Backtest</span><span class="lm up">+'+fmt(str.backtest_annual_return)+'%/yr</span></div>';
+    st+='<div class="log"><span class="lt">SPY Benchmark</span><span class="lm">'+fmt(str.benchmark_spy_annual)+'%/yr</span></div>';
+    st+='<div class="log"><span class="lt">Alpha vs SPY</span><span class="lm up">+'+fmt(str.alpha_vs_spy)+'%</span></div>';
+    st+='<div class="log"><span class="lt">Sharpe</span><span class="lm">'+fmt(str.sharpe_ratio)+'</span></div>';
+    st+='<div class="log"><span class="lt">Max Drawdown</span><span class="lm down">-'+fmt(str.max_drawdown)+'%</span></div>';
+    st+='<div class="log"><span class="lt">Rebalance</span><span class="lm">'+str.rebalance_days+' days</span></div>';
+    st+='<div class="log"><span class="lt">Fees</span><span class="lm">'+fmt(str.fee_drag_annual)+'%/yr drag</span></div>';
+    if(str.current){var c=str.current;st+='<div class="log"><span class="lt">QQQ Weight</span><span class="lm">'+c.qqq_pct+'%</span></div><div class="log"><span class="lt">Cash Weight</span><span class="lm">'+c.cash_pct+'%</span></div>';}
+  }else{st='<div class="empty">No strategy data</div>';}
+  document.getElementById('st-strat').innerHTML=st;
+  var pos=s.pos||[];
+  if(pos.length){
+    var h='<table><tr><th>Sym</th><th>Shares</th><th>Avg</th><th>Price</th><th>Value</th><th>P&L</th><th>Return</th><th>Day Chg</th><th>Weight</th></tr>';
+    pos.forEach(function(p){h+='<tr><td class="sym">'+p.sym+'</td><td class="num">'+fmt(p.shares)+'</td><td class="num">$'+fmt(p.avg)+'</td><td class="num">$'+fmt(p.price)+'</td><td class="num">$'+fmt(p.val)+'</td><td class="num '+cls(p.pl)+'">'+(p.pl>=0?'+':'')+fmt(p.pl)+'</td><td class="num '+cls(p.pl_pct)+'">'+pct(p.pl_pct)+'</td><td class="num '+cls(p.day_chg)+'">'+(p.day_chg>=0?'+':'')+fmt(p.day_chg)+' ('+(p.day_pct>=0?'+':'')+p.day_pct.toFixed(2)+'%)</td><td class="num">'+p.wt+'%</td></tr>';});
+    h+='</table>';document.getElementById('st-table').innerHTML=h;
+  }else{document.getElementById('st-table').innerHTML='<div class="empty">No positions</div>';}
   document.getElementById('st-sys').innerHTML='<div class="log"><span class="lt">Cycles</span><span class="lm">'+fmt(d.cycle_count)+'</span></div><div class="log"><span class="lt">Last Cycle</span><span class="lm">'+(d.last_cycle||'--')+'</span></div><div class="log"><span class="lt">Equity</span><span class="lm">$'+fmt(d.equity_total)+'</span></div>';
 }
-function renderLong(d){
-  var l=d.long||{};
-  document.getElementById('lt-kpis').innerHTML=kpi('Portfolio Value','$'+fmt(l.pv))+kpi('P&L','$'+fmt(l.pl),'',cls(l.pl))+kpi('Return',pct(l.chg),'',cls(l.chg))+kpi('Cash','$'+fmt(l.cash))+kpi('Holdings',fmt(l.cnt));
-  var pos=l.pos||[];if(!pos.length){document.getElementById('lt-table').innerHTML='<div class="empty">No holdings</div>';return;}
-  var h='<table><tr><th>Sym</th><th>Shares</th><th>Avg</th><th>Price</th><th>Value</th><th>P&L</th><th>Return</th><th>Score</th><th>Weight</th></tr>';
-  pos.forEach(function(p){h+='<tr><td class="sym">'+p.sym+'</td><td class="num">'+fmt(p.shares)+'</td><td class="num">$'+fmt(p.avg)+'</td><td class="num">$'+fmt(p.price)+'</td><td class="num">$'+fmt(p.val)+'</td><td class="num '+cls(p.pl)+'">'+(p.pl>=0?'+':'')+fmt(p.pl)+'</td><td class="num '+cls(p.pl_pct)+'">'+pct(p.pl_pct)+'</td><td class="num">'+(p.score?p.score:'--')+'</td><td class="num">'+p.wt+'%</td></tr>';});
-  h+='</table>';document.getElementById('lt-table').innerHTML=h;
-  document.getElementById('lt-strat').innerHTML='<div class="log"><span class="lt">Rebalance</span><span class="lm">'+(d.long_meta&&d.long_meta.rebalance||'--')+'</span></div><div class="log"><span class="lt">Cash</span><span class="lm">$'+fmt(l.cash)+'</span></div>';
+function renderDaily(){
+  fetch('/api/daily').then(function(r){return r.json()}).then(function(dl){
+    if(!dl||dl.error){document.getElementById('dl-kpis').innerHTML='';document.getElementById('dl-table').innerHTML='<div class="empty">'+(dl&&dl.error?'Error: '+dl.error:'No data')+'</div>';return;}
+    document.getElementById('dl-kpis').innerHTML=kpi('Days',fmt(dl.total_days||0))+kpi('Win Rate',(dl.win_rate||0)+'%','',dl.win_rate>=50?'up':'down')+kpi('Cumulative',pct(dl.cumulative_return||0),'',cls(dl.cumulative_return))+kpi('Best Day',pct(dl.best_day||0),'',cls(dl.best_day))+kpi('Worst Day',pct(dl.worst_day||0),'',cls(dl.worst_day));
+    var hist=dl.history||[];
+    if(!hist.length){document.getElementById('dl-table').innerHTML='<div class="empty">No daily data yet</div>';return;}
+    var h='<table><tr><th>Date</th><th>Start</th><th>End</th><th>P&L</th><th>Return</th><th>Trades</th></tr>';
+    hist.slice().reverse().forEach(function(r){h+='<tr><td class="num">'+r.date+'</td><td class="num">$'+fmt(r.start_equity)+'</td><td class="num">$'+fmt(r.end_equity)+'</td><td class="num '+cls(r.daily_pnl)+'">'+(r.daily_pnl>=0?'+':'')+fmt(r.daily_pnl)+'</td><td class="num '+cls(r.daily_return_pct)+'">'+pct(r.daily_return_pct)+'</td><td class="num">'+fmt(r.trades_today)+'</td></tr>';});
+    h+='</table>';document.getElementById('dl-table').innerHTML=h;
+  }).catch(function(e){document.getElementById('dl-table').innerHTML='<div class="empty" style="color:#ff453a">Error: '+e.message+'</div>';});
 }
 function renderStops(d){
   var stops=d.short_stops||[];if(!stops.length){document.getElementById('sp-table').innerHTML='<div class="empty">No trailing stops</div>';return;}
@@ -233,8 +247,10 @@ function renderAI(){
 }
 load();
 renderAI();
+renderDaily();
 setInterval(load,20000);
 setInterval(renderAI,25000);
+setInterval(renderDaily,60000);
 
 // ── AI Chat ──
 function sendChat(){

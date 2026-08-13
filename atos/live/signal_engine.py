@@ -476,6 +476,9 @@ def get_signals(symbols: list[str] = None) -> dict:
             vol_today = _scalar(vol)
             atr_val = _atr(df)
             boll = _bollinger(close)
+            # v29: 21日动量 + 距20日高点距离（v28 alpha选股，修复 phantom-field bug）
+            mom_21 = _scalar((close.iloc[-1] / close.iloc[-22] - 1) * 100) if len(close) >= 22 else 0.0
+            dist_20d_high = _scalar((close.iloc[-1] / close.iloc[-20:].max() - 1) * 100) if len(close) >= 20 else -10.0
 
             # 趋势判断（更精细的规则）
             if price > ma50 > ma200:
@@ -504,6 +507,8 @@ def get_signals(symbols: list[str] = None) -> dict:
                 "volume_ratio": round(vol_today / vol_avg, 2) if vol_avg > 0 else 1.0,
                 "atr":          round(atr_val, 2),
                 "bollinger":    boll,
+                "mom_21":       round(mom_21, 2),
+                "dist_20d_high": round(dist_20d_high, 2),
                 "news_score":   _calc_news_score(sym),  # 🆕 新闻催化剂分数
                 "smc_score":    _calc_smc_score(sym, df),  # 🆕 SMC聪明钱分数
             }

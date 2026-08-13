@@ -262,18 +262,18 @@ def read_state():
             d['monitor_events']=events[-5:]
     except (json.JSONDecodeError, IOError, KeyError, TypeError): pass
 
-    # v28: 策略信息
+    # v29: 策略信息 (优化: 7只alpha + 动量权重0.6)
     d['strategy'] = {
-        'name': 'v28 QQQ Core + Alpha',
-        'description': '60% QQQ + 40% momentum stocks (5 picks), quarterly rebalance',
-        'backtest_annual_return': 26.81,
-        'benchmark_spy_annual': 15.09,
-        'alpha_vs_spy': 11.72,
-        'sharpe_ratio': 1.13,
-        'max_drawdown': 39.4,
-        'fee_drag_annual': 0.13,
+        'name': 'v29 QQQ Core + Momentum Alpha',
+        'description': '60% QQQ + 40% momentum stocks (7 picks), quarterly rebalance',
+        'backtest_annual_return': 30.71,
+        'benchmark_spy_annual': 15.16,
+        'alpha_vs_spy': 15.55,
+        'sharpe_ratio': 1.18,
+        'max_drawdown': 36.8,
+        'fee_drag_annual': 0.15,
         'core_pct': 60,
-        'alpha_count': 5,
+        'alpha_count': 7,
         'rebalance_days': 63,
         'stop_loss_stock': 5.0,
         'stop_loss_qqq': 12.0,
@@ -291,7 +291,7 @@ def read_state():
             'qqq_value': round(qqq_val, 2),
             'qqq_pct': round(qqq_val / eq * 100, 1) if eq > 0 else 0,
             'positions': len(ss.get('positions', {})),
-            'total_return': round((eq / 300000 - 1) * 100, 2),
+            'total_return': round((eq / ss.get('initial_cash', 1000000) - 1) * 100, 2),
         }
     except Exception:
         pass
@@ -322,7 +322,7 @@ def read_ai_insights():
         positions = st.get('positions', {})
         stops = st.get('trailing_stops', {})
         eq = st.get('equity', 0)
-        init = st.get('initial_cash', 300000)
+        init = st.get('initial_cash', 1000000)
         cash = st.get('cash', 0)
         trade_hist = st.get('trade_history', [])
         trailing = st.get('trailing_stops', {})

@@ -81,7 +81,7 @@ def get_summary() -> dict:
         "total_days": len(history),
         "win_days": wins,
         "loss_days": losses,
-        "win_rate": round(wins / len(history) * 100, 1) if history else 0,
+        "win_rate": round(wins / (wins + losses) * 100, 1) if (wins + losses) > 0 else 0,
         "cumulative_return": cum_return,
         "best_day": best,
         "worst_day": worst,
