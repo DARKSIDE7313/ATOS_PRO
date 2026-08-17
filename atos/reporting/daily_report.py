@@ -2,7 +2,7 @@
 ATOS PRO - Daily Report Generator
 Usage: python3 -m atos.reporting.daily_report
 """
-import os, sys, datetime, smtplib
+import json, os, sys, threading, datetime, smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -24,16 +24,38 @@ def fetch_account_data():
     except ImportError:
         print("[错误] futu-api 未安装，请执行: pip install futu-api")
         return None, None
+
+    def _open_trade_ctx_with_timeout(timeout=15):
+        """OpenSecTradeContext 构造器内部无限重试（如需要图形验证码），主线程会被永久阻塞。
+        在 daemon 线程中构造，超时即放弃（一次性脚本，daemon 线程随进程退出）。"""
+        result = {}
+        def _worker():
+            try:
+                result["ctx"] = OpenSecTradeContext(filter_trdmarket=TrdMarket.US,
+                                                    host=FUTU_HOST, port=FUTU_PORT,
+                                                    security_firm=SecurityFirm.FUTUINC)
+            except Exception as e:
+                result["err"] = e
+        t = threading.Thread(target=_worker, daemon=True)
+        t.start()
+        t.join(timeout)
+        ctx = result.get("ctx")
+        if ctx is None:
+            return None, result.get("err", TimeoutError(f"Futu OpenD 连接超时 {timeout}s"))
+        return ctx, None
+
     try:
-        ctx = OpenSecTradeContext(filter_trdmarket=TrdMarket.US,
-                                  host=FUTU_HOST, port=FUTU_PORT,
-                                  security_firm=SecurityFirm.FUTUINC)
-        ret_acc, acc_data = ctx.accinfo_query(trd_env=TrdEnv.SIMULATE, acc_id=ACC_ID)
-        ret_pos, pos_data = ctx.position_list_query(trd_env=TrdEnv.SIMULATE, acc_id=ACC_ID)
-        ctx.close()
+        ctx, err = _open_trade_ctx_with_timeout()
+        if ctx is None:
+            raise RuntimeError(f"Futu OpenD 不可用: {err}")
+        try:
+            ret_acc, acc_data = ctx.accinfo_query(trd_env=TrdEnv.SIMULATE, acc_id=ACC_ID)
+            ret_pos, pos_data = ctx.position_list_query(trd_env=TrdEnv.SIMULATE, acc_id=ACC_ID)
+        finally:
+            ctx.close()
         if ret_acc != RET_OK:
             print(f"[错误] 无法获取账户信息: {acc_data}")
-            return None, None
+            return _fallback_account_from_state()
         account = {
             "cash":       float(acc_data["cash"].iloc[0]),
             "market_val": float(acc_data["market_val"].iloc[0]),
@@ -54,8 +76,39 @@ def fetch_account_data():
         return account, positions
     except Exception as e:
         print(f"[错误] 连接 Futu OpenD 失败: {e}")
-        print("请确认 FutuOpenD 已启动并登录")
-        return None, None
+        print("尝试从 shadow_state.json 回退读取账户数据…")
+        return _fallback_account_from_state()
+
+
+def _fallback_account_from_state():
+    """Futu OpenD 不可用（如需要图形验证码）时，从 shadow_state.json（系统数据源）回退。"""
+    state_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "data", "shadow_state.json")
+    s = json.load(open(state_path, encoding="utf-8"))
+    positions = []
+    for code, p in s.get("positions", {}).items():
+        qty = int(p.get("qty", 0) or p.get("shares", 0))
+        avg = float(p.get("avg_price", 0))
+        last = float(p.get("last_price", avg))
+        positions.append({
+            "code":   code,
+            "qty":    qty,
+            "cost":   avg,
+            "last":   last,
+            "pl_val": (last - avg) * qty,
+        })
+    equity = float(s.get("equity", 0))
+    cash = float(s.get("cash", 0))
+    account = {
+        "cash":       cash,
+        "market_val": equity - cash,
+        "total":      equity,
+        "initial":    float(s.get("initial_cash", 100000)),
+        "_source":    "shadow_state.json",
+    }
+    print(f"[OK] 回退账户数据 shadow_state.json: 总资产 ${equity:,.2f} / 持仓 {len(positions)} 支")
+    return account, positions
 
 
 def fetch_market_regime():
@@ -102,7 +155,7 @@ def build_html_report(account, positions, regime, spy_price, vix_price):
     else:
         rows = "<tr><td colspan='5' style='text-align:center;color:#9ca3af;padding:16px;'>目前无持仓</td></tr>"
     if account:
-        tp = account["total"] - 100000
+        tp = account["total"] - account.get("initial", 100000)
         pc = "#16a34a" if tp >= 0 else "#dc2626"
         ps = "+" if tp >= 0 else ""
         acc_html = (f"<div style='display:flex;gap:16px;flex-wrap:wrap;margin-bottom:24px;'>"
@@ -111,6 +164,9 @@ def build_html_report(account, positions, regime, spy_price, vix_price):
                     f"<div style='flex:1;min-width:148px;background:#f9fafb;border-radius:10px;padding:16px 20px;border:1px solid #e5e7eb;'><div style='font-size:12px;color:#6b7280;'>持仓市值</div><div style='font-size:22px;font-weight:700;'>${account['market_val']:,.2f}</div></div>"
                     f"<div style='flex:1;min-width:148px;background:#f9fafb;border-radius:10px;padding:16px 20px;border:1px solid #e5e7eb;'><div style='font-size:12px;color:#6b7280;'>累计盈亏</div><div style='font-size:22px;font-weight:700;color:{pc};'>{ps}${tp:,.2f}</div></div>"
                     "</div>")
+        if account.get("_source"):
+            acc_html += (f"<p style='font-size:11px;color:#94a3b8;margin:0 0 12px;'>"
+                         f"⚠️ 数据源: {account['_source']} — Futu OpenD 需人工登录（图形验证码），本次使用本地状态文件。</p>")
     else:
         acc_html = "<p style='color:#ef4444;'>无法连接 Futu OpenD，账户数据不可用</p>"
     risk = regime["risk_multiplier"]
