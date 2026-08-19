@@ -55,6 +55,7 @@ NETWORK_RETRY_BACKOFF = [60, 120, 300, 600]  # progressive backoff on disconnect
 _network_consecutive_failures = 0  # Fix: 模块级变量替代 Function.__dict__
 MAX_NETWORK_FAILURES = 3        # After this many consecutive failures, do a full reconnect sweep
 EMERGENCY_STOP_FILE = "/tmp/atos_EMERGENCY_STOP"
+_last_emergency_peak = None  # 上次触发紧急熔断时的 peak_equity（one-shot 追踪）
 
 # ── Trend Tracking ─────────────────────────────────────────
 EQUITY_TREND_DAYS = 7  # Lookback period for equity trend slope
@@ -490,12 +491,32 @@ def write_emergency_stop(dd_pct):
         log(f"Failed to write emergency stop: {e}", "ERROR")
 
 
-def check_emergency_drawdown(dd_pct):
-    """Check if drawdown exceeds emergency threshold and trigger stop."""
+def check_emergency_drawdown(dd_pct, peak_equity=None):
+    """Check if drawdown exceeds emergency threshold and trigger stop.
+
+    v3.1 (2026-08-20): one-shot per drawdown episode — the emergency file is
+    written ONCE per peak level, not re-written every check (the old code
+    re-wrote it every 5 min forever, so shadow_trader could never restart).
+    When drawdown recovers above the threshold, the file is removed so the
+    system can resume automatically.
+    """
+    global _last_emergency_peak
     if dd_pct <= EMERGENCY_DRAWDOWN_PCT:
-        write_emergency_stop(dd_pct)
-        log(f"CRITICAL: Drawdown {dd_pct:.1f}% exceeds emergency threshold {EMERGENCY_DRAWDOWN_PCT:.0f}%", "CRITICAL")
-        return True
+        # Only write if this is a NEW episode (peak changed since last write)
+        if _last_emergency_peak is None or abs((peak_equity or 0) - _last_emergency_peak) > 1.0:
+            write_emergency_stop(dd_pct)
+            _last_emergency_peak = peak_equity or 0
+            log(f"CRITICAL: Drawdown {dd_pct:.1f}% exceeds emergency threshold {EMERGENCY_DRAWDOWN_PCT:.0f}%", "CRITICAL")
+            return True
+        return True  # still in emergency, but file already written for this peak
+    # Recovered: clear the emergency file so the system can resume
+    if os.path.exists(EMERGENCY_STOP_FILE):
+        try:
+            os.remove(EMERGENCY_STOP_FILE)
+            _last_emergency_peak = None
+            log(f"✅ Emergency stop cleared — drawdown recovered to {dd_pct:.1f}%", "FIX")
+        except OSError:
+            pass
     return False
 
 
@@ -697,7 +718,7 @@ def main():
                     "ALERT")
             
             # Emergency drawdown check (at -10%)
-            emergency = check_emergency_drawdown(dd_pct)
+            emergency = check_emergency_drawdown(dd_pct, peak_equity=p.get('peak_equity', 0))
             if emergency and not _last_emergency_warning:
                 _last_emergency_warning = True
                 log(f"🚨 EMERGENCY DRAWDOWN AT {dd_pct:.1f}% — stop file written", "CRITICAL")
