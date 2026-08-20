@@ -320,9 +320,9 @@ class ShadowAccount:
     def execute(self, symbol: str, action: str, shares: int,
                 price: float, reason: str = "", ai_decision_id: int = 0) -> bool:
         """执行交易（带完整安全检查 + 风控记录）
-        
-        BUGFIX 2026-06-12: 执行层冷却拦截
-        任何 BUY / ADD 都先检查冷却期，上层策略分支绕不过。
+
+        v29 Institutional: 所有订单强制经过 Pre-Trade Risk Gate。
+        没有任何代码路径可以绕过风控门 (规格书 §8)。
         """
         if shares <= 0 or not symbol or not isinstance(symbol, str):
             return False
@@ -331,6 +331,29 @@ class ShadowAccount:
         if shares > 100000:
             logger.error(f"数量异常: {shares}股")
             return False
+
+        # ═══ v29: PRE-TRADE RISK GATE — 不可绕过 ═══
+        try:
+            from atos.core.risk_gate import get_gate, OrderIntent
+            intent = OrderIntent(
+                symbol=symbol, side=action, quantity=int(shares),
+                price=float(price), reason=reason,
+                strategy_id="v28" if reason.startswith("v28") else "legacy",
+            )
+            decision = get_gate().check(intent, self)
+            if decision.decision == "REJECT":
+                logger.warning(f"🛡️ 风控门拒绝: {action} {symbol} {shares}股 | {decision.reasons}")
+                return False
+            if decision.approved_quantity < shares:
+                logger.info(f"🛡️ 风控门减量: {symbol} {shares}→{decision.approved_quantity}股 | {decision.reasons}")
+                shares = decision.approved_quantity
+                if shares <= 0:
+                    return False
+        except Exception as e:
+            # fail closed: 风控门异常 = 拒绝交易
+            logger.error(f"🛡️ 风控门异常 (fail closed): {e}")
+            return False
+
         # v28: 跳过冷却和重复检查（v28 是季度再平衡策略，不需要这些限制）
         _is_v28 = reason.startswith("v28")
         if not _is_v28 and is_duplicate_order(symbol, action, shares):
@@ -527,6 +550,17 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
     # 周期级安全检查
     check_disk_space(min_free_mb=50)
     full_health_check(account.get_state())
+
+    # ═══ v29: Kill Switch 检查 (规格书 §10.3) ═══
+    try:
+        from atos.core.kill_switch import get_kill_switch
+        if get_kill_switch().check(account):
+            logger.critical("🔴 KILL SWITCH ACTIVE — 本周期停止所有交易")
+            _finalize_cycle(account, cycle, "KILLED", 0, {}, [], {}, "kill_switch", "N/A")
+            return
+    except Exception as e:
+        logger.error(f"Kill switch 检查异常 (fail closed): {e}")
+        return
 
     # 紧急停止开关: 存在 /tmp/atos_EMERGENCY_STOP 时跳过所有交易并退出
     if os.path.exists("/tmp/atos_EMERGENCY_STOP"):
