@@ -912,9 +912,14 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
 
         # ── v17: Triple-Barrier 时间退出检查（专业级）──
         # 持仓超过20天 → 即使盈亏不大也退出，释放资金到更好的机会
-        hold_days = 0
-        if sym in account.positions:
-            buy_time = account.positions[sym].get("buy_time", None)
+        # v29 FIX: v28 持仓跳过 — v28 季度(63天)再平衡,20天强制退出会破坏策略
+        _is_v28_pos = sym in ("QQQ",) or sym in V28_ALPHA_UNIVERSE
+        if _is_v28_pos:
+            hold_days = 0  # v28 持仓不用 Triple-Barrier
+        else:
+            hold_days = 0
+            if sym in account.positions:
+                buy_time = account.positions[sym].get("buy_time", None)
             if buy_time:
                 try:
                     from datetime import datetime as _dt
@@ -923,19 +928,21 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
                 except Exception:
                     pass
         # Triple-Barrier: 波动率自适应退出
-        atr_pct = (signals.get(sym, {}).get("atr", 0) / price) if price > 0 else 0.02
-        tb = triple_barrier(pos["avg_price"], price, hold_days, hold_days,
-                           volatility=max(0.01, atr_pct), max_hold_days=20)
-        if tb["exit"] and tb["barrier"] == "time":
-            account.execute(sym, "SELL", pos["qty"], price,
-                          reason=f"时间到期 {hold_days:.0f}天 (Triple-Barrier)")
-            logger.info(f"⏰ Triple-Barrier: {sym} 持仓{hold_days:.0f}天 到期退出")
-            continue
-        if tb["exit"] and tb["barrier"] == "stop":
-            account.execute(sym, "SELL", pos["qty"], price,
-                          reason=f"TB止损 (vol={atr_pct:.1%})")
-            logger.info(f"🛑 Triple-Barrier止损: {sym} PnL={pnl_pct:+.2%}")
-            continue
+        # v29: v28 持仓完全跳过 Triple-Barrier (时间和波动率)
+        if not _is_v28_pos:
+            atr_pct = (signals.get(sym, {}).get("atr", 0) / price) if price > 0 else 0.02
+            tb = triple_barrier(pos["avg_price"], price, hold_days, hold_days,
+                               volatility=max(0.01, atr_pct), max_hold_days=20)
+            if tb["exit"] and tb["barrier"] == "time":
+                account.execute(sym, "SELL", pos["qty"], price,
+                              reason=f"时间到期 {hold_days:.0f}天 (Triple-Barrier)")
+                logger.info(f"⏰ Triple-Barrier: {sym} 持仓{hold_days:.0f}天 到期退出")
+                continue
+            if tb["exit"] and tb["barrier"] == "stop":
+                account.execute(sym, "SELL", pos["qty"], price,
+                              reason=f"TB止损 (vol={atr_pct:.1%})")
+                logger.info(f"🛑 Triple-Barrier止损: {sym} PnL={pnl_pct:+.2%}")
+                continue
 
         # ── v28: 跳过旧止盈/保本/剥头皮规则 — v28 有自己的卖出逻辑 ──
         # v28: 只用硬止损(5%) + 移动止损(8%) + 季度再平衡，不做分批止盈
@@ -1125,9 +1132,13 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
 
     # ── v24: Citadel 单仓集中度熔断 — 单仓>15%自动减持到12% ──
     # 防止单一持仓过大导致黑天鹅风险
+    # v29 FIX: 跳过 v28 持仓 — QQQ 目标60%,alpha股目标~8-12%,熔断会死循环卖出
     _CONC_LIMIT = 0.15   # 单仓上限15%
     _CONC_TARGET = 0.12  # 减持目标12%
     for sym, pos in list(account.positions.items()):
+        # v29: v28 持仓完全跳过集中度熔断 (QQQ目标60%是策略设计,不是风险)
+        if sym == "QQQ" or sym in V28_ALPHA_UNIVERSE:
+            continue
         lp = pos.get("last_price", pos.get("avg_price", 0))
         mkt_val = pos["qty"] * lp
         weight = mkt_val / account.total_equity if account.total_equity > 0 else 0
@@ -2511,7 +2522,8 @@ def main():
                         # 自动减持最高相关性配对中市值较小的
                         top = alerts[0]
                         reduce_sym = top.get("reduce_symbol", "")
-                        if reduce_sym and reduce_sym in account.positions:
+                        # v29: 跳过 v28 持仓 — v28 策略有意持有高相关科技股组合
+                        if reduce_sym and reduce_sym in account.positions and not (reduce_sym == "QQQ" or reduce_sym in V28_ALPHA_UNIVERSE):
                             rpos = account.positions[reduce_sym]
                             rprice = rpos.get("last_price", rpos.get("avg_price", 0))
                             if rprice > 0:

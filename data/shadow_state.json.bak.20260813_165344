@@ -1,82 +1,55 @@
 {
-  "initial_cash": 1000000,
-  "cash": 15311.008487499494,
+  "initial_cash": 300000,
+  "cash": 165063.59777499997,
   "positions": {
     "QQQ": {
-      "shares": 666,
-      "qty": 666,
-      "avg_price": 718.6971664801124,
-      "last_price": 718.64,
+      "shares": 50,
+      "qty": 50,
+      "avg_price": 727.4080439999999,
+      "last_price": 723.7,
       "ai_decision_id": 0,
-      "buy_time": "2026-08-05T21:35:37.240407"
+      "buy_time": "2026-08-05T21:35:37.240407",
+      "atr": 13.75
     },
     "NVDA": {
       "shares": 110,
       "qty": 110,
       "avg_price": 218.63295000000002,
-      "last_price": 217.68,
+      "last_price": 224.09,
       "ai_decision_id": 0,
       "buy_time": "2026-08-05T21:35:37.247578",
-      "atr": 6.5,
-      "peak_price": 226.17
+      "atr": 7.83,
+      "peak_price": 224.54
+    },
+    "AAPL": {
+      "shares": 78,
+      "qty": 78,
+      "avg_price": 308.89563749999996,
+      "last_price": 302.25,
+      "ai_decision_id": 0,
+      "buy_time": "2026-08-05T21:35:37.250843",
+      "atr": 9.43,
+      "peak_price": 315.42
+    },
+    "META": {
+      "shares": 40,
+      "qty": 40,
+      "avg_price": 598.0366124999999,
+      "last_price": 578.85,
+      "ai_decision_id": 0,
+      "buy_time": "2026-08-05T21:35:37.257355",
+      "atr": 21.86,
+      "peak_price": 599.32
     },
     "AMZN": {
       "shares": 87,
       "qty": 87,
       "avg_price": 273.4113375,
-      "last_price": 266.3,
+      "last_price": 267.28,
       "ai_decision_id": 0,
       "buy_time": "2026-08-06T21:33:50.171436",
-      "atr": 9.45,
+      "atr": 9.84,
       "peak_price": 278.2
-    },
-    "CRM": {
-      "shares": 294,
-      "qty": 294,
-      "avg_price": 193.56165,
-      "last_price": 206.34,
-      "ai_decision_id": 0,
-      "buy_time": "2026-08-13T21:38:30.795837",
-      "atr": 8.19,
-      "peak_price": 207.6
-    },
-    "NFLX": {
-      "shares": 766,
-      "qty": 766,
-      "avg_price": 74.3027625,
-      "last_price": 80.25,
-      "ai_decision_id": 0,
-      "buy_time": "2026-08-13T21:38:30.934462",
-      "atr": 2.32,
-      "peak_price": 80.66
-    },
-    "MSFT": {
-      "shares": 103,
-      "qty": 103,
-      "avg_price": 488.8603125,
-      "last_price": 483.55,
-      "ai_decision_id": 0,
-      "buy_time": "2026-08-20T00:23:46.475696",
-      "atr": 12.8
-    },
-    "GOOGL": {
-      "shares": 146,
-      "qty": 146,
-      "avg_price": 346.66278750000004,
-      "last_price": 344.87,
-      "ai_decision_id": 0,
-      "buy_time": "2026-08-20T00:23:46.480468",
-      "atr": 10.69
-    },
-    "AAPL": {
-      "shares": 156,
-      "qty": 156,
-      "avg_price": 315.29362499999996,
-      "last_price": 316.42,
-      "ai_decision_id": 0,
-      "buy_time": "2026-08-20T01:28:10.190330",
-      "atr": 8.36,
-      "peak_price": 316.48
     }
   },
   "trade_history": [
@@ -1442,1313 +1415,79 @@
       "pnl": -1306.47,
       "pnl_pct": -0.0555,
       "reason": "\u786c\u6b62\u635f -5.1%"
-    },
-    {
-      "date": "2026-08-13T21:38:30.455479",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 775,
-      "price": 727.14,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$597,529",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-13T21:38:30.622763",
-      "symbol": "AAPL",
-      "action": "SELL",
-      "shares": 78,
-      "price": 300.74,
-      "pnl": -636.24,
-      "pnl_pct": -0.0264,
-      "reason": "v28\u518d\u5e73\u8861\u6362\u4ed3"
-    },
-    {
-      "date": "2026-08-13T21:38:30.702302",
-      "symbol": "META",
-      "action": "SELL",
-      "shares": 40,
-      "price": 575.96,
-      "pnl": -883.23,
-      "pnl_pct": -0.0369,
-      "reason": "v28\u518d\u5e73\u8861\u6362\u4ed3"
-    },
-    {
-      "date": "2026-08-13T21:38:30.795854",
-      "symbol": "CRM",
-      "action": "BUY",
-      "shares": 294,
-      "price": 193.56,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u52a8\u91cfalpha score=0.958",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-13T21:38:30.850022",
-      "symbol": "PLTR",
-      "action": "BUY",
-      "shares": 332,
-      "price": 171.25,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u52a8\u91cfalpha score=0.952",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-13T21:38:30.903913",
-      "symbol": "AVGO",
-      "action": "BUY",
-      "shares": 136,
-      "price": 416.57,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u52a8\u91cfalpha score=0.945",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-13T21:38:30.934475",
-      "symbol": "NFLX",
-      "action": "BUY",
-      "shares": 766,
-      "price": 74.3,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u52a8\u91cfalpha score=0.701",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-13T21:38:30.995354",
-      "symbol": "GOOGL",
-      "action": "BUY",
-      "shares": 165,
-      "price": 343.97,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u52a8\u91cfalpha score=0.253",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-13T21:49:17.537236",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 660,
-      "price": 724.19,
-      "pnl": -1952.87,
-      "pnl_pct": -0.0041,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-13T21:49:17.543255",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 657,
-      "price": 730.88,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$598,702",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-13T21:49:17.548102",
-      "symbol": "GOOGL",
-      "action": "SELL",
-      "shares": 165,
-      "price": 343.35,
-      "pnl": -101.45,
-      "pnl_pct": -0.0018,
-      "reason": "v28\u518d\u5e73\u8861\u6362\u4ed3"
-    },
-    {
-      "date": "2026-08-13T21:49:17.550148",
-      "symbol": "MU",
-      "action": "BUY",
-      "shares": 61,
-      "price": 927.85,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u52a8\u91cfalpha score=0.721",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-13T22:02:07.352963",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 657,
-      "price": 724.19,
-      "pnl": -3903.27,
-      "pnl_pct": -0.0081,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-13T22:02:07.358778",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 653,
-      "price": 730.88,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$595,830",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-13T22:16:23.874930",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 654,
-      "price": 728.25,
-      "pnl": -1626.12,
-      "pnl_pct": -0.0034,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-13T22:16:23.879852",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 651,
-      "price": 735.05,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$596,520",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-13T22:16:23.884375",
-      "symbol": "PLTR",
-      "action": "SELL",
-      "shares": 332,
-      "price": 175.67,
-      "pnl": 1465.27,
-      "pnl_pct": 0.0258,
-      "reason": "v28\u518d\u5e73\u8861\u6362\u4ed3"
-    },
-    {
-      "date": "2026-08-13T22:16:23.889901",
-      "symbol": "GOOGL",
-      "action": "BUY",
-      "shares": 164,
-      "price": 346.58,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u52a8\u91cfalpha score=0.233",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-13T22:29:06.338392",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 652,
-      "price": 728.25,
-      "pnl": -3870.26,
-      "pnl_pct": -0.0081,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-13T22:29:06.343790",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 648,
-      "price": 735.05,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$593,618",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-13T22:43:59.645229",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 649,
-      "price": 730.21,
-      "pnl": -3027.81,
-      "pnl_pct": -0.0063,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-13T22:44:04.906671",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 645,
-      "price": 737.09,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$592,566",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-13T22:58:09.512166",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 645,
-      "price": 729.17,
-      "pnl": -4819.07,
-      "pnl_pct": -0.0101,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-13T22:58:17.874673",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 642,
-      "price": 736.05,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$589,442",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-13T23:11:25.633585",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 643,
-      "price": 729.17,
-      "pnl": -4497.9,
-      "pnl_pct": -0.0095,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-13T23:11:25.639226",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 639,
-      "price": 736.05,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$586,773",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-13T23:25:36.042594",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 640,
-      "price": 728.88,
-      "pnl": -4601.08,
-      "pnl_pct": -0.0098,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-13T23:25:36.047867",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 637,
-      "price": 735.76,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$583,835",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-13T23:25:36.052957",
-      "symbol": "GOOGL",
-      "action": "SELL",
-      "shares": 164,
-      "price": 343.91,
-      "pnl": -438.03,
-      "pnl_pct": -0.0077,
-      "reason": "v28\u518d\u5e73\u8861\u6362\u4ed3"
-    },
-    {
-      "date": "2026-08-13T23:25:36.055153",
-      "symbol": "PLTR",
-      "action": "BUY",
-      "shares": 319,
-      "price": 174.07,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u52a8\u91cfalpha score=0.984",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-13T23:39:33.706302",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 637,
-      "price": 728.88,
-      "pnl": -4419.55,
-      "pnl_pct": -0.0094,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-13T23:39:33.712588",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 633,
-      "price": 735.76,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$580,973",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-13T23:53:44.434623",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 634,
-      "price": 727.46,
-      "pnl": -5267.1,
-      "pnl_pct": -0.0113,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-13T23:53:44.440325",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 630,
-      "price": 734.34,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$577,378",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-13T23:53:44.444965",
-      "symbol": "PLTR",
-      "action": "SELL",
-      "shares": 319,
-      "price": 174.2,
-      "pnl": 43.79,
-      "pnl_pct": 0.0008,
-      "reason": "v28\u518d\u5e73\u8861\u6362\u4ed3"
-    },
-    {
-      "date": "2026-08-13T23:53:44.447740",
-      "symbol": "GOOGL",
-      "action": "BUY",
-      "shares": 159,
-      "price": 345.02,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u52a8\u91cfalpha score=0.225",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-14T00:05:44.923186",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 631,
-      "price": 727.46,
-      "pnl": -4520.31,
-      "pnl_pct": -0.0098,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-14T00:05:44.933696",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 628,
-      "price": 734.34,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$574,546",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-14T00:21:15.289134",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 629,
-      "price": 727.6,
-      "pnl": -4272.82,
-      "pnl_pct": -0.0092,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-14T00:21:22.382476",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 625,
-      "price": 734.48,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$572,200",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-14T00:37:27.409033",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 625,
-      "price": 728.3,
-      "pnl": -3849.09,
-      "pnl_pct": -0.0084,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-14T00:37:27.426919",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 622,
-      "price": 735.18,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$570,211",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-14T00:51:30.211385",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 623,
-      "price": 728.34,
-      "pnl": -4168.25,
-      "pnl_pct": -0.0091,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-14T00:51:30.216746",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 619,
-      "price": 735.22,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$567,532",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-14T01:03:52.252416",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 620,
-      "price": 728.34,
-      "pnl": -4239.49,
-      "pnl_pct": -0.0093,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-14T01:03:52.258176",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 617,
-      "price": 735.22,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$565,139",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-14T01:17:35.924156",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 617,
-      "price": 729.42,
-      "pnl": -3570.92,
-      "pnl_pct": -0.0079,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-14T01:17:35.929392",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 613,
-      "price": 736.3,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$563,284",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-14T01:31:20.032719",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 614,
-      "price": 729.42,
-      "pnl": -4086.49,
-      "pnl_pct": -0.009,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-14T01:31:20.038043",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 611,
-      "price": 736.3,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$560,718",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-14T01:46:14.050855",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 612,
-      "price": 729.31,
-      "pnl": -4247.78,
-      "pnl_pct": -0.0094,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-14T01:46:23.416109",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 608,
-      "price": 736.19,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$558,111",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-14T02:00:20.325450",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 609,
-      "price": 729.31,
-      "pnl": -4194.93,
-      "pnl_pct": -0.0094,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-14T02:00:20.331141",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 606,
-      "price": 736.19,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$555,538",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-14T02:17:15.795031",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 606,
-      "price": 728.65,
-      "pnl": -4567.82,
-      "pnl_pct": -0.0102,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-14T02:17:15.801164",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 602,
-      "price": 735.53,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$552,625",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-14T02:30:52.411688",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 603,
-      "price": 728.5,
-      "pnl": -4316.63,
-      "pnl_pct": -0.0097,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-14T02:30:52.432853",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 600,
-      "price": 735.38,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$549,849",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-14T02:54:52.190549",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 600,
-      "price": 729.69,
-      "pnl": -3445.21,
-      "pnl_pct": -0.0078,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-14T02:55:12.883722",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 598,
-      "price": 736.57,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$549,273",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-14T03:18:10.964495",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 599,
-      "price": 730.35,
-      "pnl": -3587.46,
-      "pnl_pct": -0.0081,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-14T03:18:43.100127",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 595,
-      "price": 737.23,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$547,254",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-14T03:18:43.109497",
-      "symbol": "GOOGL",
-      "action": "SELL",
-      "shares": 159,
-      "price": 343.94,
-      "pnl": -171.57,
-      "pnl_pct": -0.0031,
-      "reason": "v28\u518d\u5e73\u8861\u6362\u4ed3"
-    },
-    {
-      "date": "2026-08-14T03:18:43.114480",
-      "symbol": "META",
-      "action": "BUY",
-      "shares": 87,
-      "price": 593.27,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u52a8\u91cfalpha score=0.234",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-14T03:44:00.309109",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 596,
-      "price": 729.32,
-      "pnl": -4607.45,
-      "pnl_pct": -0.0105,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-14T03:44:30.929593",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 593,
-      "price": 736.2,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$544,228",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-14T04:10:02.993188",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 593,
-      "price": 728.63,
-      "pnl": -4590.3,
-      "pnl_pct": -0.0105,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-14T04:10:25.725446",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 590,
-      "price": 735.51,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$541,210",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-14T04:34:56.535511",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 591,
-      "price": 728.63,
-      "pnl": -4168.65,
-      "pnl_pct": -0.0096,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-20T00:23:43.397573",
-      "symbol": "AVGO",
-      "action": "SELL",
-      "shares": 136,
-      "price": 363.03,
-      "pnl": -7282.03,
-      "pnl_pct": -0.1285,
-      "reason": "ATR\u6b62\u635f -12.4% (ATR9%)"
-    },
-    {
-      "date": "2026-08-20T00:23:43.402760",
-      "symbol": "META",
-      "action": "SELL",
-      "shares": 87,
-      "price": 550.41,
-      "pnl": -3728.52,
-      "pnl_pct": -0.0722,
-      "reason": "\u786c\u6b62\u635f -6.8%"
-    },
-    {
-      "date": "2026-08-20T00:23:46.459522",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 591,
-      "price": 722.09,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$532,120",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-20T00:23:46.469954",
-      "symbol": "MU",
-      "action": "SELL",
-      "shares": 61,
-      "price": 933.65,
-      "pnl": 353.8,
-      "pnl_pct": 0.0063,
-      "reason": "v28\u518d\u5e73\u8861\u6362\u4ed3"
-    },
-    {
-      "date": "2026-08-20T00:23:46.475703",
-      "symbol": "MSFT",
-      "action": "BUY",
-      "shares": 103,
-      "price": 488.86,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u52a8\u91cfalpha score=0.930",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-20T00:23:46.480473",
-      "symbol": "GOOGL",
-      "action": "BUY",
-      "shares": 146,
-      "price": 346.66,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u52a8\u91cfalpha score=0.517",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-20T00:23:46.483097",
-      "symbol": "AAPL",
-      "action": "BUY",
-      "shares": 159,
-      "price": 317.64,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u52a8\u91cfalpha score=0.380",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-20T00:34:13.336961",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 591,
-      "price": 716.59,
-      "pnl": -4859.43,
-      "pnl_pct": -0.0113,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-20T00:34:13.344112",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 588,
-      "price": 722.09,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$529,861",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-20T00:44:58.361257",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 589,
-      "price": 715.59,
-      "pnl": -4150.94,
-      "pnl_pct": -0.0098,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-20T00:44:58.388114",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 586,
-      "price": 721.09,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$526,774",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-20T00:44:58.391978",
-      "symbol": "AAPL",
-      "action": "SELL",
-      "shares": 159,
-      "price": 313.79,
-      "pnl": -611.1,
-      "pnl_pct": -0.0121,
-      "reason": "v28\u518d\u5e73\u8861\u6362\u4ed3"
-    },
-    {
-      "date": "2026-08-20T00:44:58.394917",
-      "symbol": "MU",
-      "action": "BUY",
-      "shares": 53,
-      "price": 941.09,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u52a8\u91cfalpha score=0.367",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-20T00:55:51.783860",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 586,
-      "price": 715.59,
-      "pnl": -3404.85,
-      "pnl_pct": -0.0081,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-20T00:55:51.791234",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 583,
-      "price": 721.09,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$524,632",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-20T01:06:29.678466",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 584,
-      "price": 714.34,
-      "pnl": -3978.5,
-      "pnl_pct": -0.0094,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-20T01:06:29.686229",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 581,
-      "price": 719.84,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$521,750",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-20T01:17:05.092176",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 581,
-      "price": 714.34,
-      "pnl": -3348.64,
-      "pnl_pct": -0.008,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-20T01:17:05.098618",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 578,
-      "price": 719.84,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$519,817",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-20T01:28:07.526784",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 579,
-      "price": 713.26,
-      "pnl": -3840.6,
-      "pnl_pct": -0.0092,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-20T01:28:10.172702",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 576,
-      "price": 718.76,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$516,882",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-20T01:28:10.183981",
-      "symbol": "MU",
-      "action": "SELL",
-      "shares": 53,
-      "price": 924.86,
-      "pnl": -860.32,
-      "pnl_pct": -0.0172,
-      "reason": "v28\u518d\u5e73\u8861\u6362\u4ed3"
-    },
-    {
-      "date": "2026-08-20T01:28:10.190336",
-      "symbol": "AAPL",
-      "action": "BUY",
-      "shares": 156,
-      "price": 315.29,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u52a8\u91cfalpha score=0.324",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-20T01:38:36.579507",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 576,
-      "price": 713.26,
-      "pnl": -3299.26,
-      "pnl_pct": -0.008,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-20T01:38:36.586577",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 573,
-      "price": 718.76,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$514,777",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-20T01:49:20.342280",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 574,
-      "price": 713.81,
-      "pnl": -2867.72,
-      "pnl_pct": -0.007,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-20T01:49:20.348852",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 572,
-      "price": 719.31,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$513,268",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-20T02:00:10.427852",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 573,
-      "price": 713.81,
-      "pnl": -3093.42,
-      "pnl_pct": -0.0075,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-20T02:00:10.434608",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 570,
-      "price": 719.31,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$511,363",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-20T02:10:49.272888",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 570,
-      "price": 714.18,
-      "pnl": -2912.51,
-      "pnl_pct": -0.0071,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-20T02:10:49.305411",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 568,
-      "price": 719.68,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$509,946",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-20T02:21:20.849533",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 569,
-      "price": 714.18,
-      "pnl": -3084.83,
-      "pnl_pct": -0.0075,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-20T02:21:20.860850",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 566,
-      "price": 719.68,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$508,054",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-20T02:32:26.507126",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 566,
-      "price": 713.46,
-      "pnl": -3511.61,
-      "pnl_pct": -0.0086,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-20T02:32:29.168508",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 564,
-      "price": 718.96,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$505,851",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-20T02:42:58.346261",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 565,
-      "price": 713.46,
-      "pnl": -3187.53,
-      "pnl_pct": -0.0078,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-20T02:42:58.353978",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 562,
-      "price": 718.96,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$503,972",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-20T02:53:45.519475",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 562,
-      "price": 714.1,
-      "pnl": -2747.29,
-      "pnl_pct": -0.0068,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-20T02:53:45.525962",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 558,
-      "price": 719.6,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$502,330",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-20T03:04:36.148443",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 559,
-      "price": 714.1,
-      "pnl": -3005.54,
-      "pnl_pct": -0.0075,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-20T03:04:36.157012",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 555,
-      "price": 719.6,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$500,471",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-20T03:12:18.516280",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 555,
-      "price": 714.2,
-      "pnl": -2983.21,
-      "pnl_pct": -0.0075,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-20T03:12:18.522530",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 550,
-      "price": 719.7,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$498,914",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-20T03:20:16.421274",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 551,
-      "price": 714.14,
-      "pnl": -3049.6,
-      "pnl_pct": -0.0077,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 60%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-20T03:20:19.176448",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 547,
-      "price": 719.64,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$497,092",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-20T03:27:24.594429",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 547,
-      "price": 714.33,
-      "pnl": -2908.41,
-      "pnl_pct": -0.0074,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 59%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-20T03:27:27.318998",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 543,
-      "price": 719.83,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$495,233",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-20T03:33:39.829619",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 544,
-      "price": 714.6,
-      "pnl": -2824.83,
-      "pnl_pct": -0.0072,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 59%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-20T03:33:42.848348",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 540,
-      "price": 720.1,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$493,668",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-20T03:41:46.110585",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 540,
-      "price": 714.0,
-      "pnl": -3260.23,
-      "pnl_pct": -0.0084,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 59%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-20T03:41:49.504588",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 536,
-      "price": 719.5,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$491,503",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-20T03:48:57.911620",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 537,
-      "price": 713.24,
-      "pnl": -3420.71,
-      "pnl_pct": -0.0089,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 59%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-20T03:49:00.754200",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 533,
-      "price": 718.74,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$489,172",
-      "source": "factor_engine"
-    },
-    {
-      "date": "2026-08-20T03:57:09.167726",
-      "symbol": "QQQ",
-      "action": "SELL",
-      "shares": 533,
-      "price": 713.14,
-      "pnl": -3079.62,
-      "pnl_pct": -0.008,
-      "reason": "\u96c6\u4e2d\u5ea6\u7194\u65ad 59%>15% \u2192 \u51cf\u81f312%"
-    },
-    {
-      "date": "2026-08-20T03:57:12.203166",
-      "symbol": "QQQ",
-      "action": "BUY",
-      "shares": 529,
-      "price": 718.64,
-      "pnl": 0,
-      "pnl_pct": 0,
-      "reason": "v28\u6838\u5fc3\u4ed3 \u76ee\u6807$487,393",
-      "source": "factor_engine"
     }
   ],
   "cycle_returns": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
     0.0,
     0.0,
     0.0,
@@ -3678,371 +2417,2017 @@
     0.0,
     0.0,
     0.0,
-    0.0,
-    0.0,
-    0.0,
-    0.0,
-    0.0,
-    0.0,
-    0.0,
-    0.0,
-    0.0,
-    0.0,
-    0.0,
-    0.0,
-    0.0,
-    0.0,
-    0.0,
-    0.0,
-    0.0,
-    0.0,
-    0.0,
-    0.0,
-    0.0,
-    -0.000101,
-    0.002318,
-    -0.004505,
-    0.00086,
-    -0.004563,
-    -0.001768,
-    -0.005271,
-    -0.004527,
-    -0.005307,
-    -0.004601,
-    -0.006485,
-    -0.004608,
-    -0.004085,
-    -0.003473,
-    -0.004699,
-    -0.004219,
-    -0.003279,
-    -0.004557,
-    -0.004651,
-    -0.00461,
-    -0.00524,
-    -0.005025,
-    -0.001047,
-    -0.003983,
-    -0.005225,
-    -0.005541,
-    -0.005258,
-    -0.012038,
-    -0.003908,
-    -0.006118,
-    -0.003772,
-    -0.005494,
-    -0.003704,
-    -0.005939,
-    -0.003779,
-    -0.002933,
-    -0.003713,
-    -0.00277,
-    -0.003711,
-    -0.004335,
-    -0.003715,
-    -0.003258,
-    -0.003701,
-    -0.003111,
-    -0.003653,
-    -0.003738,
-    -0.003161,
-    -0.004384,
-    -0.004744,
-    -0.003635
+    0.0
   ],
-  "cycle_count": 6300,
-  "equity": 812691.7984874996,
-  "peak_equity": 897776.44,
+  "cycle_count": 6230,
+  "equity": 295881.357775,
+  "peak_equity": 301776.47,
   "equity_history": [
     {
-      "time": "2026-08-13T16:53:44.698845",
-      "equity": 995881.36
+      "time": "2026-08-07T13:47:30.152235",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-13T18:09:03.005902",
-      "equity": 995881.36
+      "time": "2026-08-07T13:54:14.927727",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-13T18:15:50.604258",
-      "equity": 995881.36
+      "time": "2026-08-07T14:00:20.293895",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-13T18:25:46.533193",
-      "equity": 995881.36
+      "time": "2026-08-07T14:06:54.138321",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-13T18:36:39.585933",
-      "equity": 995881.36
+      "time": "2026-08-07T14:13:15.619702",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-13T18:47:08.863986",
-      "equity": 995881.36
+      "time": "2026-08-07T14:20:01.971197",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-13T18:58:09.322192",
-      "equity": 995881.36
+      "time": "2026-08-07T14:26:17.473915",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-13T19:08:45.270586",
-      "equity": 995881.36
+      "time": "2026-08-07T14:32:45.383871",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-13T19:19:24.468087",
-      "equity": 995881.36
+      "time": "2026-08-07T14:38:50.460111",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-13T19:30:05.643590",
-      "equity": 995881.36
+      "time": "2026-08-07T14:45:17.977558",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-13T19:40:54.484901",
-      "equity": 995881.36
+      "time": "2026-08-07T14:51:19.806841",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-13T19:51:15.906047",
-      "equity": 995881.36
+      "time": "2026-08-07T14:58:05.983559",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-13T20:02:10.884495",
-      "equity": 995881.36
+      "time": "2026-08-07T15:04:08.556688",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-13T20:12:45.971103",
-      "equity": 995881.36
+      "time": "2026-08-07T15:10:39.905559",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-13T20:23:31.404977",
-      "equity": 995881.36
+      "time": "2026-08-07T15:16:45.530850",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-13T20:34:18.350283",
-      "equity": 995881.36
+      "time": "2026-08-07T15:23:17.773067",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-13T20:45:09.143143",
-      "equity": 995881.36
+      "time": "2026-08-07T15:29:33.962809",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-13T20:55:35.380023",
-      "equity": 995881.36
+      "time": "2026-08-07T15:36:10.198869",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-13T21:06:38.025439",
-      "equity": 995881.36
+      "time": "2026-08-07T15:42:12.355744",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-13T21:17:11.185878",
-      "equity": 995881.36
+      "time": "2026-08-07T15:48:42.258068",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-13T21:27:47.110675",
-      "equity": 995881.36
+      "time": "2026-08-07T15:54:46.793618",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-13T21:38:31.071088",
-      "equity": 995781.11
+      "time": "2026-08-07T16:01:32.101292",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-13T21:49:17.551694",
-      "equity": 998089.27
+      "time": "2026-08-07T16:07:33.073827",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-13T22:02:07.362529",
-      "equity": 993593.05
+      "time": "2026-08-07T16:14:07.600682",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-13T22:16:23.891554",
-      "equity": 994447.71
+      "time": "2026-08-07T16:20:10.804687",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-13T22:29:06.350674",
-      "equity": 989909.81
+      "time": "2026-08-07T16:26:43.486199",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-13T22:44:04.913828",
-      "equity": 988159.24
+      "time": "2026-08-07T16:33:04.892206",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-13T22:58:17.882192",
-      "equity": 982951.11
+      "time": "2026-08-07T16:39:39.886602",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-13T23:11:25.643106",
-      "equity": 978500.81
+      "time": "2026-08-07T16:45:41.331711",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-13T23:25:36.056756",
-      "equity": 973308.11
+      "time": "2026-08-07T16:52:15.272702",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-13T23:39:33.717288",
-      "equity": 968830.02
+      "time": "2026-08-07T16:58:16.836133",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-13T23:53:44.449520",
-      "equity": 962547.62
+      "time": "2026-08-07T17:04:59.401263",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-14T00:05:44.936291",
-      "equity": 958111.9
+      "time": "2026-08-07T17:11:04.776120",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-14T00:21:22.389247",
-      "equity": 954197.59
+      "time": "2026-08-07T17:17:34.167605",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-14T00:37:27.429089",
-      "equity": 950883.2
+      "time": "2026-08-07T17:23:35.239351",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-14T00:51:30.220810",
-      "equity": 946415.03
+      "time": "2026-08-07T17:30:10.414024",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-14T01:03:52.262361",
-      "equity": 942422.42
+      "time": "2026-08-07T17:36:24.080314",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-14T01:17:35.933577",
-      "equity": 939331.79
+      "time": "2026-08-07T17:42:50.325181",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-14T01:31:20.041910",
-      "equity": 935051.55
+      "time": "2026-08-07T17:49:18.025051",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-14T01:46:23.423096",
-      "equity": 930702.37
+      "time": "2026-08-07T17:55:46.424060",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-14T02:00:20.334957",
-      "equity": 926411.7
+      "time": "2026-08-07T18:01:48.230781",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-14T02:17:15.805527",
-      "equity": 921556.85
+      "time": "2026-08-07T18:08:30.300808",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-14T02:30:52.434670",
-      "equity": 916926.24
+      "time": "2026-08-07T18:14:32.722822",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-14T02:55:12.892071",
-      "equity": 915966.0
+      "time": "2026-08-07T18:21:01.322844",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-14T03:18:43.118779",
-      "equity": 912317.27
+      "time": "2026-08-07T18:27:05.563148",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-14T03:44:30.938352",
-      "equity": 907550.75
+      "time": "2026-08-07T18:33:34.688379",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-14T04:10:25.733710",
-      "equity": 902521.85
+      "time": "2026-08-07T18:39:49.070784",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-14T04:34:56.537718",
-      "equity": 897776.44
+      "time": "2026-08-07T18:46:23.851292",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-20T00:23:46.484732",
-      "equity": 886968.57
+      "time": "2026-08-07T18:52:25.099511",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-20T00:34:13.349270",
-      "equity": 883501.88
+      "time": "2026-08-07T18:58:52.805275",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-20T00:44:58.397616",
-      "equity": 878096.27
+      "time": "2026-08-07T19:04:56.333804",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-20T00:55:51.796342",
-      "equity": 874784.17
+      "time": "2026-08-07T19:11:36.662982",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-20T01:06:29.691641",
-      "equity": 869978.08
+      "time": "2026-08-07T19:17:36.650609",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-20T01:17:05.110581",
-      "equity": 866755.99
+      "time": "2026-08-07T19:24:10.509682",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-20T01:28:10.195044",
-      "equity": 861608.72
+      "time": "2026-08-07T19:30:10.677195",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-20T01:38:36.591664",
-      "equity": 858352.98
+      "time": "2026-08-07T19:36:40.795390",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-20T01:49:20.354238",
-      "equity": 855835.04
+      "time": "2026-08-07T19:42:57.488764",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-20T02:00:10.440097",
-      "equity": 852657.33
+      "time": "2026-08-07T19:49:25.288202",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-20T02:10:49.309153",
-      "equity": 850295.53
+      "time": "2026-08-07T19:55:25.365923",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-20T02:21:20.867340",
-      "equity": 847140.0
+      "time": "2026-08-07T20:01:57.335474",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-20T02:32:29.177673",
-      "equity": 843467.76
+      "time": "2026-08-07T20:07:57.571556",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-20T02:42:58.359471",
-      "equity": 840334.42
+      "time": "2026-08-07T20:14:34.812954",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-20T02:53:45.530373",
-      "equity": 837596.45
+      "time": "2026-08-07T20:20:38.063085",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-20T03:04:36.161856",
-      "equity": 834496.39
+      "time": "2026-08-07T20:27:04.862796",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-20T03:12:18.527728",
-      "equity": 831900.52
+      "time": "2026-08-07T20:33:05.755030",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-20T03:20:19.185626",
-      "equity": 828861.69
+      "time": "2026-08-07T20:39:39.119006",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-20T03:27:27.324269",
-      "equity": 825763.07
+      "time": "2026-08-07T20:46:00.742490",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-20T03:33:42.857324",
-      "equity": 823153.17
+      "time": "2026-08-07T20:52:31.115406",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-20T03:41:49.515443",
-      "equity": 819544.11
+      "time": "2026-08-07T20:58:34.986914",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-20T03:49:00.763630",
-      "equity": 815656.55
+      "time": "2026-08-07T21:05:02.919967",
+      "equity": 297573.71
     },
     {
-      "time": "2026-08-20T03:57:12.212395",
-      "equity": 812691.8
+      "time": "2026-08-07T21:11:07.045953",
+      "equity": 297573.71
+    },
+    {
+      "time": "2026-08-07T21:17:57.768287",
+      "equity": 297573.71
+    },
+    {
+      "time": "2026-08-07T21:23:59.028359",
+      "equity": 297573.71
+    },
+    {
+      "time": "2026-08-07T21:30:29.146893",
+      "equity": 297573.71
+    },
+    {
+      "time": "2026-08-07T21:36:30.951367",
+      "equity": 298918.55
+    },
+    {
+      "time": "2026-08-07T21:42:56.346383",
+      "equity": 298121.51
+    },
+    {
+      "time": "2026-08-07T21:49:16.113652",
+      "equity": 298505.81
+    },
+    {
+      "time": "2026-08-07T21:55:47.585179",
+      "equity": 298634.12
+    },
+    {
+      "time": "2026-08-07T22:01:50.155531",
+      "equity": 298485.74
+    },
+    {
+      "time": "2026-08-07T22:08:12.876595",
+      "equity": 298319.08
+    },
+    {
+      "time": "2026-08-07T22:14:14.476165",
+      "equity": 298107.38
+    },
+    {
+      "time": "2026-08-07T22:20:54.634669",
+      "equity": 298511.15
+    },
+    {
+      "time": "2026-08-07T22:26:54.360234",
+      "equity": 298740.42
+    },
+    {
+      "time": "2026-08-07T22:33:26.524153",
+      "equity": 298913.42
+    },
+    {
+      "time": "2026-08-07T22:39:26.155205",
+      "equity": 298899.52
+    },
+    {
+      "time": "2026-08-07T22:45:52.702865",
+      "equity": 298792.65
+    },
+    {
+      "time": "2026-08-07T22:52:09.372053",
+      "equity": 298842.57
+    },
+    {
+      "time": "2026-08-07T22:58:36.021532",
+      "equity": 298936.04
+    },
+    {
+      "time": "2026-08-07T23:04:37.718580",
+      "equity": 299020.2
+    },
+    {
+      "time": "2026-08-07T23:11:07.411995",
+      "equity": 299140.73
+    },
+    {
+      "time": "2026-08-07T23:17:07.963798",
+      "equity": 299218.47
+    },
+    {
+      "time": "2026-08-07T23:23:46.502610",
+      "equity": 299213.02
+    },
+    {
+      "time": "2026-08-07T23:29:50.953272",
+      "equity": 299386.57
+    },
+    {
+      "time": "2026-08-07T23:36:14.242184",
+      "equity": 299255.39
+    },
+    {
+      "time": "2026-08-07T23:42:14.599208",
+      "equity": 299279.64
+    },
+    {
+      "time": "2026-08-07T23:48:47.795633",
+      "equity": 299146.27
+    },
+    {
+      "time": "2026-08-07T23:55:02.531537",
+      "equity": 299042.38
+    },
+    {
+      "time": "2026-08-08T00:01:30.527430",
+      "equity": 298937.85
+    },
+    {
+      "time": "2026-08-08T00:07:33.077380",
+      "equity": 298903.86
+    },
+    {
+      "time": "2026-08-08T00:13:56.456349",
+      "equity": 298886.13
+    },
+    {
+      "time": "2026-08-08T00:19:56.162683",
+      "equity": 298839.42
+    },
+    {
+      "time": "2026-08-08T00:26:41.217766",
+      "equity": 298460.58
+    },
+    {
+      "time": "2026-08-08T00:32:42.369457",
+      "equity": 298324.59
+    },
+    {
+      "time": "2026-08-08T00:39:10.822052",
+      "equity": 298532.01
+    },
+    {
+      "time": "2026-08-08T00:45:14.392539",
+      "equity": 298547.46
+    },
+    {
+      "time": "2026-08-08T00:51:39.515307",
+      "equity": 298586.83
+    },
+    {
+      "time": "2026-08-08T00:57:54.366941",
+      "equity": 298478.53
+    },
+    {
+      "time": "2026-08-08T01:04:27.759739",
+      "equity": 298355.84
+    },
+    {
+      "time": "2026-08-08T01:10:27.874658",
+      "equity": 298383.75
+    },
+    {
+      "time": "2026-08-08T01:16:53.745875",
+      "equity": 298291.52
+    },
+    {
+      "time": "2026-08-08T01:22:56.799660",
+      "equity": 298304.95
+    },
+    {
+      "time": "2026-08-08T01:29:32.640626",
+      "equity": 298246.04
+    },
+    {
+      "time": "2026-08-08T01:35:32.062660",
+      "equity": 298223.57
+    },
+    {
+      "time": "2026-08-08T01:42:02.286436",
+      "equity": 298361.49
+    },
+    {
+      "time": "2026-08-08T01:48:00.994591",
+      "equity": 298392.43
+    },
+    {
+      "time": "2026-08-08T01:54:27.947289",
+      "equity": 298340.17
+    },
+    {
+      "time": "2026-08-08T02:00:45.356203",
+      "equity": 298392.23
+    },
+    {
+      "time": "2026-08-08T02:07:10.199605",
+      "equity": 298384.48
+    },
+    {
+      "time": "2026-08-08T02:13:09.027718",
+      "equity": 298347.52
+    },
+    {
+      "time": "2026-08-08T02:19:40.655176",
+      "equity": 298294.43
+    },
+    {
+      "time": "2026-08-08T02:25:39.602004",
+      "equity": 298253.78
+    },
+    {
+      "time": "2026-08-08T02:32:18.083280",
+      "equity": 298179.64
+    },
+    {
+      "time": "2026-08-08T02:38:21.566200",
+      "equity": 298133.32
+    },
+    {
+      "time": "2026-08-08T02:44:46.518395",
+      "equity": 298112.36
+    },
+    {
+      "time": "2026-08-08T02:50:46.073890",
+      "equity": 298095.17
+    },
+    {
+      "time": "2026-08-08T02:57:16.570070",
+      "equity": 298128.7
+    },
+    {
+      "time": "2026-08-08T03:03:28.361963",
+      "equity": 298282.43
+    },
+    {
+      "time": "2026-08-08T03:09:53.478468",
+      "equity": 298418.72
+    },
+    {
+      "time": "2026-08-08T03:15:54.592845",
+      "equity": 298577.17
+    },
+    {
+      "time": "2026-08-08T03:22:16.666820",
+      "equity": 298589.68
+    },
+    {
+      "time": "2026-08-08T03:28:15.532510",
+      "equity": 298581.33
+    },
+    {
+      "time": "2026-08-08T03:35:03.139008",
+      "equity": 298497.63
+    },
+    {
+      "time": "2026-08-08T03:41:01.507073",
+      "equity": 298499.27
+    },
+    {
+      "time": "2026-08-08T03:47:22.095150",
+      "equity": 298547.63
+    },
+    {
+      "time": "2026-08-08T03:53:21.841266",
+      "equity": 298698.99
+    },
+    {
+      "time": "2026-08-08T03:59:40.384208",
+      "equity": 298814.7
+    },
+    {
+      "time": "2026-08-08T04:05:53.943171",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T04:12:25.232207",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T04:18:25.399187",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T04:24:51.111882",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T04:30:53.839078",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T04:37:35.871903",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T04:43:35.128611",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T04:50:07.102340",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T04:56:06.462625",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T05:02:32.678798",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T05:08:57.025488",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T05:15:24.148023",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T05:21:22.579984",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T05:27:52.461707",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T05:33:50.930554",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T05:40:31.136469",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T05:46:33.166283",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T05:52:59.944303",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T05:58:58.081053",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T06:05:31.536373",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T06:11:44.356777",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T06:18:09.641717",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T06:24:12.260903",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T06:30:40.810527",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T06:36:40.898421",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T06:43:32.212472",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T06:49:30.709023",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T06:55:56.961516",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T07:02:00.426171",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T07:08:28.978915",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T07:14:40.782296",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T07:21:14.643941",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T07:27:14.623748",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T07:33:40.268258",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T07:39:43.726955",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T07:46:22.036682",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T07:52:22.273342",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T07:58:54.062670",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T08:04:40.957464",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T08:10:30.158144",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T08:16:35.369048",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T08:22:23.711593",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T08:28:10.891613",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T08:33:11.674656",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T08:36:55.268639",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T08:41:55.618964",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T08:46:56.295895",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T08:51:56.654563",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T08:56:57.377361",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T09:01:57.741310",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T09:07:13.257187",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T09:12:13.633362",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T09:17:14.452772",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T09:22:14.834413",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T09:27:15.609118",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T09:32:15.970083",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T09:37:32.889456",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T09:42:33.252993",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T09:47:33.997946",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T09:52:34.371869",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T09:57:35.164364",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T10:02:35.529006",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T10:07:47.147725",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T10:12:47.533371",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T10:17:48.261758",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T10:22:48.643533",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T10:27:49.394262",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T10:32:49.765251",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T10:38:07.883204",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T10:43:08.254978",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T10:48:08.955623",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T10:53:09.351414",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T10:58:10.060369",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T11:03:10.459395",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T11:08:29.463099",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T11:13:29.836736",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T11:18:30.618214",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T11:23:30.973164",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T11:28:31.761765",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T11:33:32.116985",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T11:38:49.229031",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T11:43:49.584554",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T11:48:50.363111",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T11:53:50.726589",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T11:58:51.364542",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T12:03:51.738621",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T12:09:03.685375",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T12:14:04.053015",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T12:19:04.788653",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T12:24:05.152571",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T12:29:05.966616",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T12:34:06.344189",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T12:39:24.539208",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T12:44:24.889489",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T12:49:25.702805",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T12:54:26.065956",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T12:59:26.853096",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T13:04:27.322192",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T13:09:39.981808",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T13:14:40.345419",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T13:19:41.112924",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T13:24:41.473533",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T13:29:42.184529",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T13:34:42.541371",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T13:39:56.095373",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T13:44:56.456418",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T13:49:57.201741",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T13:54:57.540707",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T13:59:58.231246",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T14:04:58.639815",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T14:10:11.212918",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T14:15:11.578557",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T14:20:12.353733",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T14:25:12.714969",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T14:30:13.433348",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T14:35:13.801272",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T14:40:26.276402",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T14:45:26.607652",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T14:50:27.310830",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T14:55:27.651522",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T15:00:28.463710",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T15:05:28.822663",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T15:10:40.335598",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T15:15:40.731791",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T15:20:41.542278",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T15:25:41.894898",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T15:30:42.607691",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T15:35:42.967058",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T15:40:59.140115",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T15:45:59.514591",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T15:51:00.297291",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T15:56:00.668652",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T16:01:01.403400",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T16:06:01.776349",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T16:11:19.165529",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T16:16:19.541883",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T16:21:20.353784",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T16:26:20.728933",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T16:31:21.509825",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T16:36:21.883809",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T16:41:35.636128",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T16:46:36.020712",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T16:51:36.807648",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T16:56:37.179246",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T17:01:37.975132",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T17:06:38.353767",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T17:11:54.663316",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T17:16:55.032707",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T17:21:55.777414",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T17:26:56.146792",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T17:31:56.899526",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T17:36:57.257688",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T17:42:08.462313",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T17:47:08.836351",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T17:52:09.625637",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T17:57:09.995058",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T18:02:10.808939",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T18:07:11.164257",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T18:12:27.896871",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T18:17:28.274400",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T18:22:29.010563",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T18:27:29.385340",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T18:32:30.197893",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T18:37:30.511573",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T18:42:47.244471",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T18:47:47.604174",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T18:52:48.432958",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T18:57:48.808131",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T19:02:49.499385",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T19:07:49.883863",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T19:13:08.920772",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T19:18:09.270794",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T19:23:10.044815",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T19:28:10.421743",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T19:33:11.127464",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T19:38:11.355695",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T19:43:29.268458",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T19:48:29.654566",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T19:53:30.373957",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T19:58:30.736750",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T20:03:31.534683",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T20:08:31.904596",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T20:13:45.797588",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T20:18:46.184395",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T20:23:46.960138",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T20:28:47.347574",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T20:33:48.134537",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T20:38:48.513028",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T20:44:04.868413",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T20:49:05.249678",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T20:54:06.026413",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T20:59:06.397259",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T21:04:07.197632",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T21:09:07.563975",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T21:14:22.101007",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T21:19:22.474372",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T21:24:23.264359",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T21:29:23.638577",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T21:34:24.335439",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T21:39:24.702158",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T21:44:42.987262",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T21:49:43.339322",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T21:54:44.122632",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T21:59:44.495001",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T22:04:45.220170",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T22:09:45.588507",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T22:14:59.712002",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T22:20:00.081723",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T22:25:00.857801",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T22:30:01.235861",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T22:35:02.013691",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T22:40:02.372369",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T22:45:15.296213",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T22:50:15.665120",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T22:55:16.432822",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T23:00:16.785528",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T23:05:17.597955",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T23:10:17.975358",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T23:15:31.952403",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T23:20:32.341412",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T23:25:32.994981",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T23:30:33.363399",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T23:35:34.129835",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T23:40:34.513527",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T23:45:53.418941",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T23:50:53.792435",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-08T23:55:54.517256",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T00:00:54.888122",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T00:05:55.615843",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T00:10:55.998898",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T00:16:11.170575",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T00:21:11.515837",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T00:26:12.238536",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T00:31:12.594592",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T00:36:13.731987",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T00:41:14.094524",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T00:46:27.863151",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T00:51:28.206242",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T00:56:28.947307",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T01:01:29.312232",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T01:06:30.105542",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T01:11:30.480647",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T01:16:46.270706",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T01:21:46.646888",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T01:26:47.423889",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T01:31:47.793559",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T01:36:48.604532",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T01:41:48.980390",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T01:47:03.216373",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T01:52:03.423712",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T01:57:04.238563",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T02:02:04.612681",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T02:07:05.357482",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T02:12:05.731189",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T02:17:21.358727",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T02:22:21.754389",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T02:27:22.525072",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T02:32:22.892136",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T02:37:23.574657",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T02:42:23.956569",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T02:47:38.719930",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T02:52:39.032889",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T02:57:39.816143",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T03:02:40.176931",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T03:07:40.957468",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T03:12:41.318330",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T03:17:58.337796",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T03:22:58.719355",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T03:27:59.432088",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T03:32:59.793899",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T03:38:00.597855",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T03:43:00.933378",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T03:48:20.876029",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T03:53:21.245348",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T03:58:22.028389",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T04:03:22.386396",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T04:08:23.121176",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T04:13:23.517390",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T04:18:40.242843",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T04:23:40.614139",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T04:28:41.320972",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T04:33:41.676016",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T04:38:42.356083",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T04:43:42.706592",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T04:49:02.941285",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T04:54:03.325046",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T04:59:04.052338",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T05:04:04.433517",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T05:09:05.166388",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T05:14:05.558016",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T05:19:22.220670",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T05:24:22.594217",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T05:29:23.312416",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T05:34:23.672220",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T05:39:24.458448",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T05:44:24.848075",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T05:49:41.868084",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T05:54:42.231818",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T05:59:43.002639",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T06:04:43.374912",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T06:09:44.094388",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T06:14:44.450876",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T06:19:59.305129",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T06:24:59.672077",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T06:30:00.470220",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T06:35:00.845256",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T06:40:01.646661",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T06:45:02.015036",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T06:50:18.630205",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T06:55:19.016659",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T07:00:19.864485",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T07:05:20.233004",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T07:10:21.036156",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T07:15:21.427373",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T07:20:33.734971",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T07:25:34.110946",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T07:30:34.867809",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T07:35:35.242206",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T07:40:36.029614",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T07:45:36.395987",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T07:50:51.726680",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T07:55:52.103191",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T08:00:52.905045",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T08:05:53.273319",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T08:10:54.021667",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T08:15:54.422521",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T08:21:08.075372",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T08:26:08.519051",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T08:31:09.263011",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T08:36:09.640868",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T08:41:10.401669",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T08:46:10.742537",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T08:51:23.917715",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T08:56:24.300136",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T09:01:25.116878",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T09:06:25.490366",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T09:11:26.234802",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T09:16:26.585067",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T09:21:40.735046",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T09:26:41.106268",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T09:31:41.832309",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T09:36:42.203993",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T09:41:42.916075",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T09:46:43.277269",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T09:51:57.799961",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-09T09:56:58.155723",
+      "equity": 298668.06
+    },
+    {
+      "time": "2026-08-13T12:26:06.720933",
+      "equity": 295881.36
+    },
+    {
+      "time": "2026-08-13T12:33:00.362733",
+      "equity": 295881.36
+    },
+    {
+      "time": "2026-08-13T12:40:42.519790",
+      "equity": 295881.36
+    },
+    {
+      "time": "2026-08-13T12:47:53.235765",
+      "equity": 295881.36
+    },
+    {
+      "time": "2026-08-13T12:55:22.959129",
+      "equity": 295881.36
+    },
+    {
+      "time": "2026-08-13T13:02:37.670135",
+      "equity": 295881.36
+    },
+    {
+      "time": "2026-08-13T13:10:23.371726",
+      "equity": 295881.36
+    },
+    {
+      "time": "2026-08-13T13:17:34.025395",
+      "equity": 295881.36
+    },
+    {
+      "time": "2026-08-13T13:25:06.167618",
+      "equity": 295881.36
+    },
+    {
+      "time": "2026-08-13T13:32:24.050707",
+      "equity": 295881.36
+    },
+    {
+      "time": "2026-08-13T13:40:24.498315",
+      "equity": 295881.36
+    },
+    {
+      "time": "2026-08-13T13:47:46.953472",
+      "equity": 295881.36
+    },
+    {
+      "time": "2026-08-13T13:55:36.478691",
+      "equity": 295881.36
+    },
+    {
+      "time": "2026-08-13T14:03:06.895202",
+      "equity": 295881.36
+    },
+    {
+      "time": "2026-08-13T14:11:06.107461",
+      "equity": 295881.36
+    },
+    {
+      "time": "2026-08-13T14:18:22.425776",
+      "equity": 295881.36
+    },
+    {
+      "time": "2026-08-13T14:25:57.181643",
+      "equity": 295881.36
+    },
+    {
+      "time": "2026-08-13T14:32:55.513532",
+      "equity": 295881.36
     }
   ],
-  "last_cycle": "2026-08-20T03:57:12.222313",
+  "last_cycle": "2026-08-13T14:32:55.516913",
   "stop_loss_blacklist": {
-    "QQQ": {
-      "sold_cycle": 6300,
+    "GOOGL": {
+      "sold_cycle": 6213,
       "cooldown": 12
     }
   },

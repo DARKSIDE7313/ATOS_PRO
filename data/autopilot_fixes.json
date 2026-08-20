@@ -1,859 +1,5 @@
 [
   {
-    "time": "2026-07-17T18:54:07.288098",
-    "error_hash": "ed9585aefc5d",
-    "fix_type": "reduce_freq",
-    "result": "success",
-    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 2.0x"
-  },
-  {
-    "time": "2026-07-18T01:10:58.009741",
-    "error_hash": "0fbe85fe5635",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T01:56:56.884409",
-    "error_hash": "b12f80893b2c",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T01:57:47.230817",
-    "error_hash": "97a4f29f87df",
-    "fix_type": "clear_cache",
-    "result": "success",
-    "details": "\u6e05\u9664\u4e86 188 \u4e2a\u7f13\u5b58\u6587\u4ef6"
-  },
-  {
-    "time": "2026-07-18T01:58:11.147589",
-    "error_hash": "a701b1663874",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T01:58:16.284407",
-    "error_hash": "44de83773fd9",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T01:58:21.420671",
-    "error_hash": "ce7a23cba363",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T01:59:12.933322",
-    "error_hash": "9201f40b25cc",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T01:59:18.147152",
-    "error_hash": "58c4787c9c20",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T01:59:23.345146",
-    "error_hash": "f16e41b9e312",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T02:51:23.574357",
-    "error_hash": "33f749eb3187",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T03:06:10.061710",
-    "error_hash": "36c95e64a93f",
-    "fix_type": "clear_cache",
-    "result": "success",
-    "details": "\u6e05\u9664\u4e86 141 \u4e2a\u7f13\u5b58\u6587\u4ef6"
-  },
-  {
-    "time": "2026-07-18T03:24:27.075547",
-    "error_hash": "33f749eb3187",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T03:56:37.208143",
-    "error_hash": "33f749eb3187",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T03:57:28.859943",
-    "error_hash": "e92439e40f7f",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T03:57:34.033124",
-    "error_hash": "c65a6bf647d4",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T03:57:39.192334",
-    "error_hash": "381d8061da18",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T03:57:44.420102",
-    "error_hash": "11f3f0744e47",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T03:57:49.606263",
-    "error_hash": "92a198d01254",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T03:57:54.824947",
-    "error_hash": "1882d72ddf68",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T03:57:59.975785",
-    "error_hash": "b3c32129b2be",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T04:10:05.466721",
-    "error_hash": "d3f92127ca8f",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T04:29:07.495115",
-    "error_hash": "33f749eb3187",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T04:56:53.634383",
-    "error_hash": "c624cffbd125",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-18T05:01:05.506999",
-    "error_hash": "33f749eb3187",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T05:04:04.125823",
-    "error_hash": "d387b1d72233",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T05:31:57.085027",
-    "error_hash": "cc4ea544edd1",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T05:33:34.973806",
-    "error_hash": "33f749eb3187",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T05:34:00.772094",
-    "error_hash": "f397022cf1d4",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T05:35:02.619875",
-    "error_hash": "856f190f745b",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T05:36:44.475699",
-    "error_hash": "a9f0d9cb9c51",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T05:38:51.343256",
-    "error_hash": "2955d929296d",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T06:03:50.950821",
-    "error_hash": "33f749eb3187",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T06:05:21.096163",
-    "error_hash": "1abdf07d361d",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T06:06:26.206920",
-    "error_hash": "f75fffe5f759",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T06:08:33.178583",
-    "error_hash": "e8c125f7636d",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T06:09:35.004020",
-    "error_hash": "acbe0b36fe65",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T06:33:53.338994",
-    "error_hash": "33f749eb3187",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T06:36:04.286830",
-    "error_hash": "fd4928f99a7e",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T06:37:06.143955",
-    "error_hash": "35658f5ea35d",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T07:04:02.399545",
-    "error_hash": "33f749eb3187",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T07:06:47.791425",
-    "error_hash": "d874f9748816",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T07:08:54.753603",
-    "error_hash": "ebc912d29994",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T07:09:56.599608",
-    "error_hash": "abef36683a8e",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T07:34:04.830614",
-    "error_hash": "33f749eb3187",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T07:35:26.348725",
-    "error_hash": "78c54203ab1d",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T07:39:40.331799",
-    "error_hash": "3a977d57f2c5",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T07:53:04.312419",
-    "error_hash": "f3df0501d36b",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T07:55:07.903212",
-    "error_hash": "6a620410e13b",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T07:56:09.771696",
-    "error_hash": "f6003d1ce608",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T07:57:11.693423",
-    "error_hash": "875f3d5ab540",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T07:58:13.543556",
-    "error_hash": "02def784317e",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T07:59:15.394686",
-    "error_hash": "47935d33c569",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T08:04:24.636462",
-    "error_hash": "1ac20a45aaf8",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T08:05:26.469571",
-    "error_hash": "8abccb6328dc",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T08:06:54.072236",
-    "error_hash": "33f749eb3187",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T08:14:23.090031",
-    "error_hash": "b4e54f9dd49c",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T08:21:36.026013",
-    "error_hash": "e6089b6bd994",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T08:27:47.088316",
-    "error_hash": "fa279d88e52e",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T08:33:58.204714",
-    "error_hash": "eff6c49bc341",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T08:39:27.923205",
-    "error_hash": "33f749eb3187",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T08:43:58.361009",
-    "error_hash": "ac0686f58973",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T18:51:01.576160",
-    "error_hash": "272baac32cd2",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T18:59:12.966669",
-    "error_hash": "9497e5b86d16",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T19:11:53.507215",
-    "error_hash": "33f749eb3187",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-18T19:25:29.627026",
-    "error_hash": "6acab9727a47",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-18T19:35:36.468145",
-    "error_hash": "bf0d62d11c0e",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-18T20:06:09.774414",
-    "error_hash": "3eeb341b0169",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-18T20:11:12.875330",
-    "error_hash": "a2e76d376635",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-18T21:27:51.426853",
-    "error_hash": "97df552a5b48",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-18T21:43:06.086609",
-    "error_hash": "65570921463e",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-18T21:48:04.747814",
-    "error_hash": "8dcdac365944",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-18T22:24:16.060734",
-    "error_hash": "4177d6bc3723",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-18T23:45:29.342999",
-    "error_hash": "3c6a91d80d91",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-19T00:58:41.398826",
-    "error_hash": "fcde6c4a9b6d",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-19T02:32:27.696807",
-    "error_hash": "63faaa81ad5c",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-19T03:32:40.902559",
-    "error_hash": "5c704a238f27",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-19T04:05:39.383079",
-    "error_hash": "75f4e523c9cc",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-19T04:46:24.343207",
-    "error_hash": "59acb920ad54",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-19T04:56:40.543990",
-    "error_hash": "f714186a0524",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-19T05:35:07.445668",
-    "error_hash": "640c134bbb81",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-19T13:56:52.812432",
-    "error_hash": "a06e00dfa8c7",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-19T14:01:55.482822",
-    "error_hash": "a4c9c69fc4fc",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-19T14:38:07.282191",
-    "error_hash": "aa8c8fa4327a",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-19T14:48:46.369355",
-    "error_hash": "23d0e9b75837",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-19T15:14:19.994530",
-    "error_hash": "730e0ae693b7",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-19T15:45:12.280613",
-    "error_hash": "c9b1c769d92f",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-19T16:32:02.704771",
-    "error_hash": "1fd5e444864c",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-19T16:36:38.714985",
-    "error_hash": "eb3b703da6fb",
-    "fix_type": "clear_cache",
-    "result": "success",
-    "details": "\u6e05\u9664\u4e86 221 \u4e2a\u7f13\u5b58\u6587\u4ef6"
-  },
-  {
-    "time": "2026-07-19T16:42:08.399252",
-    "error_hash": "86d8e717a4a9",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-19T16:52:15.947209",
-    "error_hash": "e83234ca9382",
-    "fix_type": "clear_cache",
-    "result": "success",
-    "details": "\u6e05\u9664\u4e86 1 \u4e2a\u7f13\u5b58\u6587\u4ef6"
-  },
-  {
-    "time": "2026-07-19T16:52:20.915634",
-    "error_hash": "7b40d645c6a6",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-19T17:02:21.682193",
-    "error_hash": "8d42ba76211a",
-    "fix_type": "clear_cache",
-    "result": "success",
-    "details": "\u6e05\u9664\u4e86 1 \u4e2a\u7f13\u5b58\u6587\u4ef6"
-  },
-  {
-    "time": "2026-07-19T17:07:30.616866",
-    "error_hash": "fe7514043dc6",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-19T17:12:40.949090",
-    "error_hash": "4123c113c1d7",
-    "fix_type": "clear_cache",
-    "result": "success",
-    "details": "\u6e05\u9664\u4e86 1 \u4e2a\u7f13\u5b58\u6587\u4ef6"
-  },
-  {
-    "time": "2026-07-19T17:28:01.187125",
-    "error_hash": "e252789e69b7",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-19T17:28:08.049656",
-    "error_hash": "eee2b3fcfe82",
-    "fix_type": "clear_cache",
-    "result": "success",
-    "details": "\u6e05\u9664\u4e86 1 \u4e2a\u7f13\u5b58\u6587\u4ef6"
-  },
-  {
-    "time": "2026-07-19T17:42:59.465040",
-    "error_hash": "ea9b6d70edbb",
-    "fix_type": "clear_cache",
-    "result": "success",
-    "details": "\u6e05\u9664\u4e86 1 \u4e2a\u7f13\u5b58\u6587\u4ef6"
-  },
-  {
-    "time": "2026-07-19T17:48:18.963781",
-    "error_hash": "ad018d482a81",
-    "fix_type": "clear_cache",
-    "result": "success",
-    "details": "\u6e05\u9664\u4e86 1 \u4e2a\u7f13\u5b58\u6587\u4ef6"
-  },
-  {
-    "time": "2026-07-19T17:53:07.566658",
-    "error_hash": "f75728b0d2e1",
-    "fix_type": "clear_cache",
-    "result": "success",
-    "details": "\u6e05\u9664\u4e86 1 \u4e2a\u7f13\u5b58\u6587\u4ef6"
-  },
-  {
-    "time": "2026-07-19T17:53:12.535239",
-    "error_hash": "c4461ce0a453",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-19T18:03:13.245001",
-    "error_hash": "7d437a31132f",
-    "fix_type": "clear_cache",
-    "result": "success",
-    "details": "\u6e05\u9664\u4e86 1 \u4e2a\u7f13\u5b58\u6587\u4ef6"
-  },
-  {
-    "time": "2026-07-19T18:08:23.349789",
-    "error_hash": "c77b53b009c2",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-19T18:13:20.924891",
-    "error_hash": "716d2d0f4f65",
-    "fix_type": "clear_cache",
-    "result": "success",
-    "details": "\u6e05\u9664\u4e86 1 \u4e2a\u7f13\u5b58\u6587\u4ef6"
-  },
-  {
-    "time": "2026-07-19T18:18:29.918109",
-    "error_hash": "47dba2f91ada",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-19T18:23:31.782343",
-    "error_hash": "35b90e697603",
-    "fix_type": "clear_cache",
-    "result": "success",
-    "details": "\u6e05\u9664\u4e86 1 \u4e2a\u7f13\u5b58\u6587\u4ef6"
-  },
-  {
-    "time": "2026-07-19T18:33:39.764999",
-    "error_hash": "cb963edb5780",
-    "fix_type": "clear_cache",
-    "result": "success",
-    "details": "\u6e05\u9664\u4e86 1 \u4e2a\u7f13\u5b58\u6587\u4ef6"
-  },
-  {
-    "time": "2026-07-19T18:38:43.484261",
-    "error_hash": "32f788b65e5a",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-19T19:01:13.562953",
-    "error_hash": "50ce8d444af9",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-19T19:09:07.656353",
-    "error_hash": "c9e8121e3783",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-19T19:14:06.681493",
-    "error_hash": "df50aa7b8fd8",
-    "fix_type": "clear_cache",
-    "result": "success",
-    "details": "\u6e05\u9664\u4e86 1 \u4e2a\u7f13\u5b58\u6587\u4ef6"
-  },
-  {
-    "time": "2026-07-19T19:19:25.964346",
-    "error_hash": "cbcd2590154b",
-    "fix_type": "clear_cache",
-    "result": "success",
-    "details": "\u6e05\u9664\u4e86 1 \u4e2a\u7f13\u5b58\u6587\u4ef6"
-  },
-  {
-    "time": "2026-07-19T19:29:26.431776",
-    "error_hash": "e1cf3039e811",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-19T20:25:40.156775",
-    "error_hash": "e852e467bfcb",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-19T20:36:13.401642",
-    "error_hash": "cca420f7893f",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-19T22:03:17.957223",
-    "error_hash": "2d7ca969b36f",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-19T22:23:38.541158",
-    "error_hash": "53938cc781ce",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-19T23:32:44.678336",
-    "error_hash": "cede85349e02",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-19T23:47:53.252643",
-    "error_hash": "8fc7f15d919b",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-20T00:00:50.086860",
-    "error_hash": "e852e467bfcb",
-    "fix_type": "sleep_retry",
-    "result": "success",
-    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
-  },
-  {
-    "time": "2026-07-20T01:21:06.308465",
-    "error_hash": "1c7e56d3f2d9",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
-    "time": "2026-07-20T01:49:57.979312",
-    "error_hash": "09eea8bd3dfe",
-    "fix_type": "skip_cycle",
-    "result": "success",
-    "details": "\u4e0b\u4e2a\u4ea4\u6613\u5468\u671f\u5c06\u88ab\u8df3\u8fc7"
-  },
-  {
     "time": "2026-07-20T01:51:58.150677",
     "error_hash": "392fe39d0782",
     "fix_type": "skip_cycle",
@@ -1209,5 +355,1048 @@
     "fix_type": "clear_cache",
     "result": "success",
     "details": "\u6e05\u9664\u4e86 2 \u4e2a\u7f13\u5b58\u6587\u4ef6"
+  },
+  {
+    "time": "2026-08-14T02:30:59.549748",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 4.0x"
+  },
+  {
+    "time": "2026-08-14T04:39:31.082760",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 8.0x"
+  },
+  {
+    "time": "2026-08-14T04:44:21.355698",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T04:50:29.934748",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T04:56:33.273877",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T05:02:36.813856",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T05:08:45.564893",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T05:14:48.718793",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T05:20:51.721954",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T05:26:55.210399",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T05:32:58.677520",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T05:39:07.274582",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T05:45:10.481330",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T05:51:14.045413",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T05:57:17.627172",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T06:03:26.353727",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T06:09:29.542936",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T06:15:33.444416",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T06:21:37.143836",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T06:27:45.362840",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T06:33:48.999838",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T06:39:51.627110",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T06:45:55.332260",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T06:52:03.781843",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T06:58:07.341226",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T07:04:10.475862",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T07:10:19.574979",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T07:16:23.052164",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T07:22:31.038755",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T07:28:34.402198",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T07:34:37.701299",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T07:40:41.095671",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T07:46:49.158553",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T07:52:52.573581",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T07:58:55.051093",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T08:05:03.617643",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T08:11:06.881390",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T08:17:09.679809",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T08:23:17.867706",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T08:29:26.582476",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T08:35:24.198493",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T08:41:33.087367",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T08:47:36.519290",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T08:53:39.751204",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T08:59:42.797664",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T09:05:46.700730",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T09:11:54.766376",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T09:17:57.993462",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T09:24:01.990538",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T09:30:05.301045",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T09:36:13.610886",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T09:42:16.180445",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T09:48:24.773957",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T09:54:27.827783",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T10:00:31.677625",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T10:06:39.797668",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T10:12:43.499079",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T10:18:46.782029",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T10:24:50.116341",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T10:30:58.534974",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T10:37:01.381830",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T10:43:04.343224",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T10:49:13.134699",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T10:55:21.575018",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T11:01:20.177799",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T11:07:28.523791",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T11:13:32.218882",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T11:19:35.419310",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T11:25:38.561948",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T11:31:47.194597",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T11:37:50.573570",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T11:43:58.957098",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T11:50:07.474173",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T11:56:05.910136",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T12:02:09.326336",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T12:08:17.775791",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T12:14:21.575365",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T12:20:24.470531",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T12:26:27.583020",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T12:32:41.469199",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T12:38:45.330511",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T12:44:43.644756",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T12:50:52.158401",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T12:57:25.661905",
+    "error_hash": "ab1ab1e9844d",
+    "fix_type": "sleep_retry",
+    "result": "success",
+    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
+  },
+  {
+    "time": "2026-08-14T13:03:02.580775",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T13:09:06.272567",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T13:15:09.577164",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T13:21:18.301895",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T13:27:22.024091",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T13:33:30.860049",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T13:39:29.549417",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T13:45:37.495413",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T13:51:40.644100",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T13:57:43.796307",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T14:03:52.418988",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T14:10:01.108482",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T14:15:59.260093",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T14:22:02.395883",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T14:28:10.021871",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T14:34:13.216864",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T14:40:16.532638",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T14:46:24.850093",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T14:52:33.900941",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T14:58:32.233934",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T15:04:45.155783",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T15:10:43.740938",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T15:16:46.767756",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T15:22:54.569701",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T15:28:58.405864",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T15:35:01.873045",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T15:41:05.694634",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T15:47:14.431819",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T15:53:22.958400",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T15:59:21.695557",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T16:05:24.954966",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T16:11:33.560028",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T16:17:36.964447",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T16:23:39.713385",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T16:29:43.139404",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T16:35:51.590263",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T16:41:54.604401",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T16:47:57.715102",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T16:54:06.175662",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T17:00:09.050020",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T17:06:13.202097",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T17:12:16.588821",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T17:18:24.450101",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T17:24:27.649775",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T17:30:30.929011",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T17:36:38.786104",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T17:42:42.200922",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T17:48:50.920497",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T17:54:54.009718",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T18:00:57.618726",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T18:07:01.238088",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T18:13:09.406517",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T18:19:17.129913",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T18:25:14.996978",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T18:31:23.361135",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T18:37:27.078582",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T18:43:30.388724",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T18:49:37.612244",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T18:55:46.067307",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T19:01:43.832212",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T19:07:47.545722",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T19:13:56.339074",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T19:19:58.172719",
+    "error_hash": "5b1826d07ae8",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
+  },
+  {
+    "time": "2026-08-14T21:46:33.257938",
+    "error_hash": "ab1ab1e9844d",
+    "fix_type": "sleep_retry",
+    "result": "success",
+    "details": "\u91cd\u8bd5\u6807\u8bb0\u5df2\u8bbe\u7f6e\uff0c\u7cfb\u7edf\u5c06\u5728\u4e0b\u4e2a\u5468\u671f\u91cd\u8bd5"
+  },
+  {
+    "time": "2026-08-14T22:40:32.547644",
+    "error_hash": "686c4043724d",
+    "fix_type": "reduce_freq",
+    "result": "success",
+    "details": "API \u8c03\u7528\u9891\u7387\u5df2\u964d\u4f4e\u5230 10.0x"
   }
 ]

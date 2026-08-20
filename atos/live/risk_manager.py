@@ -73,10 +73,16 @@ def check_all_stops(positions: list, signals: dict) -> list:
     """统一检查所有止损/止盈条件。返回要执行的 SELL 指令列表。
 
     每个标的独立判断——没有传染性卖出。
+    v29: v28 持仓(QQQ + alpha池)完全跳过 — 由主循环的 v28 止损逻辑处理
     """
+    # v29: v28 持仓跳过此函数 (避免 18%止盈/ATR止损 干扰 v28 季度策略)
+    V28_SKIP = {"QQQ", "NVDA", "AAPL", "MSFT", "GOOGL", "META", "AMZN",
+                "AVGO", "AMD", "CRM", "NFLX", "PLTR", "MU", "TSLA"}
     forced = []
     for p in positions:
         sym = p["symbol"]
+        if sym in V28_SKIP:
+            continue  # v28 持仓由主循环处理止损
         px = signals.get(sym, {}).get("price", p.get("last", 0))
         if px <= 0:
             continue

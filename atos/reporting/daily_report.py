@@ -256,4 +256,8 @@ if __name__ == "__main__":
     main()
     # futu-api 构造器失败后其内部非 daemon 网络线程会无限重试，阻止解释器正常退出。
     # 一次性脚本：main() 完成即代表报告已保存/邮件已发送，直接硬退出。
+    # os._exit 不刷新 stdout 缓冲，管道模式下会丢失尾部输出（如"邮件已发送"状态行），
+    # 硬退出前必须先 flush。
+    sys.stdout.flush()
+    sys.stderr.flush()
     os._exit(0)

@@ -7,22 +7,22 @@
       "updated": "2026-08-12T02:39:09.337517"
     },
     "MSFT": {
-      "score": 0.007,
-      "articles": 37,
-      "latest_headline": "Google\u2019s new AI boss inherits a race to catch OpenAI and Anthropic",
-      "updated": "2026-08-12T13:16:32.153488"
+      "score": -0.275,
+      "articles": 44,
+      "latest_headline": "OpenAI 'will be a public company in 2027' or sooner, CFO Friar tells employees",
+      "updated": "2026-08-20T03:30:49.106129"
     },
     "AMZN": {
-      "score": 0.051,
-      "articles": 41,
-      "latest_headline": "Zaman: Rise in Japanese Long Yields Could Support Yen",
-      "updated": "2026-08-13T14:37:42.620422"
+      "score": 0.035,
+      "articles": 49,
+      "latest_headline": "Guggenheim\u2019s Beaten-Down Loan Whipsaws as Lenders Digest Call",
+      "updated": "2026-08-20T03:38:59.300107"
     },
     "TLT": {
-      "score": 0.118,
-      "articles": 22,
-      "latest_headline": "Pimco\u2019s Seidner Says Angst Over Fed Credibility Is Unwarranted",
-      "updated": "2026-08-12T18:24:02.901172"
+      "score": 0.57,
+      "articles": 36,
+      "latest_headline": "China is defying the global bond yield surge, boosting its diversification appea",
+      "updated": "2026-08-20T11:01:31.380343"
     },
     "BA": {
       "score": 0.29,
@@ -49,94 +49,94 @@
       "updated": "2026-08-10T13:07:58.091399"
     },
     "AAPL": {
-      "score": 0.307,
-      "articles": 18,
-      "latest_headline": "Rio Tinto Australia Aluminum Plant Gets $1.8 Billion Bailout",
-      "updated": "2026-08-13T08:10:00.441702"
+      "score": 0.634,
+      "articles": 27,
+      "latest_headline": "Inside India newsletter: Chip squeeze hits Chinese smartphones in India as Apple",
+      "updated": "2026-08-20T08:38:29.888021"
     },
     "BRK.B": {
-      "score": 0.625,
-      "articles": 11,
-      "latest_headline": "Berkshire CEO Abel Puts Cash to Work",
-      "updated": "2026-08-10T22:38:40.904787"
+      "score": 0.438,
+      "articles": 13,
+      "latest_headline": "Berkshire Hathaway bet big on the U.S. housing market. You probably shouldn\u2019t fo",
+      "updated": "2026-08-20T00:17:50.727200"
     },
     "SPY": {
-      "score": 0.278,
-      "articles": 49,
-      "latest_headline": "S&P 500 Closes Near Record High on Tame Inflation: Markets Wrap",
-      "updated": "2026-08-13T05:36:35.775622"
+      "score": 0.391,
+      "articles": 51,
+      "latest_headline": "S&P 500 Hits All-Time High on Inflation Cooldown: Markets Wrap",
+      "updated": "2026-08-14T04:15:22.911238"
     },
     "META": {
-      "score": 0.24,
-      "articles": 43,
-      "latest_headline": "Aluminum Extends Fall From Seven-Week High as Supply Fears Ease",
-      "updated": "2026-08-13T13:00:37.869015"
+      "score": 0.242,
+      "articles": 50,
+      "latest_headline": "Gold Surges as Treasury Buyback Plan Sends US Yields Lower",
+      "updated": "2026-08-20T02:58:57.730760"
     },
     "TSLA": {
-      "score": -0.15,
-      "articles": 68,
-      "latest_headline": "SpaceX short sellers are running out of bullets as stock rebounds more than 40% ",
-      "updated": "2026-08-13T02:34:32.680127"
+      "score": 0.286,
+      "articles": 72,
+      "latest_headline": "SpaceX Is Unlocking More Shares. What That Means for Investors.",
+      "updated": "2026-08-20T00:17:50.727274"
     },
     "NFLX": {
-      "score": 0.158,
-      "articles": 3,
-      "latest_headline": "\u2018India\u2019s Top Gun\u2019 Is Netflix\u2019s Most Ambitious Local Production",
-      "updated": "2026-08-06T22:04:29.064767"
+      "score": 0.588,
+      "articles": 5,
+      "latest_headline": "Bill Ackman once exited his Netflix stake in a huff. He\u2019s buying the streaming g",
+      "updated": "2026-08-13T19:56:32.669342"
     },
     "GS": {
-      "score": 0.634,
-      "articles": 16,
-      "latest_headline": "Goldman says Japan's $1 trillion of reserves leaves 'plenty of capacity' for fur",
-      "updated": "2026-08-13T09:15:34.509157"
+      "score": 0.616,
+      "articles": 27,
+      "latest_headline": "Goldman Strikes Deal to Buy LCN to Become Hands-Off Landlord",
+      "updated": "2026-08-20T03:24:37.198498"
     },
     "NVDA": {
-      "score": 0.133,
-      "articles": 39,
-      "latest_headline": "AI Cloud Provider Lambda Prices Loan for Nvidia-Tied Chip Deal",
-      "updated": "2026-08-13T04:51:06.470418"
+      "score": 0.505,
+      "articles": 47,
+      "latest_headline": "Marvell's stock pops 10% on AI chip deal that lets Google buy up to $12.2 billio",
+      "updated": "2026-08-20T04:07:38.866530"
     },
     "AVGO": {
-      "score": -0.15,
-      "articles": 2,
-      "latest_headline": "DeepSeek Won't Sink U.S. AI Titans",
-      "updated": "2026-08-04T18:33:52.185974"
+      "score": 0.057,
+      "articles": 5,
+      "latest_headline": "Where we stand on Broadcom after Marvell muscles in on its key customer Google",
+      "updated": "2026-08-20T03:15:32.002394"
     },
     "JPM": {
-      "score": -0.092,
-      "articles": 20,
-      "latest_headline": "JPMorgan, Goldman, Invesco Test Blockchain Across Wall Street",
-      "updated": "2026-08-12T22:54:28.254373"
+      "score": 0.367,
+      "articles": 29,
+      "latest_headline": "India Bars JPMorgan Unit for Alleged Market Manipulation",
+      "updated": "2026-08-20T11:38:17.799296"
     },
     "BAC": {
-      "score": 0.072,
-      "articles": 8,
-      "latest_headline": "Nvidia just soothed a major market fear about AI, analysts say",
-      "updated": "2026-08-12T02:39:09.337526"
+      "score": 0.35,
+      "articles": 9,
+      "latest_headline": "Oil\u2019s Rally Stalls as Hormuz Deadlock Brings Flows Into Focus",
+      "updated": "2026-08-14T01:22:59.925824"
     },
     "INTC": {
-      "score": 0.503,
-      "articles": 81,
-      "latest_headline": "This Chinese firm has topped Micron and Kioxia in shipments of crucial NAND memo",
-      "updated": "2026-08-13T11:02:26.047247"
+      "score": 0.03,
+      "articles": 106,
+      "latest_headline": "Banks Slash Cost of Leveraged Bets on SK Hynix\u2019s Korean Shares",
+      "updated": "2026-08-20T10:23:53.533196"
     },
     "C": {
-      "score": 0.617,
-      "articles": 16,
-      "latest_headline": "AI Earnings Boost Stock Futures; CPI Data Looms | Bloomberg Brief 08/12/2026",
-      "updated": "2026-08-12T21:45:43.979350"
+      "score": 0.205,
+      "articles": 24,
+      "latest_headline": "Citi Made 10 Senior APAC Hires This Year",
+      "updated": "2026-08-20T12:52:41.924101"
     },
     "GOOGL": {
-      "score": 0.131,
-      "articles": 52,
-      "latest_headline": "Zaman: Rise in Japanese Long Yields Could Support Yen",
-      "updated": "2026-08-13T14:37:42.620375"
+      "score": 0.656,
+      "articles": 66,
+      "latest_headline": "The national debt just hit $40 trillion. Here\u2019s how it can hurt Americans.",
+      "updated": "2026-08-20T05:02:36.155510"
     },
     "MRK": {
-      "score": 0.0,
-      "articles": 1,
-      "latest_headline": "Merck hikes revenue outlook as new drug sales grow, but cuts profit guidance due",
-      "updated": "2026-08-04T18:37:34.374392"
+      "score": 0.84,
+      "articles": 9,
+      "latest_headline": "Cancer vaccine from Moderna, Merck shows promise in late-stage trial; both stock",
+      "updated": "2026-08-20T05:02:36.155564"
     },
     "PFE": {
       "score": -0.05,
@@ -145,10 +145,10 @@
       "updated": "2026-08-04T19:40:32.230815"
     },
     "LLY": {
-      "score": -0.828,
-      "articles": 18,
-      "latest_headline": "Eli Lilly is suing pharmacies and peptide vendors over sale of its next big weig",
-      "updated": "2026-08-12T21:13:58.729595"
+      "score": -0.679,
+      "articles": 19,
+      "latest_headline": "Novo Nordisk CEO defends lawsuit against Eli Lilly: 'Competition has to be fair'",
+      "updated": "2026-08-13T18:52:31.388253"
     },
     "CAT": {
       "score": 0.55,
@@ -157,10 +157,10 @@
       "updated": "2026-08-04T22:52:33.007734"
     },
     "AMD": {
-      "score": 0.133,
-      "articles": 14,
-      "latest_headline": "Trump says NYC pied-\u00e0-terre tax 'must be stopped,' eyes federal block",
-      "updated": "2026-08-12T02:12:45.815925"
+      "score": 0.575,
+      "articles": 19,
+      "latest_headline": "AMD Raises $4.75 Billion From Bond Sale as AI Demand Surges",
+      "updated": "2026-08-14T03:48:12.437673"
     },
     "V": {
       "score": 0.207,
@@ -181,10 +181,10 @@
       "updated": "2026-08-05T03:33:41.904188"
     },
     "DIS": {
-      "score": 0.747,
-      "articles": 11,
-      "latest_headline": "Bob Iger, Joshua Kushner buy Los Angeles Lakers at a $12.5 billion valuation, so",
-      "updated": "2026-08-12T23:12:27.028191"
+      "score": 0.586,
+      "articles": 19,
+      "latest_headline": "Marvell's stock pops 10% on AI chip deal that lets Google buy up to $12.2 billio",
+      "updated": "2026-08-20T04:07:38.866538"
     },
     "QQQ": {
       "score": 0.54,
@@ -205,10 +205,10 @@
       "updated": "2026-08-06T17:52:45.392393"
     },
     "CRM": {
-      "score": -0.3,
-      "articles": 1,
-      "latest_headline": "Marc Benioff gets a new operating chief, as Salesforce promotes Miguel Milano",
-      "updated": "2026-08-06T04:39:26.002910"
+      "score": -0.11,
+      "articles": 2,
+      "latest_headline": "Salesforce\u2019s stock gets a boost as J.P. Morgan says AI fears are overblown",
+      "updated": "2026-08-13T22:07:26.733069"
     },
     "HON": {
       "score": -0.584,
@@ -233,8 +233,20 @@
       "articles": 1,
       "latest_headline": "Home Depot CEO taking temporary medical leave, two top execs to run the retailer",
       "updated": "2026-08-12T21:42:31.261357"
+    },
+    "COST": {
+      "score": 0.3,
+      "articles": 1,
+      "latest_headline": "Soon you can buy Medicare Advantage plans at Costco. What you need to know.",
+      "updated": "2026-08-20T00:17:50.727207"
+    },
+    "WMT": {
+      "score": 0.0,
+      "articles": 1,
+      "latest_headline": "Target\u2019s Turnaround Is Finally Working: Telsey Analyst",
+      "updated": "2026-08-20T00:17:50.727286"
     }
   },
-  "macro": -1.016,
-  "updated": "2026-08-13T14:44:57.100915"
+  "macro": -1.004,
+  "updated": "2026-08-20T14:07:11.053509"
 }

@@ -1,9 +1,9 @@
 {
   "date": "2026-06-28",
-  "start_equity": 300000.0,
+  "start_equity": 1000000,
   "end_equity": 300000.0,
-  "daily_pnl": 0.0,
-  "daily_return_pct": 0.0,
+  "daily_pnl": -700000.0,
+  "daily_return_pct": -70.0,
   "trades_today": 0,
   "positions_end": 0,
   "note": "全新开始",
