@@ -207,8 +207,9 @@ class FutuProvider:
             volume = float(row.get("volume", 0) or 0)
 
             # 股息率 Futu 给的是百分比数值（0.35 表示 0.35%），转为小数
-            # M8: 两个分支原本都除以 100（if/elif 无意义），合并为单分支
-            if div_yield > 0:
+            if div_yield > 0.1:      # >10% 不可能是股息率，说明是百分比格式
+                div_yield = div_yield / 100
+            elif 0 < div_yield <= 0.1:  # 0.35 → 0.0035
                 div_yield = div_yield / 100
 
             # 推断派息率
@@ -361,7 +362,7 @@ class FutuProvider:
         try:
             code = f"US.{ticker}" if not ticker.startswith("US.") else ticker
             self._rate_limit()
-            from futu import RET_OK, KLType, AuType
+            from futu import RET_OK, KLType
 
             ktype_map = {
                 "K_DAY": KLType.K_DAY, "K_WEEK": KLType.K_WEEK,
@@ -372,7 +373,7 @@ class FutuProvider:
 
             ctx = self._get_quote_ctx()
             ret, data, _ = ctx.request_history_kline(
-                code, ktype=kt, autype=AuType.QFQ, max_count=min(days, 1000)
+                code, ktype=kt, max_count=min(days, 1000)
             )
 
             if ret != RET_OK or data.empty:

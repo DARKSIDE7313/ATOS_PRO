@@ -88,7 +88,7 @@ def get_recent_crashes(minutes: int = 5) -> int:
         try:
             with open(lf) as f:
                 for line in f:
-                    if "周期崩溃" in line or "ULTRA失败" in line or "| ERROR" in line or "| CRITICAL" in line:
+                    if "周期崩溃" in line or "ULTRA失败" in line or "ERROR" in line:
                         try:
                             ts_str = line[:19]
                             ts = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
@@ -165,7 +165,7 @@ def deep_fix():
     time.sleep(1)
     
     # 4. 重启服务
-    restart_service("ShadowTrader", os.path.expanduser("~/Library/LaunchAgents/com.atos.shadowtrader.plist"))
+    restart_service("ShadowTrader", os.path.expanduser("~/Library/LaunchAgents/ai.atos.shadowtrader.plist"))
     
     # 5. 重启 Gateway
     for hermes_bin in [
@@ -263,7 +263,7 @@ def main():
                 clear_pycache()
                 if os.path.exists(LOCK_FILE):
                     os.remove(LOCK_FILE)
-                restart_service("ShadowTrader", os.path.expanduser("~/Library/LaunchAgents/com.atos.shadowtrader.plist"))
+                restart_service("ShadowTrader", os.path.expanduser("~/Library/LaunchAgents/ai.atos.shadowtrader.plist"))
                 fixed_something = True
             
             if not health["futu"]:

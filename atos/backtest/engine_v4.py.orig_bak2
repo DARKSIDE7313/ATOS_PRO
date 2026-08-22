@@ -24,13 +24,6 @@ RESULT_FILE = os.path.join(BASE, "data", "backtest_v4_result.json")
 ALPHA_STOCKS = ["NVDA", "AAPL", "MSFT", "GOOGL", "META", "AMZN", "AVGO", "AMD", "CRM", "NFLX"]
 
 
-def _next_open(df, dates, i):
-    """M12: T+1 开盘价（消除未来函数）。无下一天返回 None。"""
-    if i + 1 < len(dates) and dates[i + 1] in df.index:
-        return float(df.loc[dates[i + 1], 'Open'])
-    return None
-
-
 def run_v4(start_date='2016-01-01', end_date='2026-08-01', capital=300000):
     import yfinance as yf
 
@@ -105,19 +98,17 @@ def run_v4(start_date='2016-01-01', end_date='2026-08-01', capital=300000):
 
                 # 卖出现有持仓
                 for sym in list(positions.keys()):
-                    price = _next_open(data[sym], spy.index, i)
-                    if price is None:
-                        del positions[sym]
-                        continue
-                    fee = futu_sell_fee(positions[sym], price)
-                    total_fees += fee
-                    cash += positions[sym] * price - fee
-                    trades += 1
+                    if date in data[sym].index:
+                        price = data[sym].loc[date, 'Close']
+                        fee = futu_sell_fee(positions[sym], price)
+                        total_fees += fee
+                        cash += positions[sym] * price - fee
+                        trades += 1
                     del positions[sym]
 
                 # 买 QQQ 核心
-                if cfg['core'] > 0:
-                    q_price = _next_open(qqq, spy.index, i) or (qqq.loc[date, 'Close'] if date in qqq.index else core_val)
+                if cfg['core'] > 0 and date in qqq.index:
+                    q_price = qqq.loc[date, 'Close']
                     q_shares = max(1, int(core_val / q_price))
                     fee = futu_buy_fee(q_shares, q_price)
                     total_fees += fee
@@ -139,13 +130,10 @@ def run_v4(start_date='2016-01-01', end_date='2026-08-01', capital=300000):
                     per_stock = alpha_val / max(cfg['alpha_n'], 1)
 
                     for sym, score, price in candidates[:cfg['alpha_n']]:
-                        fill = _next_open(data[sym], spy.index, i)
-                        if fill is None:
-                            continue
-                        shares = max(1, int(per_stock / fill))
-                        fee = futu_buy_fee(shares, fill)
+                        shares = max(1, int(per_stock / price))
+                        fee = futu_buy_fee(shares, price)
                         total_fees += fee
-                        cost = shares * fill + fee
+                        cost = shares * price + fee
                         if cost <= cash:
                             cash -= cost
                             positions[sym] = shares

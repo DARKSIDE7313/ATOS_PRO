@@ -26,13 +26,6 @@ BASE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 RESULT_FILE = os.path.join(BASE, "data", "backtest_v3_result.json")
 
 
-def _next_open(df, dates, i):
-    """M12: T+1 开盘价（消除未来函数）。无下一天返回 None。"""
-    if i + 1 < len(dates) and dates[i + 1] in df.index:
-        return float(df.loc[dates[i + 1], 'Open'])
-    return None
-
-
 def run_v3(start_date='2016-01-01', end_date='2026-08-01', capital=300000):
     import yfinance as yf
 
@@ -40,9 +33,9 @@ def run_v3(start_date='2016-01-01', end_date='2026-08-01', capital=300000):
     print("📊 回测 v3 — Pure QQQ Trend")
     print("=" * 60)
 
-    spy = yf.Ticker('SPY').history(start=start_date, end=end_date, auto_adjust=True)
-    qqq = yf.Ticker('QQQ').history(start=start_date, end=end_date, auto_adjust=True)
-    tlt = yf.Ticker('TLT').history(start=start_date, end=end_date, auto_adjust=True)
+    spy = yf.Ticker('SPY').history(start=start_date, end=end_date)
+    qqq = yf.Ticker('QQQ').history(start=start_date, end=end_date)
+    tlt = yf.Ticker('TLT').history(start=start_date, end=end_date)
 
     spy_ma50 = spy['Close'].rolling(50).mean()
     spy_ma200 = spy['Close'].rolling(200).mean()
@@ -95,8 +88,6 @@ def run_v3(start_date='2016-01-01', end_date='2026-08-01', capital=300000):
 
             q_price = qqq.loc[date, 'Close']
             s_price = spy.loc[date, 'Close']
-            q_fill = _next_open(qqq, spy.index, i) or q_price  # M12: T+1 开盘成交
-            t_fill = _next_open(tlt, spy.index, i) or (tlt.loc[date, 'Close'] if date in tlt.index else q_price)
             s_ma50 = spy_ma50.iloc[i] if not pd.isna(spy_ma50.iloc[i]) else s_price
             s_ma200 = spy_ma200.iloc[i] if not pd.isna(spy_ma200.iloc[i]) else s_price
 
@@ -116,11 +107,11 @@ def run_v3(start_date='2016-01-01', end_date='2026-08-01', capital=300000):
                     ts_drop = (peak_price - q_price) / peak_price
                     if ts_drop >= cfg['trailing_stop']:
                         # 止损卖出
-                        fee = futu_sell_fee(shares, q_fill)
+                        fee = futu_sell_fee(shares, q_price)
                         total_fees += fee
-                        cash += shares * q_fill - fee
-                        pnl = (q_fill - avg_price) / avg_price
-                        trades.append({'date': str(date.date()), 'action': 'SELL', 'price': round(q_fill, 2), 'reason': f'TS{ts_drop:.1%}', 'pnl': round(pnl * 100, 2)})
+                        cash += shares * q_price - fee
+                        pnl = (q_price - avg_price) / avg_price
+                        trades.append({'date': str(date.date()), 'action': 'SELL', 'price': round(q_price, 2), 'reason': f'TS{ts_drop:.1%}', 'pnl': round(pnl * 100, 2)})
                         shares = 0
                         in_position = False
                         peak_price = 0
@@ -128,18 +119,18 @@ def run_v3(start_date='2016-01-01', end_date='2026-08-01', capital=300000):
             # 趋势过滤
             if not bull and in_position and shares > 0:
                 # 卖出 QQQ
-                fee = futu_sell_fee(shares, q_fill)
+                fee = futu_sell_fee(shares, q_price)
                 total_fees += fee
-                cash += shares * q_fill - fee
-                pnl = (q_fill - avg_price) / avg_price
-                trades.append({'date': str(date.date()), 'action': 'SELL', 'price': round(q_fill, 2), 'reason': 'BEAR', 'pnl': round(pnl * 100, 2)})
+                cash += shares * q_price - fee
+                pnl = (q_price - avg_price) / avg_price
+                trades.append({'date': str(date.date()), 'action': 'SELL', 'price': round(q_price, 2), 'reason': 'BEAR', 'pnl': round(pnl * 100, 2)})
                 shares = 0
                 in_position = False
                 peak_price = 0
 
                 # BEAR 替代资产
                 if cfg.get('bear_asset') and cfg['bear_asset'] in ('TLT',) and date in tlt.index:
-                    t_price = t_fill
+                    t_price = tlt.loc[date, 'Close']
                     bear_shares = max(1, int(cash * 0.95 / t_price))
                     fee = futu_buy_fee(bear_shares, t_price)
                     total_fees += fee
@@ -151,7 +142,7 @@ def run_v3(start_date='2016-01-01', end_date='2026-08-01', capital=300000):
             if bull and bear_shares > 0:
                 # 卖 TLT 换 QQQ
                 if date in tlt.index:
-                    t_price = t_fill
+                    t_price = tlt.loc[date, 'Close']
                     fee = futu_sell_fee(bear_shares, t_price)
                     total_fees += fee
                     cash += bear_shares * t_price - fee
@@ -159,16 +150,16 @@ def run_v3(start_date='2016-01-01', end_date='2026-08-01', capital=300000):
 
             if bull and not in_position and shares == 0 and bear_shares == 0:
                 # 买入 QQQ
-                shares = max(1, int(cash * 0.95 / q_fill))
-                fee = futu_buy_fee(shares, q_fill)
+                shares = max(1, int(cash * 0.95 / q_price))
+                fee = futu_buy_fee(shares, q_price)
                 total_fees += fee
-                cost = shares * q_fill + fee
+                cost = shares * q_price + fee
                 if cost <= cash:
                     cash -= cost
-                    avg_price = q_fill
-                    peak_price = q_fill
+                    avg_price = q_price
+                    peak_price = q_price
                     in_position = True
-                    trades.append({'date': str(date.date()), 'action': 'BUY', 'price': round(q_fill, 2), 'shares': shares})
+                    trades.append({'date': str(date.date()), 'action': 'BUY', 'price': round(q_price, 2), 'shares': shares})
                 else:
                     shares = 0
 

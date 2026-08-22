@@ -26,13 +26,6 @@ for sym in data:
     df['ma50'] = df['Close'].rolling(50).mean()
     df['dist_high'] = (df['Close'] / df['Close'].rolling(20).max() - 1) * 100
 
-def _next_open(df, dates, i):
-    """M12: T+1 开盘价（消除未来函数：T 日收盘信号 -> T+1 日开盘成交）。无下一天返回 None。"""
-    if i + 1 < len(dates) and dates[i + 1] in df.index:
-        return float(df.loc[dates[i + 1], 'Open'])
-    return None
-
-
 def run(core_pct, alpha_pct, cash_pct, n_stocks, label):
     cash = 300000.0
     positions = {}
@@ -44,7 +37,7 @@ def run(core_pct, alpha_pct, cash_pct, n_stocks, label):
     for i, date in enumerate(dates):
         pv = cash + sum(q * data[s].loc[date,'Close'] for s,(q,_) in positions.items() if s in data and date in data[s].index)
         curve.append((date, pv))
-        if i % 63 != 0:  # M10: 移除 i<200 双重预热，dates 已切片
+        if i < 200 or i % 63 != 0:
             continue
 
         # Alpha candidates
@@ -69,8 +62,7 @@ def run(core_pct, alpha_pct, cash_pct, n_stocks, label):
         for sym in list(positions.keys()):
             if sym not in targets:
                 qty,avg = positions[sym]
-                p = _next_open(data[sym], dates, i)
-                if p is None: continue
+                p = data[sym].loc[date,'Close']
                 fee = futu_sell_fee(qty,p)
                 cash += qty*p - fee
                 total_fees += fee; trades += 1
@@ -79,8 +71,7 @@ def run(core_pct, alpha_pct, cash_pct, n_stocks, label):
         # Adjust
         for sym, tv in targets.items():
             if sym not in data or date not in data[sym].index: continue
-            p = _next_open(data[sym], dates, i)
-            if p is None: continue
+            p = data[sym].loc[date,'Close']
             cq = positions.get(sym,(0,0))[0]
             diff = tv - cq*p
             if abs(diff) < 1000: continue
@@ -109,7 +100,7 @@ def run(core_pct, alpha_pct, cash_pct, n_stocks, label):
                 else: del positions[sym]
 
     fv = cash + sum(q*data[s].iloc[-1]['Close'] for s,(q,_) in positions.items() if s in data)
-    yrs = len(data['SPY'])/252  # M11: 完整交易日数（原 len(dates) 已切片，少算 ~0.8 年）
+    yrs = len(dates)/252
     ar = ((fv/300000)**(1/yrs)-1)*100
     vals = pd.Series([v for _,v in curve])
     mdd = ((vals-vals.expanding().max())/vals.expanding().max()).min()*100

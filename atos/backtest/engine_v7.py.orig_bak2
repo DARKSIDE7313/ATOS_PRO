@@ -40,13 +40,6 @@ for sym in data:
     for lb in MOM_LBS:
         df[f'mom_{lb}'] = df['Close'].pct_change(lb)
 
-def _next_open(df, dates, i):
-    """M12: T+1 开盘价（消除未来函数：T 日收盘信号 -> T+1 日开盘成交）。无下一天返回 None。"""
-    if i + 1 < len(dates) and dates[i + 1] in df.index:
-        return float(df.loc[dates[i + 1], 'Open'])
-    return None
-
-
 def run(core_pct, alpha_pct, cash_pct, n_stocks, rebalance, mom_lb, w_mom):
     cash = INITIAL
     positions = {}  # sym -> (qty, avg)
@@ -101,9 +94,7 @@ def run(core_pct, alpha_pct, cash_pct, n_stocks, rebalance, mom_lb, w_mom):
         for sym in list(positions.keys()):
             if sym not in targets:
                 qty, avg = positions[sym]
-                p = _next_open(data[sym], dates, i)
-                if p is None:
-                    continue
+                p = data[sym].loc[date, 'Close']
                 fee = futu_sell_fee(qty, p)
                 cash += qty * p - fee
                 total_fees += fee; trades += 1
@@ -113,9 +104,7 @@ def run(core_pct, alpha_pct, cash_pct, n_stocks, rebalance, mom_lb, w_mom):
         for sym, tv in targets.items():
             if sym not in data or date not in data[sym].index:
                 continue
-            p = _next_open(data[sym], dates, i)
-            if p is None:
-                continue
+            p = data[sym].loc[date, 'Close']
             cq = positions.get(sym, (0, 0))[0]
             diff = tv - cq * p
             if abs(diff) < 1000:

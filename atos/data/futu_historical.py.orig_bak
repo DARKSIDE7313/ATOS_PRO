@@ -48,7 +48,6 @@ def _init_futu():
             _quote_ctx = open_quote_context_with_timeout(host='127.0.0.1', port=11111, timeout=10.0)
             if _quote_ctx is None:
                 logger.warning("Futu初始化超时（可能需手动过验证码）→ 回退 yfinance")
-                _FUTU_FAIL_TS = time.time()
                 return False
             ret, data = _quote_ctx.get_market_state(['US.SPY'])
             if ret == RET_OK:
@@ -59,7 +58,6 @@ def _init_futu():
                 logger.warning(f"Futu连接失败: {data}")
                 _quote_ctx.close()
                 _quote_ctx = None
-                _FUTU_FAIL_TS = time.time()
                 return False
         except Exception as e:
             logger.warning(f"Futu初始化失败: {e}")

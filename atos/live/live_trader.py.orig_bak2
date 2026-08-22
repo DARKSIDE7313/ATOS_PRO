@@ -37,7 +37,6 @@ from atos.portfolio import (
 )
 
 import yfinance as yf
-import pandas as pd
 
 INTERVAL_MINUTES = 30
 logger = get_logger("live_trader")
@@ -47,9 +46,13 @@ _REGIME_CACHE_TS = None
 
 
 def is_market_open():
-    """美股交易时间 — M4: 复用 futu_bridge 的统一时钟（正确处理 DST + 假日）"""
-    from atos.live.futu_bridge import is_market_open as _futu_open
-    return _futu_open()[0]
+    """美股交易时间：9:30 AM – 4:00 PM EST (UTC 13:30–20:00)"""
+    now = datetime.datetime.now(datetime.timezone.utc)
+    if now.weekday() >= 5:
+        return False
+    open_ = now.replace(hour=13, minute=30, second=0, microsecond=0)
+    close_ = now.replace(hour=20, minute=0, second=0, microsecond=0)
+    return open_ <= now <= close_
 
 
 def _seconds_until_next_market_open() -> float:
@@ -88,11 +91,6 @@ def get_regime():
     engine = _REGIME_ENGINE
     engine.spy_prices = []
     engine.vix_prices = []
-    # M14: MultiIndex 兼容 — yf.download 可能返回 MultiIndex columns
-    if isinstance(spy.columns, pd.MultiIndex):
-        spy = spy.xs("SPY", axis=1, level=1)
-    if isinstance(vix.columns, pd.MultiIndex):
-        vix = vix.xs("^VIX", axis=1, level=1)
     spy_c = spy["Close"].squeeze().tolist()
     vix_c = vix["Close"].squeeze().tolist()
     for i in range(min(len(spy_c), len(vix_c))):

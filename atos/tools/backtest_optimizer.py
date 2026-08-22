@@ -629,7 +629,7 @@ def download_data(symbols: list, period: str = "3y") -> Dict[str, pd.DataFrame]:
         ticker_str = " ".join(chunk)
         try:
             df_all = yf.download(ticker_str, period=period, interval="1d",
-                                progress=False, auto_adjust=True, group_by="ticker", progress=False, auto_adjust=True)
+                                progress=False, auto_adjust=True, group_by="ticker")
             for sym in chunk:
                 try:
                     if isinstance(df_all.columns, pd.MultiIndex):

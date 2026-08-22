@@ -147,13 +147,6 @@ def get_spy_trend(spy_df, date):
     return "CAUTIOUS"
 
 
-def _next_open(df, dates, i):
-    """M12: T+1 开盘价（消除未来函数）。无下一天返回 None。"""
-    if i + 1 < len(dates) and dates[i + 1] in df.index:
-        return float(df.loc[dates[i + 1], 'Open'])
-    return None
-
-
 def run_backtest(start_date='2018-01-01', end_date='2026-08-01', initial_capital=300000):
     """运行回测"""
     import yfinance as yf
@@ -174,7 +167,7 @@ def run_backtest(start_date='2018-01-01', end_date='2026-08-01', initial_capital
     for sym in all_symbols:
         try:
             ticker = yf.Ticker(sym)
-            hist = ticker.history(start=start_date, end=end_date, auto_adjust=True)
+            hist = ticker.history(start=start_date, end=end_date)
             if len(hist) > 100:
                 data[sym] = hist
             else:
@@ -241,7 +234,7 @@ def run_backtest(start_date='2018-01-01', end_date='2026-08-01', initial_capital
                 # 清仓
                 for sym in list(positions.keys()):
                     if sym in data and date in data[sym].index:
-                        price = _next_open(data[sym], trading_days, i) or data[sym].loc[date, 'Close']
+                        price = data[sym].loc[date, 'Close']
                         fee = futu_sell_fee(positions[sym]['shares'], price) if PARAMS['use_fees'] else 0
                         total_fees += fee
                         cash += positions[sym]['shares'] * price - fee
@@ -288,13 +281,12 @@ def run_backtest(start_date='2018-01-01', end_date='2026-08-01', initial_capital
                 sell_reason = f"BEAR止损{pnl_pct:.1%}"
 
             if sell_reason:
-                fill = _next_open(data[sym], trading_days, i) or price
-                fee = futu_sell_fee(pos['shares'], fill) if PARAMS['use_fees'] else 0
+                fee = futu_sell_fee(pos['shares'], price) if PARAMS['use_fees'] else 0
                 total_fees += fee
-                cash += pos['shares'] * fill - fee
+                cash += pos['shares'] * price - fee
                 trades.append({
                     'date': str(date.date()), 'sym': sym, 'action': 'SELL',
-                    'price': round(fill, 2), 'reason': sell_reason,
+                    'price': round(price, 2), 'reason': sell_reason,
                     'pnl_pct': round(pnl_pct * 100, 2),
                     'shares': pos['shares'],
                 })
@@ -352,31 +344,27 @@ def run_backtest(start_date='2018-01-01', end_date='2026-08-01', initial_capital
         candidates.sort(key=lambda x: -x[1])
         n_buys = min(3, PARAMS['max_positions'] - len(positions))
         for sym, score, price in candidates[:n_buys]:
-            # M12: T 日信号 -> T+1 日开盘成交
-            fill = _next_open(data[sym], trading_days, i)
-            if fill is None:
-                continue
             pos_value = port_value * PARAMS['single_position_pct']
-            shares = max(1, int(pos_value / fill))
-            fee = futu_buy_fee(shares, fill) if PARAMS['use_fees'] else 0
-            cost = shares * fill + fee
+            shares = max(1, int(pos_value / price))
+            fee = futu_buy_fee(shares, price) if PARAMS['use_fees'] else 0
+            cost = shares * price + fee
 
             if cost > cash * (1 - PARAMS['min_cash_pct']):
-                shares = max(1, int((cash * (1 - PARAMS['min_cash_pct'])) / fill))
-                fee = futu_buy_fee(shares, fill) if PARAMS['use_fees'] else 0
-                cost = shares * fill + fee
+                shares = max(1, int((cash * (1 - PARAMS['min_cash_pct'])) / price))
+                fee = futu_buy_fee(shares, price) if PARAMS['use_fees'] else 0
+                cost = shares * price + fee
                 if shares <= 0:
                     continue
 
             cash -= cost
             total_fees += fee
             positions[sym] = {
-                'shares': shares, 'avg_price': fill,
-                'buy_date': date, 'high_since_buy': fill,
+                'shares': shares, 'avg_price': price,
+                'buy_date': date, 'high_since_buy': price,
             }
             trades.append({
                 'date': str(date.date()), 'sym': sym, 'action': 'BUY',
-                'price': round(fill, 2), 'score': round(score, 3),
+                'price': round(price, 2), 'score': round(score, 3),
                 'shares': shares,
             })
 
@@ -398,7 +386,7 @@ def run_backtest(start_date='2018-01-01', end_date='2026-08-01', initial_capital
     if len(equity_curve) > 1:
         eq_values = [e[1] for e in equity_curve]
         returns = pd.Series(eq_values).pct_change().dropna()
-        sharpe = returns.mean() / returns.std() * np.sqrt(252) if returns.std() > 0 else 0  # M9: 日采样用 sqrt(252)（原 sqrt(252/5) 低估 ~2.24 倍）
+        sharpe = returns.mean() / returns.std() * np.sqrt(252 / 5) if returns.std() > 0 else 0  # 每周采样
     else:
         sharpe = 0
 

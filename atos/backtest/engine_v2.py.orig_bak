@@ -54,13 +54,6 @@ def compute_rsi(prices, period=14):
     return 100 - (100 / (1 + rs))
 
 
-def _next_open(df, dates, i):
-    """M12: T+1 开盘价（消除未来函数）。无下一天返回 None。"""
-    if i + 1 < len(dates) and dates[i + 1] in df.index:
-        return float(df.loc[dates[i + 1], 'Open'])
-    return None
-
-
 def run_backtest_v2(start_date='2018-01-01', end_date='2026-08-01', initial_capital=300000):
     import yfinance as yf
 
@@ -77,7 +70,7 @@ def run_backtest_v2(start_date='2018-01-01', end_date='2026-08-01', initial_capi
     data = {}
     for sym in all_syms:
         try:
-            hist = yf.Ticker(sym).history(start=start_date, end=end_date, auto_adjust=True)
+            hist = yf.Ticker(sym).history(start=start_date, end=end_date)
             if len(hist) > 100:
                 data[sym] = hist
         except Exception:
@@ -165,8 +158,8 @@ def run_backtest_v2(start_date='2018-01-01', end_date='2026-08-01', initial_capi
             if bull:
                 # 应该持有 QQQ
                 if core_etf not in positions and target_core_value > 1000:
-                    # 买入 QQQ (M12: T+1 开盘成交)
-                    price = _next_open(qqq, trading_days, i) or qqq_price
+                    # 买入 QQQ
+                    price = qqq_price
                     shares = max(1, int(target_core_value / price))
                     fee = futu_buy_fee(shares, price)
                     cost = shares * price + fee
@@ -185,7 +178,7 @@ def run_backtest_v2(start_date='2018-01-01', end_date='2026-08-01', initial_capi
                 # BEAR: 卖核心仓
                 for etf in list(positions.keys()):
                     if positions[etf].get('type') == 'core':
-                        price = _next_open(data[etf], trading_days, i) or (data[etf].loc[date, 'Close'] if date in data[etf].index else positions[etf]['avg_price'])
+                        price = data[etf].loc[date, 'Close'] if date in data[etf].index else positions[etf]['avg_price']
                         fee = futu_sell_fee(positions[etf]['shares'], price)
                         total_fees += fee
                         pnl_pct = (price - positions[etf]['avg_price']) / positions[etf]['avg_price']
@@ -235,13 +228,12 @@ def run_backtest_v2(start_date='2018-01-01', end_date='2026-08-01', initial_capi
                 sell_reason = f"BEAR退出 PnL={pnl_pct:.1%}"
 
             if sell_reason:
-                fill = _next_open(mom_data[sym], trading_days, i) or price
-                fee = futu_sell_fee(pos['shares'], fill)
+                fee = futu_sell_fee(pos['shares'], price)
                 total_fees += fee
-                cash += pos['shares'] * fill - fee
+                cash += pos['shares'] * price - fee
                 trades.append({
                     'date': str(date.date()), 'sym': sym, 'action': 'SELL',
-                    'price': round(fill, 2), 'shares': pos['shares'],
+                    'price': round(price, 2), 'shares': pos['shares'],
                     'reason': sell_reason, 'pnl_pct': round(pnl_pct * 100, 2),
                 })
                 del positions[sym]
@@ -286,31 +278,27 @@ def run_backtest_v2(start_date='2018-01-01', end_date='2026-08-01', initial_capi
         alpha_budget = port_value * 0.40  # 40% alpha 仓
 
         for sym, score, price in candidates[:n_buys]:
-            # M12: T 日信号 -> T+1 日开盘成交
-            fill = _next_open(mom_data[sym], trading_days, i)
-            if fill is None:
-                continue
             pos_value = alpha_budget / max_alpha
-            shares = max(1, int(pos_value / fill))
-            fee = futu_buy_fee(shares, fill)
-            cost = shares * fill + fee
+            shares = max(1, int(pos_value / price))
+            fee = futu_buy_fee(shares, price)
+            cost = shares * price + fee
 
             if cost > cash * 0.90:
-                shares = max(1, int(cash * 0.85 / fill))
-                fee = futu_buy_fee(shares, fill)
-                cost = shares * fill + fee
+                shares = max(1, int(cash * 0.85 / price))
+                fee = futu_buy_fee(shares, price)
+                cost = shares * price + fee
                 if shares <= 0:
                     continue
 
             cash -= cost
             total_fees += fee
             positions[sym] = {
-                'shares': shares, 'avg_price': fill,
-                'buy_date': date, 'peak_price': fill, 'type': 'alpha',
+                'shares': shares, 'avg_price': price,
+                'buy_date': date, 'peak_price': price, 'type': 'alpha',
             }
             trades.append({
                 'date': str(date.date()), 'sym': sym, 'action': 'BUY',
-                'price': round(fill, 2), 'shares': shares,
+                'price': round(price, 2), 'shares': shares,
                 'reason': f'动量={score:.3f}',
             })
 
@@ -330,7 +318,7 @@ def run_backtest_v2(start_date='2018-01-01', end_date='2026-08-01', initial_capi
     if len(equity_curve) > 1:
         eq_vals = [e[1] for e in equity_curve]
         rets = pd.Series(eq_vals).pct_change().dropna()
-        sharpe = rets.mean() / rets.std() * np.sqrt(252) if rets.std() > 0 else 0  # M9: 日采样用 sqrt(252)
+        sharpe = rets.mean() / rets.std() * np.sqrt(252 / 5) if rets.std() > 0 else 0
     else:
         sharpe = 0
 

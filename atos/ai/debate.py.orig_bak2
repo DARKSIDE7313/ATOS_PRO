@@ -20,26 +20,6 @@ from atos.core.logging import get_logger
 
 logger = get_logger("ai.debate")
 
-
-def _extract_json(text: str) -> dict:
-    """健壮 JSON 解析：处理 DeepSeek 无 response_format 时可能返回的 markdown 包裹/前后缀。"""
-    import re
-    if not text:
-        raise ValueError("empty response")
-    text = text.strip()
-    try:
-        return json.loads(text)
-    except Exception:
-        pass
-    m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
-    if m:
-        return json.loads(m.group(1))
-    start, end = text.find("{"), text.rfind("}")
-    if start != -1 and end > start:
-        return json.loads(text[start:end + 1])
-    raise ValueError("no JSON found")
-
-
 API_URL = "https://api.deepseek.com/chat/completions"
 MODEL = "deepseek-chat"  # 统一使用 deepseek-chat (直连DeepSeek API/OpenRouter 一致)
 API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
@@ -77,11 +57,12 @@ def cio_review(snapshot: dict) -> dict:
                 {"role": "system", "content": CIO_PROMPT},
                 {"role": "user", "content": json.dumps(cio_input, ensure_ascii=False)},
             ],
+            "response_format": {"type": "json_object"},
         }
         headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
         resp = requests.post(API_URL, json=payload, headers=headers, timeout=60)
         resp.raise_for_status()
-        result = _extract_json(resp.json()["choices"][0]["message"]["content"])
+        result = json.loads(resp.json()["choices"][0]["message"]["content"])
         result["_cio_source"] = "api"
         logger.info(f"CIO review: {result.get('portfolio_health', 'N/A')}")
         return result
@@ -300,11 +281,12 @@ def vetos(symbols: list[str], snapshot: dict) -> dict:
                         {"role": "system", "content": VETO_PROMPT},
                         {"role": "user", "content": json.dumps(veto_input, ensure_ascii=False)},
                     ],
+                    "response_format": {"type": "json_object"},
                 }
                 headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
                 resp = requests.post(API_URL, json=payload, headers=headers, timeout=30)
                 resp.raise_for_status()
-                result = _extract_json(resp.json()["choices"][0]["message"]["content"])
+                result = json.loads(resp.json()["choices"][0]["message"]["content"])
                 if result.get("veto", False):
                     results[sym] = {"veto": True, "reason": result.get("reason", "LLM否决"), "risk_level": result.get("risk_level", "MEDIUM")}
                     logger.info(f"🧠 AI-LLM否决 {sym}: {result.get('reason', '')[:60]}")

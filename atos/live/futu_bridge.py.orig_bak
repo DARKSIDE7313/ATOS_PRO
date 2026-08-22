@@ -16,7 +16,6 @@ import datetime
 import socket
 import functools
 from atos.core.logging import get_logger
-from atos.config_shared import FUTU
 
 logger = get_logger("futu_bridge")
 
@@ -111,14 +110,19 @@ US_HOLIDAYS_2026 = {
 
 
 def _is_edt_now() -> bool:
-    """判断当前是否为美国东部夏令时 (EDT) — 线程安全（zoneinfo，不修改全局 TZ）"""
-    from zoneinfo import ZoneInfo
+    """判断当前是否为美国东部夏令时 (EDT)"""
+    import time as _time, os as _os
+    old_tz = _os.environ.get("TZ", "")
+    _os.environ["TZ"] = "America/New_York"
     try:
-        now_ny = datetime.datetime.now(ZoneInfo("America/New_York"))
-        # EDT 期间 dst() 返回 1 小时，EST 返回 0；bool(timedelta) 直接给出判断
-        return bool(now_ny.dst())
-    except Exception:
-        return False
+        _time.tzset()
+        return bool(_time.daylight)
+    finally:
+        if old_tz:
+            _os.environ["TZ"] = old_tz
+        else:
+            _os.environ.pop("TZ", None)
+        _time.tzset()
 
 
 def is_market_open() -> tuple[bool, str]:
@@ -127,15 +131,13 @@ def is_market_open() -> tuple[bool, str]:
     返回 (是否开市, 原因说明)
     """
     now = datetime.datetime.now(datetime.timezone.utc)
-    from zoneinfo import ZoneInfo
-    ny_now = now.astimezone(ZoneInfo("America/New_York"))
-    today = ny_now.date()  # M3: 用美东日期判断假日/周末（而非 UTC 日期）
+    today = now.date()
 
-    # 周末（美东时间）
-    if ny_now.weekday() >= 5:
+    # 周末
+    if now.weekday() >= 5:
         return False, "周末休市"
 
-    # 假日（美东日期）
+    # 假日
     if today in US_HOLIDAYS_2026:
         return False, f"假日休市: {US_HOLIDAYS_2026[today]}"
 
@@ -184,7 +186,7 @@ def check_connection(host: str = "127.0.0.1", port: int = 11111) -> dict:
             host=host, port=port,
             security_firm=SecurityFirm.FUTUINC,
         )
-        ret, data = ctx.accinfo_query(trd_env=TrdEnv.REAL if FUTU["trd_env"] == "REAL" else TrdEnv.SIMULATE, acc_id=FUTU["acc_id"])
+        ret, data = ctx.accinfo_query(trd_env=TrdEnv.SIMULATE, acc_id=19489722)
         ctx.close()
         if ret == RET_OK:
             result["connected"] = True
@@ -205,14 +207,12 @@ def check_connection(host: str = "127.0.0.1", port: int = 11111) -> dict:
 @retry_with_backoff(max_retries=3, base_delay=2.0)
 def safe_place_order(ticker: str, side: str, quantity: int,
                       host: str = "127.0.0.1", port: int = 11111,
-                      acc_id: int = None, env: str = None) -> dict:
+                      acc_id: int = 19489722, env: str = "SIMULATE") -> dict:
     """
     安全下单（带重试、限流、错误翻译）。
     env: "SIMULATE" | "REAL"
     """
     _rate_limiter.wait()
-    acc_id = acc_id if acc_id is not None else FUTU["acc_id"]
-    env = env if env is not None else FUTU["trd_env"]
 
     # 开盘检查
     market_open, reason = is_market_open()
@@ -284,7 +284,7 @@ def safe_place_order(ticker: str, side: str, quantity: int,
 
 def sync_positions(account_positions: list[dict],
                     host: str = "127.0.0.1", port: int = 11111,
-                    acc_id: int = None) -> dict:
+                    acc_id: int = 19489722) -> dict:
     """
     将本地记录与 FutuOpenD 实际持仓对账。
     返回差异报告。
@@ -296,7 +296,7 @@ def sync_positions(account_positions: list[dict],
             host=host, port=port,
             security_firm=SecurityFirm.FUTUINC,
         )
-        ret, data = ctx.position_list_query(trd_env=TrdEnv.REAL if FUTU["trd_env"] == "REAL" else TrdEnv.SIMULATE, acc_id=FUTU["acc_id"] if acc_id is None else acc_id)
+        ret, data = ctx.position_list_query(trd_env=TrdEnv.SIMULATE, acc_id=acc_id)
         ctx.close()
 
         if ret != RET_OK:
@@ -309,7 +309,7 @@ def sync_positions(account_positions: list[dict],
                 actual[sym] = {
                     "qty": int(row["qty"]),
                     "avg_price": float(row["cost_price"]),
-                    "last": float(row["nominal_price"]),
+                    "last": float(row["last_price"]),
                 }
 
         local = {}

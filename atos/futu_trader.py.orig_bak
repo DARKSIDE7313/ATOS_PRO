@@ -1,16 +1,8 @@
 from futu import *
 
-try:
-    from atos.config_shared import FUTU
-    ACC_ID = FUTU["acc_id"]
-    HOST = FUTU["host"]
-    PORT = FUTU["port"]
-    TRD_ENV = TrdEnv.REAL if FUTU["trd_env"] == "REAL" else TrdEnv.SIMULATE
-except ImportError:
-    ACC_ID = 19489722
-    HOST = '127.0.0.1'
-    PORT = 11111
-    TRD_ENV = TrdEnv.SIMULATE
+ACC_ID = 19489722
+HOST = '127.0.0.1'
+PORT = 11111
 
 def place_order(ticker, side, quantity):
     """
@@ -41,11 +33,12 @@ def place_order(ticker, side, quantity):
 
     # 下单
     ret, data = ctx.place_order(
+        price=price,
         qty=quantity,
         code=symbol,
         trd_side=trd_side,
-        order_type=OrderType.MARKET,  # L7: 市价单不传 price
-        trd_env=TRD_ENV,
+        order_type=OrderType.MARKET,
+        trd_env=TrdEnv.SIMULATE,
         acc_id=ACC_ID
     )
     ctx.close()
@@ -66,7 +59,7 @@ def get_positions():
         port=PORT,
         security_firm=SecurityFirm.FUTUINC
     )
-    ret, data = ctx.position_list_query(trd_env=TRD_ENV, acc_id=ACC_ID)
+    ret, data = ctx.position_list_query(trd_env=TrdEnv.SIMULATE, acc_id=ACC_ID)
     ctx.close()
 
     if ret != RET_OK:
@@ -78,7 +71,7 @@ def get_positions():
     else:
         print("=== 当前持仓 ===")
         for _, row in data.iterrows():
-            print(f"  {row['code']} | 数量: {row['qty']} | 成本: ${float(row['cost_price']):.2f} | 现价: ${float(row['nominal_price']):.2f} | 盈亏: ${float(row['pl_val']):.2f}")
+            print(f"  {row['code']} | 数量: {row['qty']} | 成本: ${float(row['cost_price']):.2f} | 现价: ${float(row['last_price']):.2f} | 盈亏: ${float(row['pl_val']):.2f}")
 
 def get_account_info():
     """查看账户资金"""
@@ -88,7 +81,7 @@ def get_account_info():
         port=PORT,
         security_firm=SecurityFirm.FUTUINC
     )
-    ret, data = ctx.accinfo_query(trd_env=TRD_ENV, acc_id=ACC_ID)
+    ret, data = ctx.accinfo_query(trd_env=TrdEnv.SIMULATE, acc_id=ACC_ID)
     ctx.close()
 
     if ret != RET_OK:

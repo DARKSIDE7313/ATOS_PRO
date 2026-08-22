@@ -28,25 +28,17 @@ MAX_POSITIONS = {
 
 # === 风控全局阈值 ===
 RISK = {
-    "max_daily_loss_pct":   0.025,  # 日亏损2.5%熔断
-    "max_drawdown_pct":     0.10,   # 最大回撤10%
-    "max_consecutive_losses": 3,    # 连续3次亏损降频
-    "stop_loss_pct":        0.05,   # 硬止损5% (v16: 从6%收紧)
-    "take_profit_pct":      0.18,   # 止盈18% (让赢家奔跑)
-    "cooldown_cycles":      24,     # 冷却周期 (v9: 从48→24)
+    "max_daily_loss_pct":   0.02,   # 日亏损2%熔断
+    "max_drawdown_pct":     0.15,   # 最大回撤15%
+    "max_consecutive_losses": 5,    # 连续5次亏损降频
+    "stop_loss_pct":        0.07,   # 硬止损7% (v6 进攻性, 从8%收紧)
+    "take_profit_pct":      0.11,   # 止盈11% (v6 进攻性, 从12%收紧)
+    "cooldown_cycles":      48,     # 冷却周期
 }
 
 # === 仪表盘配置 ===
 DASHBOARD = {
     "initial_capital": TOTAL_CAPITAL,  # 与总资金一致
-}
-
-# === Futu 交易配置（L6: 硬编码账号集中到配置） ===
-FUTU = {
-    "acc_id": 19489722,
-    "trd_env": "SIMULATE",  # "SIMULATE" | "REAL"
-    "host": "127.0.0.1",
-    "port": 11111,
 }
 
 

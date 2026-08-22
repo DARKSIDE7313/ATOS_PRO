@@ -41,14 +41,6 @@ DASHBOARD = {
     "initial_capital": TOTAL_CAPITAL,  # 与总资金一致
 }
 
-# === Futu 交易配置（L6: 硬编码账号集中到配置） ===
-FUTU = {
-    "acc_id": 19489722,
-    "trd_env": "SIMULATE",  # "SIMULATE" | "REAL"
-    "host": "127.0.0.1",
-    "port": 11111,
-}
-
 
 def get_short_term_capital() -> float:
     return ALLOCATION["short_term"]

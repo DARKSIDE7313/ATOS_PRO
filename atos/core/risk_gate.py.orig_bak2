@@ -171,8 +171,7 @@ class PreTradeRiskGate:
                 max_val = equity * cap_pct
                 cur_val = 0
                 if intent.symbol in account.positions:
-                    _pos = account.positions[intent.symbol]
-                    cur_val = _pos.get('qty', _pos.get('shares', 0)) * intent.price
+                    cur_val = account.positions[intent.symbol].get('qty', 0) * intent.price
                 room = max_val - cur_val
                 checks['single_cap'] = room > 0
                 if room <= 0:

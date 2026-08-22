@@ -141,7 +141,6 @@ class TrailingStop:
         self._breach_count = 0
         self._min_trail_pct = 0.03   # 最低追踪 3%（保护利润）
         self._max_trail_pct = 0.08   # 最高追踪 8%（防止止损太宽）
-        self.activation_price = None  # M18: 激活价（保本线），在 __init__ 声明避免 AttributeError
 
     def init(self, entry_price: float):
         self.entry_price = entry_price

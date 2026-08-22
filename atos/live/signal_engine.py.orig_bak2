@@ -14,6 +14,7 @@ import time
 import math
 import json
 import threading
+import socket
 import pandas as pd
 import yfinance as yf
 from functools import lru_cache
@@ -21,7 +22,8 @@ from datetime import datetime, timedelta
 from atos.core.universe import ALL_SYMBOLS, LONG_TERM_SYMBOLS, SHORT_TERM_SYMBOLS
 from atos.core.logging import get_logger, log_signal, log_error
 
-# L1: 移除全局 socket.setdefaulttimeout(8) — 进程级副作用影响其它库，yfinance 已显式传 timeout=8
+# 🆕 v19: 全局 socket 超时 — 8秒足够，30秒拖慢整个周期
+socket.setdefaulttimeout(8)
 
 logger = get_logger("signal_engine")
 
@@ -185,12 +187,7 @@ _batch_fail_count = 0
 _batch_circuit_open = False
 
 def _prefetch_batch(symbols: list[str]) -> None:
-    """⚠️ 死代码（L2 标注，有意禁用）: 中国大陆 yfinance 被墙，批量下载已停用。
-
-    本函数直接 return，_batch_success 恒为 False，因此
-    _get_cached_data() 中 `if _batch_success:` 分支为死代码。
-    单只标的走 _get_cached_data 内的 Futu 历史数据路径。保留仅为接口兼容，勿在此添加逻辑。
-    """
+    """中国大陆：yfinance 被墙，跳过批量下载，单只 Futu 缓存"""
     global _batch_fail_count, _batch_circuit_open, _batch_success
     _batch_success = False
     return  # 单只下载走 Futu 历史数据路径
@@ -560,11 +557,6 @@ def get_realtime_signals(symbols: list[str] = None,
     # v11: 如果信号为空，使用上周期缓存（防止 yfinance 全部超时时系统停摆）
     global _signal_cache, _signal_cache_ts
     if not signals and _signal_cache:
-        # L3: 周末不回退到周五缓存（过期价会污染卖出检查）
-        from datetime import timezone
-        if datetime.now(timezone.utc).weekday() >= 5:
-            logger.info("⏸ 周末休市，不使用过期信号缓存")
-            return {}
         age = (datetime.now() - _signal_cache_ts).total_seconds() if _signal_cache_ts else 999
         cache_cycles = getattr(get_realtime_signals, '_cache_cycles_used', 0)
         if age < _SIGNAL_CACHE_TTL and cache_cycles < _MAX_CACHE_CYCLES:

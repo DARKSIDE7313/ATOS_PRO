@@ -15,15 +15,12 @@
 import os
 import json
 
-from atos.config_shared import RISK
-
-# H4: 风控参数统一从 config_shared.RISK 读取（消除 config_shared / risk_manager 双账本）
-MAX_DAILY_LOSS_PCT = RISK["max_daily_loss_pct"]        # 日亏损超过 2.5% → 熔断
-MAX_DRAWDOWN_PCT = RISK["max_drawdown_pct"]            # 最大回撤 10% → 暂停新开仓
-MAX_CONSECUTIVE_LOSSES = RISK["max_consecutive_losses"]  # 连续 3 次亏损 → 降频
-COOLDOWN_CYCLES = RISK["cooldown_cycles"]              # 冷却周期
-STOP_LOSS_PCT = RISK["stop_loss_pct"]                  # 止损 5%
-TAKE_PROFIT_PCT = RISK["take_profit_pct"]              # 止盈 18%
+MAX_DAILY_LOSS_PCT = 0.025      # 日亏损超过 2.5% → 熔断
+MAX_DRAWDOWN_PCT = 0.10         # 最大回撤 10%（从 12% 收紧）→ 暂停新开仓
+MAX_CONSECUTIVE_LOSSES = 3      # 连续 3 次亏损 → 降频
+COOLDOWN_CYCLES = 24            # v9: 冷却从48→24周期(约2小时)
+STOP_LOSS_PCT = 0.05            # v16: 止损5%（从6%收紧，更快截断亏损）
+TAKE_PROFIT_PCT = 0.18          # 止盈18%: 让赢家充分奔跑（从15%提高）
 MAX_ORDERS_PER_CYCLE = 4        # 每周期最多4笔（从6降低，减少churning）
 
 # 持久化路径
@@ -37,7 +34,6 @@ _orders_this_day = 0
 _consecutive_losses = 0
 _current_drawdown = 0.0
 _trade_circuit_open = False    # 熔断开关
-_daily_start_equity = None     # L5: 当日基准权益（固定分母，防日亏损自强化）
 
 
 def reset_cycle():
@@ -48,24 +44,18 @@ def reset_cycle():
 
 def reset_daily():
     """每天调用一次"""
-    global _daily_pnl_pct, _daily_pnl, _orders_this_day, _trade_circuit_open, _daily_start_equity
+    global _daily_pnl_pct, _daily_pnl, _orders_this_day, _trade_circuit_open
     _daily_pnl_pct = 0.0
     _daily_pnl = 0.0
     _orders_this_day = 0
     _trade_circuit_open = False  # 每日重置熔断
-    _daily_start_equity = None   # L5: 重置当日基准权益
 
 
 def record_fill(pnl: float, total_equity: float = 0):
     """记录一笔成交后的盈亏"""
-    global _daily_pnl, _daily_pnl_pct, _orders_this_cycle, _orders_this_day, _consecutive_losses, _daily_start_equity
+    global _daily_pnl, _daily_pnl_pct, _orders_this_cycle, _orders_this_day, _consecutive_losses
     _daily_pnl += pnl
-    # L5: 用当日基准权益（固定分母）计算日亏损率，避免亏损缩小分母的自强化
-    if _daily_start_equity is None and total_equity > 0:
-        _daily_start_equity = total_equity
-    if _daily_start_equity and _daily_start_equity > 0:
-        _daily_pnl_pct = _daily_pnl / _daily_start_equity
-    elif total_equity > 0:
+    if total_equity > 0:
         _daily_pnl_pct = _daily_pnl / total_equity
     _orders_this_cycle += 1
     _orders_this_day += 1
@@ -174,7 +164,7 @@ def check_daily_limits(total_equity: float) -> dict:
         }
 
     # 开仓次数限制
-    if _orders_this_day >= MAX_ORDERS_PER_CYCLE * 3:  # L4: 每周期4笔 × 3 = 12笔/天
+    if _orders_this_day >= MAX_ORDERS_PER_CYCLE * 3:  # 每周期8笔 × 3 = 24笔/天
         return {
             "can_trade": False,
             "reason": f"今日{_orders_this_day}单已达上限",
@@ -330,10 +320,7 @@ def save_risk_state():
     }
 
     try:
-        # M13: 原子写 — 先写临时文件再 os.replace，避免写一半崩溃留下损坏 JSON
-        tmp_path = path + ".tmp"
-        with open(tmp_path, "w") as f:
+        with open(path, "w") as f:
             json.dump(data, f, indent=2)
-        os.replace(tmp_path, path)
     except Exception:
         pass  # Silent fail — state is not critical for correctness

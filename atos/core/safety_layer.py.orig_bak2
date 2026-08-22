@@ -68,12 +68,10 @@ def _load_safety_state():
 
 
 def _save_safety_state(state):
-    """保存风控状态（原子写）"""
+    """保存风控状态"""
     os.makedirs(os.path.dirname(SAFETY_STATE_FILE), exist_ok=True)
-    tmp = SAFETY_STATE_FILE + ".tmp"
-    with open(tmp, 'w') as f:
+    with open(SAFETY_STATE_FILE, 'w') as f:
         json.dump(state, f, indent=2)
-    os.replace(tmp, SAFETY_STATE_FILE)
 
 
 def check_portfolio_risk(equity, peak_equity, positions, cash):

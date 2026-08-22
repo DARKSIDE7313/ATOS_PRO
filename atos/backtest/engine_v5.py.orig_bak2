@@ -42,13 +42,6 @@ def calc_indicators(df):
     df['vol20'] = df['Close'].pct_change().rolling(20).std() * np.sqrt(252)
     return df
 
-def _next_open(df, dates, i):
-    """M12: T+1 开盘价（消除未来函数：T 日收盘信号 -> T+1 日开盘成交）。无下一天返回 None。"""
-    if i + 1 < len(dates) and dates[i + 1] in df.index:
-        return float(df.loc[dates[i + 1], 'Open'])
-    return None
-
-
 def run_strategy(data, dates, name, core_pct=0.60, n_stocks=5, use_rs=False, vol_weight=False, dual_mom=False, sector_mom=False):
     cash = 300000.0
     positions = {}  # sym -> (qty, avg_price)
@@ -61,7 +54,7 @@ def run_strategy(data, dates, name, core_pct=0.60, n_stocks=5, use_rs=False, vol
         port_val = cash + sum(q * data[s].loc[date, 'Close'] for s, (q, _) in positions.items() if s in data and date in data[s].index)
         equity_curve.append((date, port_val))
         
-        if i % 63 != 0:  # 季度再平衡（M10: 移除 i<200 双重预热，dates 已切片）
+        if i < 200 or i % 63 != 0:  # 季度再平衡
             continue
         
         spy = data.get('SPY')
@@ -121,9 +114,7 @@ def run_strategy(data, dates, name, core_pct=0.60, n_stocks=5, use_rs=False, vol
         for sym in list(positions.keys()):
             if sym not in targets:
                 qty, avg = positions[sym]
-                price = _next_open(data[sym], dates, i)
-                if price is None:
-                    continue
+                price = data[sym].loc[date, 'Close']
                 fee = futu_sell_fee(qty, price)
                 cash += qty * price - fee
                 total_fees += fee
@@ -134,9 +125,7 @@ def run_strategy(data, dates, name, core_pct=0.60, n_stocks=5, use_rs=False, vol
         for sym, target_val in targets.items():
             if sym not in data or date not in data[sym].index:
                 continue
-            price = _next_open(data[sym], dates, i)
-            if price is None:
-                continue
+            price = data[sym].loc[date, 'Close']
             current_qty = positions.get(sym, (0, 0))[0]
             current_val = current_qty * price
             diff = target_val - current_val
@@ -181,7 +170,7 @@ def run_strategy(data, dates, name, core_pct=0.60, n_stocks=5, use_rs=False, vol
     
     # 最终结算
     final_val = cash + sum(q * data[s].iloc[-1]['Close'] for s, (q, _) in positions.items() if s in data)
-    years = len(data['SPY']) / 252  # M11: 用完整交易日数（原 len(dates) 已切片，少算 ~0.8 年致年化高估）
+    years = len(dates) / 252
     total_ret = (final_val / 300000 - 1) * 100
     annual_ret = ((final_val / 300000) ** (1/years) - 1) * 100 if years > 0 else 0
     

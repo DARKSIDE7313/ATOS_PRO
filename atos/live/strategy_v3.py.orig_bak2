@@ -176,10 +176,10 @@ def composite_signal(symbol: str, regime: str, sig: dict) -> dict:
         score -= weights["reversal"] * 0.10
         reasons.append(f"RSI={rsi:.0f}偏高")
 
-    score = min(1.0, score)  # M15: 移除 max(0.0,...) 下界，保留负分（看空信号）
+    score = max(0.0, min(1.0, score))
 
-    # BUY > 0.20, SELL < 0.0（真正看空）, HOLD 其余
-    decision = "BUY" if score > 0.20 else ("SELL" if score < 0.0 else "HOLD")
+    # BUY > 0.20, HOLD 0.05-0.20, SELL only if < 0.05 (actual bearish signal)
+    decision = "BUY" if score > 0.20 else ("SELL" if score < 0.05 else "HOLD")
 
     return {
         "symbol": symbol,
@@ -192,11 +192,9 @@ def composite_signal(symbol: str, regime: str, sig: dict) -> dict:
 
 def get_v3_signals(symbols: list[str], regime: str = "UNKNOWN") -> dict:
     """
-    ⚠️ 已废弃（M16）：本函数曾返回硬编码 0.5 占位，容易被误当真实信号。
-    真实计算在 atos/factors/engine.py 的 combine() per-symbol loop 中完成
-    （调用 composite_signal()）。请勿调用本函数。
+    从 signal_engine 已有数据计算多时间框架信号。
+    修复: 不再返回硬编码 0.5，由 composite_signal 在 combine() 中按标的逐个计算。
+    这里返回占位，实际计算在 combine() 的 per-symbol loop 中完成。
     """
-    raise NotImplementedError(
-        "get_v3_signals 已废弃：真实计算在 factors.engine.combine() 中完成，"
-        "请勿调用本函数（原返回硬编码 0.5 占位）"
-    )
+    logger.info(f"v3多时间框架信号: {len(symbols)} 只标的将在 factor combine 中计算")
+    return {sym: {"composite": 0.5, "decision": "HOLD"} for sym in symbols}
