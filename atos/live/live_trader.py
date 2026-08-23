@@ -350,7 +350,9 @@ def run_cycle():
         logger.info(f"下单 {action} {abs(qty)}股 {sym} | {order.get('reason', '--')}")
         result = place_order(sym, action, abs(qty))
 
-        if result:
+        # H8 修复: safe_place_order 永远返回 dict(成功/失败都返回 dict)，
+        # 原 `if result:` 恒真导致失败下单也被记为成功。改为检查 success 字段。
+        if result and isinstance(result, dict) and result.get("success"):
             log_trade(sym, action, abs(qty), signals.get(sym, {}).get("price", 0),
                       reason=order.get("reason", ""))
             if action == "SELL":
@@ -358,7 +360,7 @@ def run_cycle():
             else:
                 record_fill(0.0, account["total"])
         else:
-            log_error("live_trader", f"下单失败: {action} {qty}股 {sym}")
+            log_error("live_trader", f"下单失败: {action} {qty}股 {sym}: {result}")
 
     logger.info(f"交易周期结束 | {advice.get('risk_notes', '--')}")
 

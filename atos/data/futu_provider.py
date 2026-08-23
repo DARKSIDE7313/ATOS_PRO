@@ -71,6 +71,15 @@ class FutuProvider:
     def _get_quote_ctx(self):
         """延迟创建连接（复用）"""
         if self._quote_ctx is None:
+            # H7: TCP 预检查 — 防止 OpenQuoteContext 构造函数内部重试阻塞调用线程
+            # (Pattern 92/94: futu-api 构造函数端口不可达时每 6 秒重试, 永久阻塞)
+            import socket
+            try:
+                _s = socket.create_connection((self.host, self.port), timeout=2)
+                _s.close()
+            except Exception as e:
+                raise ConnectionError(
+                    f"FutuOpenD 端口不可达 {self.host}:{self.port}: {e}")
             from futu import OpenQuoteContext
             self._quote_ctx = OpenQuoteContext(host=self.host, port=self.port)
             logger.info(f"Futu连接: {self.host}:{self.port}")

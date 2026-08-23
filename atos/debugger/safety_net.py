@@ -305,49 +305,11 @@ def full_health_check(account_state: dict = None) -> dict:
 # ═══════════════════════════════════════════
 
 def is_safe_to_trade() -> tuple[bool, str]:
-    """综合判断现在是否应该交易（精确DST检测）"""
-    import datetime
-    now = datetime.datetime.now(datetime.timezone.utc)
+    """综合判断现在是否应该交易。
 
-    # 周末
-    if now.weekday() >= 5:
-        return False, "周末休市"
-
-    # 精确 DST 检测:
-    # 美国 EDT 从3月第2个周日开始, 到11月第1个周日结束
-    # 规则: 3月8-14日第一个周日之后 → EDT; 11月1-7日第一个周日之后 → EST
-    year = now.year
-
-    def _nth_sunday(year, month, n):
-        """返回指定年月中第n个周日的日期"""
-        first = datetime.datetime(year, month, 1, tzinfo=datetime.timezone.utc)
-        days_until_sun = (6 - first.weekday()) % 7
-        return first + datetime.timedelta(days=days_until_sun + (n-1)*7)
-
-    dst_start = _nth_sunday(year, 3, 2)   # 3月第2个周日
-    dst_end = _nth_sunday(year, 11, 1)    # 11月第1个周日
-
-    is_dst = dst_start <= now < dst_end
-    if is_dst:
-        open_hour, close_hour = 13, 20   # EDT: 9:30AM=13:30UTC, 4PM=20:00UTC
-        tz_name = "EDT"
-    else:
-        open_hour, close_hour = 14, 21   # EST: 9:30AM=14:30UTC, 4PM=21:00UTC
-        tz_name = "EST"
-
-    # 当前 UTC 时间的时分
-    current_minutes = now.hour * 60 + now.minute
-    open_minutes = open_hour * 60 + 30   # 9:30 AM ET
-    close_minutes = close_hour * 60      # 4:00 PM ET (收盘后还有15分钟可交易)
-
-    if current_minutes < open_minutes:
-        mins_to_open = open_minutes - current_minutes
-        return False, f"盘前 ({tz_name} 距开盘{mins_to_open}分钟)"
-    if current_minutes > close_minutes:
-        return False, f"已收盘 ({tz_name})"
-
-    # 月末/季末警告
-    if now.day >= 28:
-        logger.debug("月末/季末 — 注意可能的高波动")
-
-    return True, f"交易时间 ({tz_name})"
+    Phase 5: 委派到 atos.core.market_clock (全系统单一时钟真源)。
+    原实现为手算 DST 近似规则且无假日表; market_clock 用 zoneinfo 精确 DST
+    + 2026 美股假日表 (与原 futu_bridge 实现一致)。返回 (bool, reason) 不变。
+    """
+    from atos.core.market_clock import is_market_open
+    return is_market_open()

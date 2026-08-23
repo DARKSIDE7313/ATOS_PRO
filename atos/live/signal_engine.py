@@ -201,51 +201,21 @@ def clear_cache():
 
 def _is_edt() -> bool:
     """Check if US Eastern time is currently in EDT (Daylight Saving).
-    Thread-safe via zoneinfo (no os.environ mutation)."""
-    import zoneinfo
-    try:
-        tz = zoneinfo.ZoneInfo("America/New_York")
-        now_ny = datetime.now(tz)
-        # EDT is UTC-4, EST is UTC-5. If utc_offset == -4 hours → EDT.
-        return now_ny.utcoffset().total_seconds() / 3600 == -4
-    except Exception:
-        # Fallback: use time.daylight (not thread-safe but only reached on zoneinfo failure)
-        try:
-            return time.daylight != 0
-        except Exception:
-            return False
+    Thread-safe via zoneinfo (no os.environ mutation).
+
+    Phase 5: 委派到 atos.core.market_clock (单一时钟真源)。"""
+    from atos.core.market_clock import is_edt_now
+    return is_edt_now()
 
 
 def is_nasdaq_open() -> bool:
     """判断当前时间是否在纳斯达克交易时段内（9:30AM-4:00PM ET，含DST自动侦测）。
 
-    规则：
-      - 周末（周六/周日）全天休市
-      - EDT (夏令时) = UTC-4，9:30 ET = 13:30 UTC
-      - EST (冬令时) = UTC-5，9:30 ET = 14:30 UTC
-      - 收盘时间对应 UTC: 20:00 (EDT) / 21:00 (EST)
+    Phase 5: 委派到 atos.core.market_clock.is_market_open —
+    统一为 zoneinfo 精确 DST + 2026 假日表 (原实现无假日检测)。
     """
-    from datetime import datetime, timezone
-    now_utc = datetime.now(timezone.utc)
-
-    # 周末
-    if now_utc.weekday() >= 5:
-        return False
-
-    is_edt = _is_edt()
-    if is_edt:
-        open_utc = 13  # 9:30 AM EDT = 13:30 UTC
-        close_utc = 20  # 4:00 PM EDT = 20:00 UTC
-    else:
-        open_utc = 14  # 9:30 AM EST = 14:30 UTC
-        close_utc = 21  # 4:00 PM EST = 21:00 UTC
-
-    hour, minute = now_utc.hour, now_utc.minute
-    if hour < open_utc or (hour == open_utc and minute < 30):
-        return False
-    if hour >= close_utc:
-        return False
-    return True
+    from atos.core.market_clock import is_market_open
+    return is_market_open()[0]
 
 # 兼容旧代码的导出
 UNIVERSE = {
@@ -529,6 +499,12 @@ def get_signals(symbols: list[str] = None) -> dict:
         logger.warning(f"信号计算完成: {len(results)}/{total} 只标的 ({skipped}只跳过, yfinance数据不可用)")
     else:
         logger.info(f"信号计算完成: {len(results)}/{total} 只标的")
+    # Phase 5: 信号契约审计 (§8.2 字段白名单 — 只告警不改值, 防幽灵字段再生)
+    try:
+        from atos.core.signal_schema import audit_signals
+        audit_signals(results, logger=logger)
+    except Exception:
+        pass
     return results
 
 

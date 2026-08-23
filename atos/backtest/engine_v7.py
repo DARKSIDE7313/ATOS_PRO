@@ -20,25 +20,30 @@ POOL = ['NVDA','AAPL','MSFT','GOOGL','META','AMZN','AVGO','AMD','CRM','NFLX','PL
 ALL = ['QQQ','SPY'] + POOL
 INITIAL = 300000.0
 
-t0 = time.time()
+# Phase 5: import 不再触发回测 — 数据准备/网格搜索收进函数, 仅 __main__ 执行
 data = {}
-for sym in ALL:
-    df = yf.download(sym, start='2016-01-01', end='2026-08-01', progress=False, auto_adjust=True)
-    if not df.empty:
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
-        data[sym] = df
-print(f"[{time.time()-t0:.0f}s] Downloaded {len(data)} symbols", flush=True)
-
 MOM_LBS = [21, 63, 126, 252]
-for sym in data:
-    df = data[sym]
-    df['rsi'] = 100 - 100/(1 + df['Close'].diff().clip(lower=0).rolling(14).mean()
-                              / df['Close'].diff().clip(upper=0).abs().rolling(14).mean())
-    df['ma50'] = df['Close'].rolling(50).mean()
-    df['dist_high'] = (df['Close'] / df['Close'].rolling(20).max() - 1) * 100
-    for lb in MOM_LBS:
-        df[f'mom_{lb}'] = df['Close'].pct_change(lb)
+
+def _prepare_data():
+    t0 = time.time()
+    global data
+    data = {}
+    for sym in ALL:
+        df = yf.download(sym, start='2016-01-01', end='2026-08-01', progress=False, auto_adjust=True)
+        if not df.empty:
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+            data[sym] = df
+    print(f"[{time.time()-t0:.0f}s] Downloaded {len(data)} symbols", flush=True)
+
+    for sym in data:
+        df = data[sym]
+        df['rsi'] = 100 - 100/(1 + df['Close'].diff().clip(lower=0).rolling(14).mean()
+                                  / df['Close'].diff().clip(upper=0).abs().rolling(14).mean())
+        df['ma50'] = df['Close'].rolling(50).mean()
+        df['dist_high'] = (df['Close'] / df['Close'].rolling(20).max() - 1) * 100
+        for lb in MOM_LBS:
+            df[f'mom_{lb}'] = df['Close'].pct_change(lb)
 
 def _next_open(df, dates, i):
     """M12: T+1 开盘价（消除未来函数：T 日收盘信号 -> T+1 日开盘成交）。无下一天返回 None。"""
@@ -162,42 +167,49 @@ def run(core_pct, alpha_pct, cash_pct, n_stocks, rebalance, mom_lb, w_mom):
             'fee_yr': round(total_fees / INITIAL / yrs * 100, 2), 'final': round(fv)}
 
 # SPY benchmark
-spy = data['SPY']
-spy_ret = (spy['Close'].iloc[-1] / spy['Close'].iloc[252] - 1) * 100
-spy_yrs = (len(spy) - 252) / 252
-spy_ann = ((spy['Close'].iloc[-1] / spy['Close'].iloc[252]) ** (1 / spy_yrs) - 1) * 100
-print(f"\nSPY benchmark: {spy_ann:.2f}%/yr (buy & hold)\n", flush=True)
+def main():
+    t0 = time.time()
+    _prepare_data()
+    spy = data['SPY']
+    spy_ret = (spy['Close'].iloc[-1] / spy['Close'].iloc[252] - 1) * 100
+    spy_yrs = (len(spy) - 252) / 252
+    spy_ann = ((spy['Close'].iloc[-1] / spy['Close'].iloc[252]) ** (1 / spy_yrs) - 1) * 100
+    print(f"\nSPY benchmark: {spy_ann:.2f}%/yr (buy & hold)\n", flush=True)
 
-configs = []
-for rebalance in [21, 42, 63, 126]:
-    for mom_lb in MOM_LBS:
-        for w_mom in [0.3, 0.4, 0.5, 0.6]:
-            for n_stocks in [5, 7]:
-                configs.append((rebalance, mom_lb, w_mom, n_stocks))
+    configs = []
+    for rebalance in [21, 42, 63, 126]:
+        for mom_lb in MOM_LBS:
+            for w_mom in [0.3, 0.4, 0.5, 0.6]:
+                for n_stocks in [5, 7]:
+                    configs.append((rebalance, mom_lb, w_mom, n_stocks))
 
-results = []
-t1 = time.time()
-for idx, (rb, lb, wm, ns) in enumerate(configs):
-    r = run(0.60, 0.40, 0.00, ns, rb, lb, wm)
-    results.append(r)
-    if (idx + 1) % 32 == 0:
-        print(f"  [{time.time()-t1:.0f}s] {idx+1}/{len(configs)} done", flush=True)
+    results = []
+    t1 = time.time()
+    for idx, (rb, lb, wm, ns) in enumerate(configs):
+        r = run(0.60, 0.40, 0.00, ns, rb, lb, wm)
+        results.append(r)
+        if (idx + 1) % 32 == 0:
+            print(f"  [{time.time()-t1:.0f}s] {idx+1}/{len(configs)} done", flush=True)
 
-results.sort(key=lambda x: -x['annual'])
-print(f"\n{'='*80}")
-print(f"Top 12 by annual return (SPY benchmark {spy_ann:.2f}%):")
-print(f"{'rb(d)':>6} {'mom':>4} {'wMom':>5} {'N':>3} {'Annual':>8} {'MaxDD':>7} {'Sharpe':>7} {'Fee/yr':>7} {'Final':>10}")
-print('-'*80)
-for r in results[:12]:
-    print(f"{r['rebalance']:>6} {r['mom_lb']:>4} {r['w_mom']:>5.2f} {r['n_stocks']:>3} "
-          f"{r['annual']:>7.2f}% {r['max_dd']:>6.1f}% {r['sharpe']:>7.2f} {r['fee_yr']:>6.2f}% {r['final']:>10,}")
+    results.sort(key=lambda x: -x['annual'])
+    print(f"\n{'='*80}")
+    print(f"Top 12 by annual return (SPY benchmark {spy_ann:.2f}%):")
+    print(f"{'rb(d)':>6} {'mom':>4} {'wMom':>5} {'N':>3} {'Annual':>8} {'MaxDD':>7} {'Sharpe':>7} {'Fee/yr':>7} {'Final':>10}")
+    print('-'*80)
+    for r in results[:12]:
+        print(f"{r['rebalance']:>6} {r['mom_lb']:>4} {r['w_mom']:>5.2f} {r['n_stocks']:>3} "
+              f"{r['annual']:>7.2f}% {r['max_dd']:>6.1f}% {r['sharpe']:>7.2f} {r['fee_yr']:>6.2f}% {r['final']:>10,}")
 
-# current v28i baseline for comparison
-base = [r for r in results if r['rebalance'] == 63 and r['mom_lb'] == 21 and abs(r['w_mom'] - 0.4) < 0.001 and r['n_stocks'] == 5]
-print(f"\nCurrent v28i baseline (63d/21d/0.4/5): {base[0]['annual'] if base else 'N/A'}%/yr")
+    # current v28i baseline for comparison
+    base = [r for r in results if r['rebalance'] == 63 and r['mom_lb'] == 21 and abs(r['w_mom'] - 0.4) < 0.001 and r['n_stocks'] == 5]
+    print(f"\nCurrent v28i baseline (63d/21d/0.4/5): {base[0]['annual'] if base else 'N/A'}%/yr")
 
-out = {'timestamp': str(pd.Timestamp.now()), 'spy_annual': round(spy_ann, 2),
-       'results': results, 'n_configs': len(configs)}
-with open(os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'backtest_v7_result.json'), 'w') as f:
-    json.dump(out, f, indent=2, default=str)
-print(f"\nSaved data/backtest_v7_result.json ({len(configs)} configs, {time.time()-t0:.0f}s total)")
+    out = {'timestamp': str(pd.Timestamp.now()), 'spy_annual': round(spy_ann, 2),
+           'results': results, 'n_configs': len(configs)}
+    with open(os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'backtest_v7_result.json'), 'w') as f:
+        json.dump(out, f, indent=2, default=str)
+    print(f"\nSaved data/backtest_v7_result.json ({len(configs)} configs, {time.time()-t0:.0f}s total)")
+
+
+if __name__ == '__main__':
+    main()

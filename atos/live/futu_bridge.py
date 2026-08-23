@@ -91,74 +91,13 @@ def translate_error(error_code: int, default_msg: str = "") -> str:
 
 
 # ========== 4. 交易时间（含夏令时） ==========
-
-# 美股假日（2026年）
-US_HOLIDAYS_2026 = {
-    datetime.date(2026, 1, 1):   "元旦",
-    datetime.date(2026, 1, 19):  "马丁路德金日",
-    datetime.date(2026, 2, 16):  "总统日",
-    datetime.date(2026, 4, 3):   "耶稣受难日",
-    datetime.date(2026, 5, 25):  "阵亡将士纪念日",
-    datetime.date(2026, 6, 19):  "六月节",
-    datetime.date(2026, 7, 3):   "独立日(观察)",
-    datetime.date(2026, 9, 7):   "劳动节",
-    datetime.date(2026, 11, 26): "感恩节",
-    datetime.date(2026, 12, 25): "圣诞节",
-    # 半天交易日（1pm收盘）
-    datetime.date(2026, 11, 27): "黑色星期五(半天)",
-    datetime.date(2026, 12, 24): "圣诞前夕(半天)",
-}
-
-
-def _is_edt_now() -> bool:
-    """判断当前是否为美国东部夏令时 (EDT) — 线程安全（zoneinfo，不修改全局 TZ）"""
-    from zoneinfo import ZoneInfo
-    try:
-        now_ny = datetime.datetime.now(ZoneInfo("America/New_York"))
-        # EDT 期间 dst() 返回 1 小时，EST 返回 0；bool(timedelta) 直接给出判断
-        return bool(now_ny.dst())
-    except Exception:
-        return False
-
-
-def is_market_open() -> tuple[bool, str]:
-    """
-    检查美股是否在交易（自动识别夏令时/冬令时）。
-    返回 (是否开市, 原因说明)
-    """
-    now = datetime.datetime.now(datetime.timezone.utc)
-    from zoneinfo import ZoneInfo
-    ny_now = now.astimezone(ZoneInfo("America/New_York"))
-    today = ny_now.date()  # M3: 用美东日期判断假日/周末（而非 UTC 日期）
-
-    # 周末（美东时间）
-    if ny_now.weekday() >= 5:
-        return False, "周末休市"
-
-    # 假日（美东日期）
-    if today in US_HOLIDAYS_2026:
-        return False, f"假日休市: {US_HOLIDAYS_2026[today]}"
-
-    # EDT (夏令时 3月-11月): 开盘 13:30 UTC, 收盘 20:00 UTC
-    # EST (冬令时): 开盘 14:30 UTC, 收盘 21:00 UTC
-    is_edt = _is_edt_now()
-    open_hour, close_hour = (13, 20) if is_edt else (14, 21)
-
-    # 半天交易日
-    half_day = US_HOLIDAYS_2026.get(today, "")
-    if "半天" in half_day:
-        open_t = now.replace(hour=open_hour, minute=30, second=0)
-        close_t = now.replace(hour=open_hour + 4, minute=0, second=0)  # 1pm local
-    else:
-        open_t = now.replace(hour=open_hour, minute=30, second=0)   # 9:30am local
-        close_t = now.replace(hour=close_hour, minute=0, second=0)   # 4:00pm local
-
-    if now < open_t:
-        return False, f"盘前 (距开盘 {(open_t - now).seconds // 60} 分钟)"
-    if now > close_t:
-        return False, "已收盘"
-
-    return True, "正常交易"
+# Phase 5: 时钟实现已上移至 atos/core/market_clock.py (全系统单一真源)。
+# 此处保留同名常量/函数作为兼容委派 — 签名与返回值完全不变。
+from atos.core.market_clock import (  # noqa: F401  (re-export)
+    US_HOLIDAYS_2026,
+    is_edt_now as _is_edt_now,
+    is_market_open,
+)
 
 
 # ========== 5. FutuOpenD 健康检查 ==========
@@ -229,6 +168,14 @@ def safe_place_order(ticker: str, side: str, quantity: int,
         trd_side = TrdSide.BUY if side == "BUY" else TrdSide.SELL
         symbol = f"US.{ticker}"
 
+        # H7: TCP 预检查 — 防止 OpenSecTradeContext 构造函数内部重试阻塞调用线程
+        # (Pattern 92/94: futu-api 构造函数端口不可达时每 6 秒重试, 永久阻塞)
+        try:
+            _s = socket.create_connection((host, port), timeout=2)
+            _s.close()
+        except Exception as _e:
+            return {"success": False, "error": f"FutuOpenD 端口不可达 {host}:{port}: {_e}"}
+
         ctx = OpenSecTradeContext(
             filter_trdmarket=TrdMarket.US,
             host=host, port=port,
@@ -291,6 +238,12 @@ def sync_positions(account_positions: list[dict],
     """
     try:
         from futu import OpenSecTradeContext, TrdMarket, TrdEnv, SecurityFirm, RET_OK
+        # H7: TCP 预检查 — 防止 OpenSecTradeContext 构造函数内部重试阻塞 (Pattern 92/94)
+        try:
+            _s = socket.create_connection((host, port), timeout=2)
+            _s.close()
+        except Exception as _e:
+            return {"synced": False, "error": f"FutuOpenD 端口不可达 {host}:{port}: {_e}"}
         ctx = OpenSecTradeContext(
             filter_trdmarket=TrdMarket.US,
             host=host, port=port,

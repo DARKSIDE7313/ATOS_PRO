@@ -226,13 +226,13 @@ OPTIMIZER_ROUND_TEMPLATE = """## 策略配置
 
 def _call_llm(prompt: str, temperature: float = 0.7) -> str:
     """调用 DeepSeek API"""
-    from atos.ai.engine_v5 import _call_deepseek
+    from atos.ai.legacy.engine_v5 import _call_deepseek
     return _call_deepseek(OPTIMIZER_SYSTEM_PROMPT, prompt, temperature=temperature, timeout=90)
 
 
 def _extract_json(text: str) -> List[Dict]:
     """从 LLM 输出提取 JSON 数组"""
-    from atos.ai.engine_v5 import _extract_json as engine_extract_json
+    from atos.ai.legacy.engine_v5 import _extract_json as engine_extract_json
     text = text.strip()
     # 尝试直接解析
     try:

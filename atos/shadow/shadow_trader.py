@@ -8,6 +8,21 @@ ATOS PRO v3 — Shadow Trader（影子交易，完全重写版）
   4. 冷却期全覆盖 → 任何卖出都触发冷却
   5. 闭市后只做风控，不开仓
 
+Phase 5 框架重塑 (2026-08-22):
+  本文件从 2059 行上帝对象拆分为 **纯编排层**，职责实现全部下沉到
+  atos/shadow/ 子模块 (均可独立测试):
+    account.py         — ShadowAccount 账户领域对象 (execute 强制过风控门)
+    state_store.py     — shadow_state.json 平铺 schema 唯一构造/读写点
+    market_data.py     — SPY/VIX 缓存 + SPY 趋势分级
+    cycle_state.py     — CycleState 跨周期状态单例 (替代函数属性缓存)
+    strategy_v28.py    — v29 QQQ Core+Alpha 策略 + is_v28_position 单一隔离判定
+    risk_loop.py       — 风控阶段全部卖出规则集群
+    decision_layers.py — 质量门控 / 情报简报 / AI v6 建议
+    ic_feedback.py     — IC 反馈环
+    equity_tracker.py  — 周期结算 / 绩效 / day_changes 数据桥
+  本文件仅保留: run_shadow_cycle (周期编排) + _finalize_cycle (结算编排)
+  + main (进程入口)。顶部 re-export 保持对旧导入路径的完全兼容。
+
 交易流程：
   信号 → 因子排名 → 风控过滤 → AI否决 → 执行
                       ↓
@@ -48,7 +63,34 @@ from atos.debugger.safety_net import (
 from atos.market.regime_gate import evaluate_regime_gate
 from atos.longterm.serenity import get_chokepoint_candidates
 from atos.scheduler import start_scheduler, stop_scheduler, signal_queue
-from atos.config_shared import ALLOCATION
+
+# ── Phase 5: 拆分后的子模块 ──
+from atos.shadow.account import ShadowAccount
+from atos.shadow.state_store import (
+    build_state_dict, save_account_state, save_emergency_state,
+    load_saved_state, get_state_file_path,
+)
+from atos.shadow.market_data import get_market_data_cached, compute_spy_trend
+from atos.shadow.cycle_state import CycleState
+from atos.shadow.strategy_v28 import (
+    V28_ALPHA_UNIVERSE, V28_CORE_PCT, V28_ALPHA_COUNT, V28_REBALANCE_DAYS,
+    V28_STOP_LOSS, V28_TRAILING_STOP, V28_QQQ_TRAILING,
+    is_v28_position, _v28_qqq_core_alpha,
+)
+from atos.shadow.risk_loop import run_risk_phase
+from atos.shadow.decision_layers import (
+    compute_quality_gate, fetch_intel_briefing, run_ai_counsel,
+)
+from atos.shadow.ic_feedback import run_ic_feedback
+from atos.shadow.equity_tracker import (
+    compute_cycle_return, record_cycle_equity, update_perf_tracker,
+    record_daily_returns, write_day_changes,
+)
+from atos.core.position_schema import normalize_positions
+
+# ── 兼容旧导入路径的别名 (外部代码零改动) ──
+_save_account_state = save_account_state
+_get_market_data_cached = get_market_data_cached
 
 # ── Vibe Bridge 安全导入（atos/vibe_bridge.py 已删除，用 layers 替代）──
 def is_vibe_alive() -> bool:
@@ -59,7 +101,7 @@ def is_vibe_alive() -> bool:
     except Exception:
         return False
 
-def run_swarm_research(symbols: list, goal: str = "") -> dict | None:
+def run_swarm_research(symbols: list, goal: str = ""):
     try:
         from atos.layers.vibe_bridge import VibeBridge
         import asyncio
@@ -75,479 +117,16 @@ def run_swarm_research(symbols: list, goal: str = "") -> dict | None:
 # 全局交易成本参数（必须跑赢大盘 + 手续费的核心）
 # ============================================================
 import yfinance as yf
-import pandas as pd
-import numpy as np
 
 logger = get_logger("shadow_trader")
 
 
 # ============================================================
-# 缓存层
-# ============================================================
-_spy_cache = None
-_vix_cache = None
-_cache_ts = None
-_CACHE_TTL_MINUTES = 10  # 10分钟缓存
-
-
-def _get_market_data_cached():
-    """缓存SPY/VIX数据（中国大陆优化：Futu优先）"""
-    global _spy_cache, _vix_cache, _cache_ts
-    now = datetime.datetime.now()
-    if _spy_cache is not None and _vix_cache is not None and _cache_ts is not None:
-        if (now - _cache_ts).total_seconds() < _CACHE_TTL_MINUTES * 60:
-            return _spy_cache, _vix_cache
-
-    # 🆕 优先用Futu历史数据（中国大陆不被墙）
-    try:
-        from atos.data.futu_historical import get_spy_vix_data
-        spy, vix = get_spy_vix_data()
-        if spy is not None and not spy.empty and len(spy) >= 50:
-            _spy_cache, _vix_cache, _cache_ts = spy, vix, now
-            return spy, vix
-    except Exception:
-        pass
-
-    # Fallback to yfinance
-    try:
-        spy = yf.download("SPY", period="1y", interval="1d", progress=False, auto_adjust=True, timeout=15)
-        vix = yf.download("^VIX", period="1y", interval="1d", progress=False, auto_adjust=True, timeout=15)
-    except Exception:
-        spy, vix = pd.DataFrame(), pd.DataFrame()
-
-    _spy_cache, _vix_cache, _cache_ts = spy, vix, now
-    return spy, vix
-
-
-# ============================================================
-# 模拟账户
-# ============================================================
-class ShadowAccount:
-    """本地模拟账户"""
-
-    def __init__(self, initial_cash: float = 1000000.0):
-        self.initial_cash = initial_cash
-        self.cash = initial_cash
-        self.positions = {}            # {symbol: {qty, avg_price, last_price, decision_id}}
-        self.trade_history = []
-        self.cycle_returns = []
-        self.trailing_stops = {}       # {symbol: TrailingStop}
-        self.cycle_count = 0
-        self.prev_equity = initial_cash
-        self.commission_per_share = 0.005
-        self.min_commission = 1.0
-        self.slippage_pct = 0.001      # 0.1%
-        self.stop_loss_blacklist = {}  # {symbol: sell_cycle} — 任何卖出都加入
-        self.strategy_decay_factor = 1.0
-        self.peak_equity = initial_cash
-        self.equity_history = []
-        self._last_ai_cycle = 0        # 上次AI运行的周期
-        self._max_positions_override = None  # M6: AI 降仓时的仓位上限覆盖（可写）
-
-    # ---- 冷却期 ----
-    def is_cooling_off(self, symbol: str) -> bool:
-        """检查冷却期（任何卖出都会触发，不仅仅是止损）。
-        
-        BUGFIX P2 2026-06-12: 使用真实的动态冷却长度判断。
-        """
-        if symbol in self.stop_loss_blacklist:
-            entry = self.stop_loss_blacklist[symbol]
-            if isinstance(entry, dict):
-                sold_cycle = entry.get("sold_cycle", 0)
-                cooldown = entry.get("cooldown", COOLDOWN_CYCLES)
-            else:
-                # 兼容旧格式（纯整数）
-                sold_cycle = entry
-                cooldown = COOLDOWN_CYCLES
-                # 升级为新格式
-                self.stop_loss_blacklist[symbol] = {
-                    "sold_cycle": sold_cycle,
-                    "cooldown": cooldown,
-                }
-            if self.cycle_count - sold_cycle < cooldown:
-                return True
-            else:
-                del self.stop_loss_blacklist[symbol]
-        return False
-
-    def add_to_blacklist(self, symbol: str):
-        """任何卖出都加入冷却黑名单。
-        
-        BUGFIX P2 2026-06-12: 存储 sold_cycle + 真实 cooldown 长度。
-        之前只存了 cycle_count，比较时仍然用的固定 COOLDOWN_CYCLES，
-        导致动态冷却实际没生效。
-        """
-        vol_mult = 1.0
-        try:
-            if hasattr(self, 'positions') and symbol in self.positions:
-                pos = self.positions[symbol]
-                lp = pos.get("last_price", pos.get("avg_price", 0))
-                atr_val = pos.get("atr", 0)
-                if atr_val > 0 and lp > 0:
-                    daily_vol = atr_val / lp
-                    if daily_vol > 0.03:
-                        vol_mult = 1.5
-                    elif daily_vol < 0.01:
-                        vol_mult = 0.7
-        except Exception:
-            pass
-        
-        dynamic_cooldown = min(int(COOLDOWN_CYCLES * vol_mult), 12)  # Fix: 上限12周期≈1小时
-        self.stop_loss_blacklist[symbol] = {
-            "sold_cycle": self.cycle_count,
-            "cooldown": dynamic_cooldown,
-        }
-        logger.info(f"🔒 冷却: {symbol} → 禁止买入至周期#{self.cycle_count + dynamic_cooldown} (波动率系数×{vol_mult:.1f})")
-
-    def clean_blacklist(self):
-        """清理过期条目（按真实 cooldown 判断）"""
-        expired = []
-        for s, entry in self.stop_loss_blacklist.items():
-            if isinstance(entry, dict):
-                sold = entry.get("sold_cycle", 0)
-                cd = entry.get("cooldown", COOLDOWN_CYCLES)
-            else:
-                sold = entry
-                cd = COOLDOWN_CYCLES
-            if self.cycle_count - sold >= cd:
-                expired.append(s)
-        for s in expired:
-            del self.stop_loss_blacklist[s]
-
-    # ---- 属性 ----
-    @property
-    def total_equity(self) -> float:
-        """计算总权益 — 防御 NaN 污染"""
-        pos_val = 0.0
-        for p in self.positions.values():
-            lp = p.get("last_price", p.get("avg_price", 0))
-            qty = p.get("shares", p.get("qty", p.get("quantity", 0)))  # Fix: 兼容 shares/qty/quantity 三个键名
-            # 防御 nan / None / 负数
-            if lp is None: lp = 0
-            if isinstance(lp, float) and math.isnan(lp):
-                lp = p.get("avg_price", 0)
-            if lp is None: lp = 0
-            if isinstance(lp, float) and math.isnan(lp):
-                lp = 0
-            if lp <= 0:
-                ap = p.get("avg_price", 0)
-                lp = ap if ap and (isinstance(ap, float) and not math.isnan(ap)) else 0
-            if lp <= 0:
-                lp = 0
-            pos_val += qty * lp
-        return self.cash + pos_val
-
-    @property
-    def position_list(self) -> list:
-        result = []
-        for sym, p in self.positions.items():
-            qty = p.get("shares", p.get("qty", p.get("quantity", 0)))  # Fix: 兼容多键名
-            last = p.get("last_price", p["avg_price"])
-            pnl_pct = (last - p["avg_price"]) / p["avg_price"] if p["avg_price"] > 0 else 0
-            result.append({
-                "symbol": sym, "qty": qty, "avg_price": p["avg_price"],
-                "last": last, "mkt_val": last * qty,
-                "pnl_pct": round(pnl_pct, 4),
-            })
-        return result
-
-    @property
-    def mode(self) -> str:
-        t = self.total_equity
-        if t < 50000: return "VERY_AGGRESSIVE"
-        elif t < 200000: return "AGGRESSIVE"
-        elif t < 500000: return "MODERATE"
-        return "CONSERVATIVE"
-
-    # Bug #7 注释: mode 名称反映风险偏好而非仓位数量。
-    # VERY_AGGRESSIVE(3仓)=资金极少时只能集中火力, AGGRESSIVE(15仓)=有资金后可以分散,
-    # MODERATE(8仓)=适中, CONSERVATIVE(10仓)=大资金但适度分散保持流动性。
-    @property
-    def max_positions(self) -> int:
-        # M6: AI 降仓可动态覆盖（可写属性），否则按 mode 返回默认值
-        if self._max_positions_override is not None:
-            return self._max_positions_override
-        return {"VERY_AGGRESSIVE": 3, "AGGRESSIVE": 15, "MODERATE": 12, "CONSERVATIVE": 15}[self.mode]
-
-    @max_positions.setter
-    def max_positions(self, value: int):
-        self._max_positions_override = max(1, int(value))
-
-    @property
-    def max_single_pct(self) -> float:
-        return 0.12          # v19: 单仓上限 12%（从 20% 降低，专业基金标准 ≤12%，
-                              # 防止单票黑天鹅事件造成过度集中损失）
-
-    # v28: ETF 单仓上限（QQQ/SPY 是分散化ETF，不是单票）
-    ETF_MAX_PCT = 0.65       # QQQ 可以到 65%
-
-    @property
-    def min_cash_pct(self) -> float:
-        return 0.02  # v28: 满仓策略，最低现金 2%
-
-    def get_state(self) -> dict:
-        pos_val = sum(
-            p.get("shares", p.get("qty", 0)) * p.get("last_price", p.get("avg_price", 0))
-            for p in self.positions.values()
-        )
-        return {
-            "total": self.total_equity,
-            "cash": self.cash,
-            "mkt_val": pos_val,
-            "mode": self.mode,
-            "max_positions": self.max_positions,
-            "alloc": {"short_pct": 0.2, "long_pct": 0.7, "cash_pct": 0.1},
-            "positions": self.position_list,
-            "constraints": {
-                "max_single_pct": self.max_single_pct,
-                "short_budget": self.total_equity * 0.2,
-                "long_budget": self.total_equity * 0.7,
-                "min_cash": self.total_equity * self.min_cash_pct,
-            },
-        }
-
-    def update_prices(self, signals: dict):
-        """更新持仓价格 — 强制防御 NaN"""
-        for sym, p in self.positions.items():
-            if sym in signals:
-                px = signals[sym].get("price", None)
-                # 防御 nan：px 必须是 > 0 的数字
-                if px is None or not isinstance(px, (int, float)):
-                    continue
-                if isinstance(px, float) and math.isnan(px):
-                    continue
-                if px <= 0:
-                    continue
-                p["last_price"] = px
-                # Fix #10: 存储 ATR 供滑点计算
-                atr = signals[sym].get("atr", 0)
-                if atr > 0:
-                    p["atr"] = atr
-
-    # ---- 执行 ----
-    def execute(self, symbol: str, action: str, shares: int,
-                price: float, reason: str = "", ai_decision_id: int = 0) -> bool:
-        """执行交易（带完整安全检查 + 风控记录）
-
-        v29 Institutional: 所有订单强制经过 Pre-Trade Risk Gate。
-        没有任何代码路径可以绕过风控门 (规格书 §8)。
-        """
-        if shares <= 0 or not symbol or not isinstance(symbol, str):
-            return False
-        if safe_price(price) is None:
-            return False
-        if shares > 100000:
-            logger.error(f"数量异常: {shares}股")
-            return False
-
-        # ═══ v29: PRE-TRADE RISK GATE — 不可绕过 ═══
-        try:
-            from atos.core.risk_gate import get_gate, OrderIntent
-            intent = OrderIntent(
-                symbol=symbol, side=action, quantity=int(shares),
-                price=float(price), reason=reason,
-                strategy_id="v28" if reason.startswith("v28") else "legacy",
-            )
-            decision = get_gate().check(intent, self)
-            if decision.decision == "REJECT":
-                logger.warning(f"🛡️ 风控门拒绝: {action} {symbol} {shares}股 | {decision.reasons}")
-                return False
-            if decision.approved_quantity < shares:
-                logger.info(f"🛡️ 风控门减量: {symbol} {shares}→{decision.approved_quantity}股 | {decision.reasons}")
-                shares = decision.approved_quantity
-                if shares <= 0:
-                    return False
-        except Exception as e:
-            # fail closed: 风控门异常 = 拒绝交易
-            logger.error(f"🛡️ 风控门异常 (fail closed): {e}")
-            return False
-
-        # v28: 跳过冷却和重复检查（v28 是季度再平衡策略，不需要这些限制）
-        _is_v28 = reason.startswith("v28")
-        if not _is_v28 and is_duplicate_order(symbol, action, shares):
-            return False
-
-        # BUGFIX P1: 执行层冷却拦截 — 任何 BUY/ADD 先查冷却
-        if not _is_v28 and action in ("BUY", "ADD") and self.is_cooling_off(symbol):
-            logger.debug(f"🚫 冷却拦截: {action} {symbol} (执行层)")
-            return False
-
-        # 硬性现金下限
-        if action == "BUY":
-            min_cash = self.total_equity * self.min_cash_pct
-            try:
-                from atos.core.fee_model import futu_buy_fee
-                estimated_cost = price * shares + futu_buy_fee(shares, price)
-            except ImportError:
-                estimated_cost = price * shares + max(self.min_commission, shares * self.commission_per_share)
-            if self.cash - estimated_cost < min_cash:
-                affordable = int((self.cash - min_cash) / (price * 1.001))
-                if affordable <= 0:
-                    return False
-                shares = affordable
-
-        # 单仓上限（硬约束，不允许超过）
-        # v28: ETF (QQQ/SPY/TLT/GLD/IWM) 用更高的上限 — ETF 是分散化的
-        _ETF_SYMBOLS = {"QQQ", "SPY", "TLT", "GLD", "IWM", "SLV", "USO", "IBB"}
-        if symbol in _ETF_SYMBOLS:
-            max_single_val = self.total_equity * self.ETF_MAX_PCT
-        else:
-            max_single_val = self.total_equity * self.max_single_pct
-        current_val = self.positions[symbol].get("qty", self.positions[symbol].get("shares", 0)) * price if symbol in self.positions else 0
-        max_buy = max_single_val - current_val
-        if max_buy <= 0 and action == "BUY":
-            logger.debug(f"  {symbol} 已达单仓上限 (${max_single_val:,.0f})")
-            return False
-
-        # 总仓位上限（v28: 满仓策略 98%，留 2% 现金缓冲）
-        if action == "BUY" or action == "ADD":
-            total_pos_val = sum(p.get("qty", p.get("shares", 0)) * (p.get("last_price", p["avg_price"])) for p in self.positions.values())
-            estimated_buy = price * shares
-            max_total_pos = self.total_equity * 0.98
-            if total_pos_val + estimated_buy > max_total_pos:
-                available = max_total_pos - total_pos_val
-                if available <= 0:
-                    logger.debug(f"  总仓位已满 (${total_pos_val:,.0f}/${max_total_pos:,.0f})")
-                    return False
-                estimated_shares = max(1, int(available / price))
-                if estimated_shares < shares:
-                    shares = estimated_shares
-
-        # 滑点 — Fix #10: 动态滑点，基于波动率
-        daily_vol = 0.005
-        if symbol in self.positions:
-            atr_val = self.positions[symbol].get("atr", 0)
-            if atr_val > 0 and price > 0:
-                daily_vol = atr_val / price
-        dynamic_slip = max(0.0005, min(0.005, daily_vol * 0.25))
-        slip = price * dynamic_slip
-        fill = price + slip if action == "BUY" else price - slip
-        # v28: Futu 真实费用模型
-        try:
-            from atos.core.fee_model import futu_buy_fee, futu_sell_fee
-            comm = futu_buy_fee(shares, fill) if action == "BUY" else futu_sell_fee(shares, fill)
-        except ImportError:
-            comm = max(self.min_commission, shares * self.commission_per_share)
-        pnl = 0.0  # Fix: 声明在外层，log_trade 可以访问
-
-        if action == "BUY":
-            buy_val = fill * shares
-            max_buy_val = max_single_val - current_val
-            if buy_val > max_buy_val:
-                shares = max(1, int(max_buy_val / fill))
-            if shares <= 0:
-                return False
-
-            cost = fill * shares + comm
-            if cost > self.cash:
-                affordable = max(1, int((self.cash - self.min_commission) / fill))
-                if affordable <= 0:
-                    return False
-                shares = affordable
-                cost = fill * shares + comm
-
-            self.cash -= cost
-            if symbol in self.positions:
-                old = self.positions[symbol]
-                old_shares = old.get("shares", old.get("qty", 0))
-                total_qty = old_shares + shares
-                old_cost = old_shares * old["avg_price"]
-                self.positions[symbol] = {
-                    "shares": total_qty, "qty": total_qty,
-                    "avg_price": (old_cost + fill * shares) / total_qty,
-                    "last_price": fill,
-                    "ai_decision_id": ai_decision_id or old.get("ai_decision_id", 0),
-                    "buy_time": old.get("buy_time", datetime.datetime.now().isoformat()),
-                }
-            else:
-                self.positions[symbol] = {"shares": shares, "qty": shares, "avg_price": fill, "last_price": fill,
-                                          "ai_decision_id": ai_decision_id,  # v19: 追踪AI决策
-                                          "buy_time": datetime.datetime.now().isoformat()}  # v17: Triple-Barrier时间追踪
-
-            self.trade_history.append({
-                "date": datetime.datetime.now().isoformat(),
-                "symbol": symbol, "action": action, "shares": shares,
-                "price": round(fill, 2), "pnl": 0, "pnl_pct": 0,
-                "reason": reason,
-                "source": "factor_engine",
-            })
-
-        elif action == "SELL":
-            if symbol not in self.positions:
-                return False
-            pos = self.positions[symbol]
-            actual_qty = pos.get("shares", pos.get("qty", 0))  # Fix: 用实际持仓量
-            if actual_qty < shares:
-                shares = actual_qty
-
-            pnl = (fill - pos["avg_price"]) * shares
-            pnl_pct = (fill - pos["avg_price"]) / pos["avg_price"] if pos["avg_price"] > 0 else 0
-            self.cash += fill * shares - comm
-
-            # 记录风控
-            record_fill(pnl, self.total_equity)
-
-            # 保存到 trade_stats 供 Kelly 学习
-            try:
-                from atos.live.kelly import save_trade
-                result = save_trade(pnl_pct)
-                logger.info(f"[Kelly] 交易记录: {symbol} PnL={pnl_pct:.2%} total_trades={result.get('total_trades',0)} WR={result.get('win_rate',0):.1%}")
-            except Exception as e:
-                logger.warning(f"[Kelly] save_trade failed: {e}")
-
-            pos["qty"] -= shares
-            pos["shares"] = pos["qty"]  # Fix: 同步 shares 键
-
-            # v19 Fix: 反馈闭环 — 根据持仓中记录的AI决策ID追踪结果
-            try:
-                from atos.ai.memory import record_outcome
-                outcome = "WIN" if pnl > 0 else ("LOSS" if pnl < 0 else "BREAKEVEN")
-                # 从持仓数据中获取AI决策ID（买入时记录的）
-                decision_id = pos.get("ai_decision_id", 0) if isinstance(pos, dict) else 0
-                if decision_id > 0:
-                    record_outcome(decision_id, outcome, pnl_pct, 0, reason)
-                    logger.info(f"[AI追踪] #{decision_id} → {outcome} PnL={pnl_pct:.2%}")
-            except Exception:
-                pass
-
-            if pos["qty"] <= 0:
-                del self.positions[symbol]
-                if symbol in self.trailing_stops:
-                    del self.trailing_stops[symbol]
-
-            self.trade_history.append({
-                "date": datetime.datetime.now().isoformat(),
-                "symbol": symbol, "action": action, "shares": shares,
-                "price": round(fill, 2), "pnl": round(pnl, 2),
-                "pnl_pct": round(pnl_pct, 4),
-                "reason": reason,
-            })
-
-            # v3: 任何卖出都触发冷却期
-            self.add_to_blacklist(symbol)
-
-        elif action == "ADD":
-            # 加仓：按比例增持，但不超过单仓上限
-            target_val = self.total_equity * 0.03  # 每次加仓3%
-            add_val = min(target_val, max_buy, self.cash - self.total_equity * self.min_cash_pct)
-            if add_val < price * 1.001:
-                return False
-            add_shares = max(1, int(add_val / fill))
-            if add_shares <= 0:
-                return False
-            return self.execute(symbol, "BUY", add_shares, price, reason)
-
-        log_trade(symbol, action, shares, price, pnl=pnl, reason=reason)
-        # P0 修复: 每次成交后立即保存状态 (防止中断丢失)
-        _save_account_state(self)  # Fix: self 就是 account，execute() 是 ShadowAccount 的方法
-        return True
-
-
-# ============================================================
-# 主交易循环
+# 主交易循环 — 周期编排
 # ============================================================
 def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
-    """影子交易周期（重写版）"""
+    """影子交易周期（重写版）— Phase 5: 纯编排, 实现下沉至子模块"""
+    state = CycleState.get()
     account.cycle_count += 1
     reset_cycle()
     logger.info(f"Cycle {cycle} (#{account.cycle_count}) | "
@@ -575,23 +154,7 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
         logger.critical("🚨 紧急停止文件 /tmp/atos_EMERGENCY_STOP 存在 — 跳过所有交易并退出")
         # 保存最终状态
         try:
-            save_state_path = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                "..", "data", "shadow_state.json")
-            state = {
-                "initial_cash": account.initial_cash,
-                "cash": account.cash,
-                "positions": account.positions,
-                "cycle_count": account.cycle_count,
-                "equity": account.total_equity,
-                "peak_equity": account.peak_equity,
-                "drawdown": round((account.peak_equity - account.total_equity) / account.peak_equity, 6) if account.peak_equity > 0 else 0,
-                "stopped_at": datetime.datetime.now().isoformat(),
-                "reason": "EMERGENCY_STOP",
-            }
-            os.makedirs(os.path.dirname(save_state_path), exist_ok=True)
-            with open(save_state_path, "w") as f:
-                json.dump(state, f, indent=2)
+            save_emergency_state(account, reason="EMERGENCY_STOP")
         except Exception:
             pass
         sys.exit(0)
@@ -639,21 +202,20 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
 
     # ---- v26: 定时抓取新闻情绪（每30分钟一次）----
     import time as _time
-    _last_news = getattr(run_shadow_cycle, '_last_news_fetch', 0)
-    if _time.time() - _last_news > 1800:  # 30分钟
+    if _time.time() - state.last_news_fetch > 1800:  # 30分钟
         try:
             from atos.news.sentiment_engine import refresh_news
             refresh_news()
-            run_shadow_cycle._last_news_fetch = _time.time()
+            state.last_news_fetch = _time.time()
         except Exception as e:
             logger.warning(f"📰 新闻抓取失败: {e}")
 
     # ---- 1. 市场状态 ----
-    spy, vix = _get_market_data_cached()
+    spy, vix = get_market_data_cached()
     # RegimeEngine 持久化实例（避免每次重建导致学习数据丢失）
-    if not hasattr(run_shadow_cycle, '_regime_engine'):
-        run_shadow_cycle._regime_engine = RegimeEngine()
-    engine = run_shadow_cycle._regime_engine
+    if state.regime_engine is None:
+        state.regime_engine = RegimeEngine()
+    engine = state.regime_engine
     # 先清除旧数据再用新数据填充（确保数据是最新的）
     # 基础级: 保留最近 500 个点的滚动窗口，不丢失学习数据
     spy_c = spy["Close"].squeeze().tolist()
@@ -671,37 +233,7 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
                 f"{'📈 交易时段' if is_market_hours else '🏁 闭市'}")
 
     # SPY趋势过滤
-    spy_trend = "BULL"  # Default optimistic
-    try:
-        spy_close_raw = spy["Close"]
-        if isinstance(spy_close_raw, pd.DataFrame):
-            spy_close = spy_close_raw.squeeze()
-        else:
-            spy_close = spy_close_raw
-
-        # Convert to numpy, drop NaN
-        spy_vals = spy_close.dropna().values
-        if len(spy_vals) < 20:
-            raise ValueError(f"SPY数据不足 ({len(spy_vals)}根有效K线)")
-
-        spy_current = float(spy_vals[-1])
-        spy_ma20 = float(np.mean(spy_vals[-20:]))
-        spy_ma50 = float(np.mean(spy_vals[-50:])) if len(spy_vals) >= 50 else spy_ma20
-
-        # 🏦 v22: 放宽 BULL 判断 — 价格高于 MA20 即是牛市，不要求 >2%
-        if spy_current < spy_ma20 and spy_current < spy_ma50 and spy_ma20 < spy_ma50:
-            spy_trend = "BEAR"
-            logger.warning(f"🐻 SPY死叉: ${spy_current:.0f} < MA20=${spy_ma20:.0f} < MA50=${spy_ma50:.0f}")
-        elif spy_current < spy_ma20 * 0.98:
-            spy_trend = "CAUTIOUS"
-            logger.info(f"🟡 SPY谨慎: ${spy_current:.0f} < MA20*0.98=${spy_ma20*0.98:.0f}")
-        elif spy_current > spy_ma20:
-            spy_trend = "BULL"
-        else:
-            spy_trend = "BULL"  # 默认乐观 — 轻微低于MA20不算谨慎
-    except Exception as e:
-        spy_trend = "UNKNOWN"
-        logger.warning(f"SPY趋势分析失败 → 降级UNKNOWN: {e}")
+    spy_trend = compute_spy_trend(spy)
 
     # 🆕 v4: RGVH 风格宏观门控（3独立过滤器）
     try:
@@ -756,9 +288,8 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
         factor_result = combine(signals, v, m, q, regime["regime"], use_v3_signals=True)
         top_picks = get_top_picks(factor_result, n=10)
         # v27: IC方向自适应 — 负IC时不反转选股(避免选到垃圾股)，而是标记降仓
-        _ic_neg = getattr(run_shadow_cycle, '_ic_inverted', False)
-        if _ic_neg:
-            logger.info(f"⚠️ IC负值({getattr(run_shadow_cycle, '_ic_ema', 0):.3f}) → 维持正常选股但降仓50%")
+        if state.ic_inverted:
+            logger.info(f"⚠️ IC负值({state.ic_ema or 0:.3f}) → 维持正常选股但降仓50%")
     except Exception as e:
         logger.error(f"因子失败: {e}")
 
@@ -766,585 +297,50 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
     # ============================================================
     # Vibe-Trading 火力全开：每小时触发一次 Swarm 多代理研究
     # ============================================================
-    _last_vibe = getattr(run_shadow_cycle, "_last_vibe", 0)
     now = __import__("time").time()
-    if now - _last_vibe > 1800 and is_vibe_alive():  # 30分钟更频繁触发 Vibe Swarm
+    if now - state.last_vibe > 1800 and is_vibe_alive():  # 30分钟更频繁触发 Vibe Swarm
         try:
             top_syms = [p["symbol"] for p in top_picks[:8]] if top_picks else []
             if len(top_syms) >= 3:
                 swarm_result = run_swarm_research(top_syms, goal="find supply chain chokepoints and high conviction ideas")
                 if swarm_result:
                     logger.info(f'[Vibe] Swarm 已触发: {swarm_result.get("run_id")}')
-                    run_shadow_cycle._last_vibe = now
+                    state.last_vibe = now
         except Exception as ve:
             logger.debug(f"[Vibe] Swarm 跳过: {ve}")
 
-    try:
-        from atos.factors.engine import ic_analysis
-        # 用函数属性存储上周期分数（跨周期持久化）
-        prev_scores = getattr(run_shadow_cycle, '_prev_scores', {})
-        prev_breakdown = getattr(run_shadow_cycle, '_prev_breakdown', {})
-
-        # 计算本周期实际收益（%）
-        if prev_scores and factor_result:
-            current_returns = {}
-            for sym in prev_scores:
-                sig = signals.get(sym, {})
-                price_now = sig.get("price", 0)
-                prev_price = getattr(run_shadow_cycle, '_prev_prices', {}).get(sym, 0)
-                if price_now > 0 and prev_price > 0:
-                    current_returns[sym] = (price_now - prev_price) / prev_price
-
-            if len(current_returns) >= 10:
-                ic_result = ic_analysis(prev_scores, current_returns,
-                                        regime["regime"], prev_breakdown)
-                # Fix: IC EMA 平滑 — 减少噪音，更稳定判断因子是否有效
-                prev_ic_ema = getattr(run_shadow_cycle, '_ic_ema', None)
-                current_ic = ic_result['ic']
-                if prev_ic_ema is None:
-                    run_shadow_cycle._ic_ema = current_ic
-                else:
-                    run_shadow_cycle._ic_ema = prev_ic_ema * 0.7 + current_ic * 0.3
-                smoothed_ic = run_shadow_cycle._ic_ema
-                logger.info(f"[IC反馈] IC={current_ic:.4f} (平滑={smoothed_ic:.4f}) | {ic_result.get('verdict','')} | n={ic_result['n']}")
-
-                # v26: IC方向自适应 — 负IC时反转因子权重
-                # IC持续<-0.05说明因子反向，应该反转选股方向
-                if smoothed_ic < -0.05:
-                    run_shadow_cycle._ic_inverted = True
-                    if not getattr(run_shadow_cycle, '_ic_invert_logged', False):
-                        logger.warning(f"🔄 IC持续为负({smoothed_ic:.4f}) → 因子方向反转，低分股优先")
-                        run_shadow_cycle._ic_invert_logged = True
-                elif smoothed_ic > 0.02:
-                    if getattr(run_shadow_cycle, '_ic_inverted', False):
-                        logger.info(f"🔄 IC回正({smoothed_ic:.4f}) → 恢复正常选股方向")
-                    run_shadow_cycle._ic_inverted = False
-                    run_shadow_cycle._ic_invert_logged = False
-
-        # 存储本周期分数和价格，供下周期使用
-        run_shadow_cycle._prev_scores = factor_result.get("scores", {}) if factor_result else {}
-        run_shadow_cycle._prev_breakdown = factor_result.get("breakdown", {}) if factor_result else {}
-        run_shadow_cycle._prev_prices = {
-            sym: sig.get("price", 0)
-            for sym, sig in signals.items() if sig.get("price", 0) > 0
-        }
-        run_shadow_cycle._prev_rsi = {
-            sym: sig.get("rsi", 50)
-            for sym, sig in signals.items()
-        }
-    except Exception as ic_err:
-        logger.debug(f"IC反馈环跳过: {ic_err}")
+    # 🆕 IC 反馈环（子模块）
+    run_ic_feedback(signals, factor_result, regime)
 
     # 更新价格
     account.update_prices(signals)
 
     # ---- 4. 风控阶段（硬止损/追踪止损/止盈）— 每个标的独立！ ----
-    # 4a. 硬止损 + 硬止盈（统一检查）
-    # Fix #9: 相关性崩盘熔断
-    stp_count = 0
-    for order in check_all_stops(account.position_list, signals):
-        sym = order["symbol"]
-        px = signals.get(sym, {}).get("price", 0)
-        if px <= 0:
-            continue
-        qty = min(order["qty"], account.positions.get(sym, {}).get("qty", 0))
-        if qty <= 0:
-            continue
-        account.execute(sym, "SELL", qty, px, reason=order["reason"])
-        logger.info(f"🚨 {order['exit_type']}: {sym} {qty}股 {order['reason']}")
-        stp_count += 1
-
-    # Fix #9: 相关性崩盘检测 — 单周期多止损 → 熔断新开仓
-    if stp_count >= 3:
-        logger.critical(f"🚨 相关性崩盘: {stp_count}只持仓触发止损 — 本周期暂停新开仓")
-        is_market_hours = False  # 强制跳过新开仓
-
-    # ── 组合轮动已禁用 — 历史数据显示此逻辑是最大亏损来源 ──
-    # 文艺复兴/AQR等顶级基金的核心原则: 让赢家跑, 让止损负责退出
-    # 频繁轮动 = 手续费 + 滑点 + 追涨杀跌 = 稳定亏损
-    # 仅保留止损(-5%)和止盈(+15%)作为退出机制
-    ROTATION_DISABLED = True
-
-    # ── v24: 两阶段部分止盈 — 基于 GS 成功模式优化 ──
-    # GS 实证: 7次分批止盈各~9%, 共+$2,212 → 提前到+5%首次锁利
-    # Renaissance 核心: 让利润跑但分阶段锁定
-    # v28: 跳过 — v28 持仓不做分批止盈，让利润充分奔跑
-    for sym, pos in list(account.positions.items()):
-        if sym in ("QQQ",) or sym in V28_ALPHA_UNIVERSE:
-            continue  # v28 持仓跳过
-        qty_now = pos.get("shares", pos.get("qty", 0))
-        px = signals.get(sym, {}).get("price", pos.get("avg_price", 0))
-        if px <= 0: continue
-        pnl = (px - pos["avg_price"]) / pos["avg_price"] if pos["avg_price"] > 0 else 0
-        
-        # Tier 1: +5% → 卖1/4锁利 (GS模式: 第一次止盈)
-        if pnl >= 0.05 and pnl < 0.15 and qty_now >= 4:
-            partial_key = f"_partial1_{sym}"
-            if not getattr(account, partial_key, False):
-                sell_qty = max(1, qty_now // 4)
-                if sell_qty > 0:
-                    account.execute(sym, "SELL", sell_qty, px,
-                                  reason=f"Tier1止盈 +{pnl:.1%} (卖1/4锁利@5%)")
-                    logger.info(f"💰 Tier1止盈: {sym} {sell_qty}/{qty_now}股 +{pnl:.1%}")
-                    setattr(account, partial_key, True)
-        
-        # Tier 2: +15% → 再卖1/4 (原逻辑保留)
-        elif pnl >= 0.15 and qty_now >= 4:
-            sell_qty = max(1, qty_now // 4)
-            if sell_qty > 0:
-                account.execute(sym, "SELL", sell_qty, px,
-                              reason=f"Tier2止盈 +{pnl:.1%} (卖1/4锁利@15%)")
-                logger.info(f"💰 Tier2止盈: {sym} {sell_qty}/{qty_now}股 +{pnl:.1%}")
-        
-        # ── v24: Citadel 动量衰减止盈 ──
-        # 浮盈>3%但MACD转负 → 动量衰减，提前锁利
-        if pnl > 0.03:
-            macd_val = signals.get(sym, {}).get("macd_hist", 0)
-            if macd_val < -0.3:
-                momentum_exit_key = f"_momexit_{sym}"
-                if not getattr(account, momentum_exit_key, False):
-                    sell_qty = max(1, qty_now // 3)
-                    if sell_qty > 0:
-                        account.execute(sym, "SELL", sell_qty, px,
-                                      reason=f"动量衰减止盈 +{pnl:.1%} MACD={macd_val:.2f} (卖1/3)")
-                        logger.info(f"📉 动量衰减止盈: {sym} {sell_qty}股 +{pnl:.1%} MACD转负")
-                        setattr(account, momentum_exit_key, True)
-
-    # 4b. 追踪止损（每个标的独立判断）
-    # BUGFIX 2026-06-11: 
-    #   - BEAR/CAUTIOUS 趋势下完全关闭追踪止损（不是只是不创建新的）
-    #   - 确认次数从5提升到8（40分钟过滤盘中假突破）
-    #   - 日累计亏损超过3%时加宽止损幅度
-    #   - 追踪止损本身已经有 confirm_cycles 保护，但确认完才触发
-    
-    # 检查日亏损状态：如果今天已经亏得多，加宽止损容忍度
-    from atos.live.risk_manager import get_state as get_rm_state
-    rm_state = get_rm_state()
-    daily_pnl_pct = abs(rm_state.get("daily_pnl_pct", 0))
-    dd_widen_factor = 1.0
-    if daily_pnl_pct > 0.035:  # v10: 日亏>3.5%才加宽 (原2.5%太敏感)
-        dd_widen_factor = 1.4
-        logger.info(f"📉 日亏损{daily_pnl_pct:.2%}>3.5% — 加宽追踪止损 {dd_widen_factor:.0%}")
-    elif daily_pnl_pct > 0.025:
-        dd_widen_factor = 1.2  # 日亏>2.5%：加宽20%
-
-    # 趋势分级止损策略（v8 收紧版）：
-    #   BEAR     = 全关（持有等反弹）
-    #   CAUTIOUS = 保留追踪止损但加宽1.3倍
-    #   BULL     = 正常追踪止损
-    if spy_trend == "BEAR":
-        use_trailing = False
-        trail_widen = 1.0
-        if account.trailing_stops:
-            account.trailing_stops.clear()
-            logger.info("🐻 BEAR趋势: 关闭所有追踪止损，持有等反弹")
-    elif spy_trend == "CAUTIOUS":
-        use_trailing = True
-        trail_widen = 1.15   # v10: 从 1.3 降低 — 别太宽，追踪止损才有意义
-        logger.info("🟡 CAUTIOUS趋势: 保留追踪止损但加宽%.0f倍" % trail_widen)
-    else:
-        use_trailing = True
-        trail_widen = 1.0
-
-    for sym, pos in list(account.positions.items()):
-        price = signals.get(sym, {}).get("price", pos.get("last_price", 0))
-        if price <= 0:
-            continue
-        pnl_pct = (price - pos["avg_price"]) / pos["avg_price"] if pos["avg_price"] > 0 else 0
-
-        # ── v17: Triple-Barrier 时间退出检查（专业级）──
-        # 持仓超过20天 → 即使盈亏不大也退出，释放资金到更好的机会
-        # v29 FIX: v28 持仓跳过 — v28 季度(63天)再平衡,20天强制退出会破坏策略
-        _is_v28_pos = sym in ("QQQ",) or sym in V28_ALPHA_UNIVERSE
-        if _is_v28_pos:
-            hold_days = 0  # v28 持仓不用 Triple-Barrier
-        else:
-            hold_days = 0
-            if sym in account.positions:
-                buy_time = account.positions[sym].get("buy_time", None)
-            if buy_time:
-                try:
-                    from datetime import datetime as _dt
-                    bought = _dt.fromisoformat(str(buy_time)) if isinstance(buy_time, str) else buy_time
-                    hold_days = (_dt.now() - bought).total_seconds() / 86400
-                except Exception:
-                    pass
-        # Triple-Barrier: 波动率自适应退出
-        # v29: v28 持仓完全跳过 Triple-Barrier (时间和波动率)
-        if not _is_v28_pos:
-            atr_pct = (signals.get(sym, {}).get("atr", 0) / price) if price > 0 else 0.02
-            tb = triple_barrier(pos["avg_price"], price, 0.0, hold_days,
-                               volatility=max(0.01, atr_pct), max_hold_days=20)
-            if tb["exit"] and tb["barrier"] == "time":
-                account.execute(sym, "SELL", pos["qty"], price,
-                              reason=f"时间到期 {hold_days:.0f}天 (Triple-Barrier)")
-                logger.info(f"⏰ Triple-Barrier: {sym} 持仓{hold_days:.0f}天 到期退出")
-                continue
-            if tb["exit"] and tb["barrier"] == "stop":
-                account.execute(sym, "SELL", pos["qty"], price,
-                              reason=f"TB止损 (vol={atr_pct:.1%})")
-                logger.info(f"🛑 Triple-Barrier止损: {sym} PnL={pnl_pct:+.2%}")
-                continue
-
-        # ── v28: 跳过旧止盈/保本/剥头皮规则 — v28 有自己的卖出逻辑 ──
-        # v28: 只用硬止损(5%) + 移动止损(8%) + 季度再平衡，不做分批止盈
-        _v28_position = sym in ("QQQ",) or sym in V28_ALPHA_UNIVERSE
-        if not _v28_position:
-            # ── v23: 利润保护 — 更早保本 + 分批止盈 ──
-            # 0. v25: Renaissance 快速剥头皮 — 持仓<1天且盈利>2% → 快速锁利
-            buy_time_str = pos.get("buy_time", "")
-            if buy_time_str:
-                try:
-                    bought_dt = datetime.datetime.fromisoformat(str(buy_time_str))
-                    hours_held = (datetime.datetime.now() - bought_dt).total_seconds() / 3600
-                    if hours_held < 24 and pnl_pct >= 0.02:
-                        account.execute(sym, "SELL", pos["qty"], price, reason=f"快速剥头皮 +{pnl_pct:.1%} ({hours_held:.0f}h)")
-                        logger.info(f"⚡ 剥头皮: {sym} +{pnl_pct:.1%} {hours_held:.0f}h → 全卖")
-                        continue
-                except (ValueError, TypeError):
-                    pass
-
-            # 1. +3%: 止损提到成本价（保本）
-            if pnl_pct >= 0.03 and sym in account.trailing_stops:
-                ts = account.trailing_stops[sym]
-                if ts.activation_price is None or ts.activation_price < pos["avg_price"] * 1.001:
-                    ts.activation_price = pos["avg_price"] * 1.001
-            # 2. 分批止盈
-            recent_partials = sum(
-                1 for t in account.trade_history[-10:]
-                if t.get("symbol") == sym and "止盈" in t.get("reason", "")
-            )
-            if pnl_pct >= 0.03 and recent_partials == 0:
-                quarter = max(1, pos["qty"] // 4)
-                account.execute(sym, "SELL", quarter, price, reason=f"Tier1止盈 +{pnl_pct:.1%} (卖1/4锁利@3%)")
-                logger.info(f"💰 Tier1止盈: {sym} +{pnl_pct:.1%} 卖{quarter}股")
-                continue
-            if pnl_pct >= 0.05 and recent_partials == 1:
-                quarter = max(1, pos["qty"] // 4)
-                account.execute(sym, "SELL", quarter, price, reason=f"Tier2止盈 +{pnl_pct:.1%} (卖1/4锁利@5%)")
-                logger.info(f"💰 Tier2止盈: {sym} +{pnl_pct:.1%} 卖{quarter}股")
-                continue
-            if pnl_pct >= 0.08 and recent_partials == 2:
-                quarter = max(1, pos["qty"] // 4)
-                account.execute(sym, "SELL", quarter, price, reason=f"Tier3止盈 +{pnl_pct:.1%} (卖1/4锁利@8%)")
-                logger.info(f"💰 Tier3止盈: {sym} +{pnl_pct:.1%} 卖{quarter}股")
-                continue
-            # 3. 自适应止盈
-            tp_level = 0.22 if spy_trend == "BULL" else (0.18 if spy_trend == "CAUTIOUS" else 0.12)
-            if pnl_pct >= tp_level:
-                account.execute(sym, "SELL", pos["qty"], price, reason=f"止盈 +{pnl_pct:.1%}")
-                logger.info(f"💰 止盈: {sym} +{pnl_pct:.1%}")
-                continue
-            # 3b. Citadel超买主动止盈
-            rsi_sell = signals.get(sym, {}).get("rsi", 50)
-            if rsi_sell > 80 and pnl_pct > 0.02:
-                half = max(1, pos["qty"] // 2)
-                account.execute(sym, "SELL", half, price, reason=f"超买止盈 RSI={rsi_sell:.0f} PnL={pnl_pct:+.1%}")
-                logger.info(f"📈 Citadel超买止盈: {sym} RSI={rsi_sell:.0f} PnL={pnl_pct:+.1%} 卖{half}股")
-                continue
-        # 4. 🏦 v28: ATR动态止损 — 与 v28 策略对齐
-        # H12: v28 持仓(QQQ+alpha)跳过 section-4 ATR 硬止损，交给 _v28_qqq_core_alpha 自己的止损逻辑
-        if _v28_position:
-            continue
-        atr = signals.get(sym, {}).get("atr", 0)
-        if atr > 0 and price > 0:
-            atr_pct_stop = atr / price
-            if spy_trend == "BULL":
-                sl_mult = 3.0
-            elif spy_trend == "CAUTIOUS":
-                sl_mult = 2.5
-            else:
-                sl_mult = 2.0
-            sl_atr = sl_mult * atr_pct_stop
-            # v28: QQQ 用 12% 止损，个股用 5%
-            if sym == "QQQ":
-                sl_level = max(0.08, min(0.12, sl_atr))
-            else:
-                sl_level = max(0.04, min(0.05, sl_atr))
-        else:
-            sl_level = 0.12 if sym == "QQQ" else 0.05
-        if pnl_pct <= -sl_level:
-            account.execute(sym, "SELL", pos["qty"], price, reason=f"硬止损 {pnl_pct:.1%} (上限{sl_level:.0%})")
-            logger.info(f"🛑 止损: {sym} {pnl_pct:.1%} (上限{sl_level:.0%})")
-            continue
-
-        # 🏦 v22: Flat 持仓清理 — 持有7天以上且不涨不跌(-2%~+2%) → 卖出释放资金
-        # v28: 跳过 — v28 持仓按季度再平衡，不做Flat清理
-        if not _v28_position and hold_days >= 7 and abs(pnl_pct) < 0.02:
-            # 但如果有高因子分数(>0.6)或强MACD，则保留
-            score = signals.get(sym, {}).get("score", 0)
-            macd_h = signals.get(sym, {}).get("macd_hist", 0)
-            if score < 0.55 and macd_h <= 0:
-                account.execute(sym, "SELL", pos["qty"], price,
-                              reason=f"Flat清理 {hold_days:.0f}天 PnL={pnl_pct:+.1%}")
-                logger.info(f"🗑 Flat清理: {sym} 持有{hold_days:.0f}天不涨 释放资金")
-                continue
-
-        # v28: 不设置 trailing stop — v28 有自己的卖出逻辑
-        if _v28_position:
-            continue
-
-        if sym not in account.trailing_stops:
-            if not use_trailing:
-                continue
-            # 🆕 v17 回测优化 — 自适应追踪止损
-            # BULL: 宽止损 14% 让赢家奔跑
-            # CAUTIOUS: 中等 11%
-            # BEAR: 紧止损 7%（防守优先）
-            atr_val = signals.get(sym, {}).get("atr", 0)
-            if atr_val > 0 and price > 0:
-                daily_vol = atr_val / price
-                if spy_trend == "BULL":
-                    trail = max(0.08, min(0.18, daily_vol * 3.0))
-                elif spy_trend == "CAUTIOUS":
-                    trail = max(0.06, min(0.14, daily_vol * 2.5))
-                else:
-                    trail = max(0.05, min(0.10, daily_vol * 2.0))
-            else:
-                trail = 0.14 if spy_trend == "BULL" else (0.10 if spy_trend == "CAUTIOUS" else 0.07)
-            widen = min(max(dd_widen_factor, trail_widen), 1.5)
-            trail = min(trail * widen, 0.20 if spy_trend == "BULL" else 0.14)
-            confirm = 2 if spy_trend == "BULL" else (3 if spy_trend == "CAUTIOUS" else 4)
-            ts = TrailingStop(trail_pct=trail, confirm_cycles=confirm)
-            ts.init(pos["avg_price"])
-            act_pct = 1.05 if spy_trend == "BULL" else (1.04 if spy_trend == "CAUTIOUS" else 1.02)
-            ts.activation_price = pos["avg_price"] * act_pct
-            account.trailing_stops[sym] = ts
-            continue
-
-        result = account.trailing_stops[sym].update(price)
-        if result["triggered"]:
-            # v8: 不再给"额外机会"——触发就卖
-            account.execute(sym, "SELL", pos["qty"], price, reason=f"追踪止损 (确认{result['breach_count']}/{result['confirm_cycles']})")
-            log_risk("TRAILING_STOP", f"{sym}: {result['reason']}")
-            logger.info(f"🎯 追踪止损: {sym} PnL={pnl_pct:+.2%}")
-            continue
-
-    # 4c. 动量退出 — 持仓不涨不跌超过阈值 → 释放资金给更强信号
-    # v23: 解决"卡死"问题 — 持仓横盘但占用资金,系统无法开新仓
-    _MOMENTUM_EXIT_DAYS = 5       # 5天不涨不跌就走
-    _MOMENTUM_EXIT_THRESHOLD = 0.015  # 1.5%以内算"不涨不跌"
-    for sym, pos in list(account.positions.items()):
-        if sym not in account.positions:
-            continue
-        # v28: 跳过动量退出 — v28 持仓按季度再平衡
-        if sym in ("QQQ",) or sym in V28_ALPHA_UNIVERSE:
-            continue
-        buy_date_str = pos.get("buy_date", pos.get("buy_time", ""))
-        if not buy_date_str:
-            continue
-        try:
-            buy_date = datetime.fromisoformat(buy_date_str.replace("Z", "+00:00"))
-            days_held = (datetime.now(buy_date.tzinfo) - buy_date).days if buy_date.tzinfo else (datetime.now() - buy_date).days
-        except Exception:
-            continue
-        
-        avg = pos["avg_price"]
-        lp = pos.get("last_price", avg)
-        pnl_pct = (lp - avg) / avg if avg > 0 else 0
-        
-        # 不涨不跌判定: 持有>5天, |pnl|<1.5%, 且MACD不强势
-        macd_hist = signals.get(sym, {}).get("macd_hist", 0)
-        rsi = signals.get(sym, {}).get("rsi", 50)
-        
-        if (days_held >= _MOMENTUM_EXIT_DAYS 
-            and abs(pnl_pct) < _MOMENTUM_EXIT_THRESHOLD 
-            and macd_hist < 0.05 
-            and rsi < 55):
-            reason = f"动量退出 (持{days_held}天, PnL{pnl_pct:+.1%}, MACD={macd_hist:.3f})"
-            account.execute(sym, "SELL", pos["qty"], lp, reason=reason)
-            log_trade("SELL", sym, pos["qty"], lp, reason)
-            logger.info(f"🔄 {reason}: {sym}")
-            continue
-        
-        # 弱势持仓加速退出: 持有>3天, 亏损>2%, MACD<0, RSI<40
-        if (days_held >= 3 
-            and pnl_pct < -0.02 
-            and macd_hist < 0 
-            and rsi < 40):
-            reason = f"弱势退出 (持{days_held}天, PnL{pnl_pct:+.1%}, RSI={rsi:.0f})"
-            account.execute(sym, "SELL", pos["qty"], lp, reason=reason)
-            log_trade("SELL", sym, pos["qty"], lp, reason)
-            logger.info(f"🔄 {reason}: {sym}")
-            continue
-
-    # 4d. 回撤更新
-    account.peak_equity = max(account.peak_equity, account.total_equity)
-    update_drawdown(account.total_equity, account.peak_equity)
-    current_dd = (account.peak_equity - account.total_equity) / account.peak_equity if account.peak_equity > 0 else 0
-    if current_dd > 0.05:
-        logger.info(f"📉 当前回撤: {current_dd:.2%} (峰值${account.peak_equity:,.0f})")
-
-    # ── v24: Citadel 单仓集中度熔断 — 单仓>15%自动减持到12% ──
-    # 防止单一持仓过大导致黑天鹅风险
-    # v29 FIX: 跳过 v28 持仓 — QQQ 目标60%,alpha股目标~8-12%,熔断会死循环卖出
-    _CONC_LIMIT = 0.15   # 单仓上限15%
-    _CONC_TARGET = 0.12  # 减持目标12%
-    for sym, pos in list(account.positions.items()):
-        # v29: v28 持仓完全跳过集中度熔断 (QQQ目标60%是策略设计,不是风险)
-        if sym == "QQQ" or sym in V28_ALPHA_UNIVERSE:
-            continue
-        lp = pos.get("last_price", pos.get("avg_price", 0))
-        mkt_val = pos["qty"] * lp
-        weight = mkt_val / account.total_equity if account.total_equity > 0 else 0
-        if weight > _CONC_LIMIT and lp > 0:
-            # 计算需要卖多少股才能回到12%
-            target_val = account.total_equity * _CONC_TARGET
-            excess_val = mkt_val - target_val
-            sell_qty = max(1, int(excess_val / lp))
-            if sell_qty < pos["qty"]:
-                account.execute(sym, "SELL", sell_qty, lp,
-                              reason=f"集中度熔断 {weight:.0%}>{_CONC_LIMIT:.0%} → 减至{_CONC_TARGET:.0%}")
-                logger.info(f"🛡️ 集中度熔断: {sym} {weight:.1%}>{_CONC_LIMIT:.0%} 卖{sell_qty}股")
-
-    # 4d. 风格检查（回撤/熔断）
-    risk_state = get_risk_state()
-    if risk_state["circuit_open"]:
-        logger.warning(f"🔴 熔断中: {risk_state.get('daily_pnl_pct', 0):.2%} 日亏损")
+    risk_hours, halt_mode = run_risk_phase(account, signals, spy_trend)
+    is_market_hours = is_market_hours and risk_hours
+    if halt_mode:
         # 熔断后只跑风控，不开仓
         _finalize_cycle(account, cycle, regime, current_vix, signals, top_picks, {},
-                        "circuit_open", spy_trend)
+                        halt_mode, spy_trend)
         return
 
     # ---- 5. 智能质量门控（替代低胜率 AI 辩论：基于因子质量+动量+RSI） ----
     # 🆕 每周期运行（不再跳周期），严格过滤低质量信号
     ai_veto_map = {}
     if is_market_hours:
-        try:
-            for pick in (top_picks or [])[:8]:
-                sym = pick["symbol"]
-                sig = signals.get(sym, {})
-                bd = pick.get("breakdown", {})
-                factor_score = pick.get("score", 0)
-
-                # v27: 趋势自适应质量门控 — 与入场过滤对齐
-                quality_factors = sum(1 for k in ["value","momentum","quality","technical"] if bd.get(k, 0) > 0.2)
-                if spy_trend == "BULL":
-                    macd_ok = sig.get("macd_hist", 0) > -3.0
-                    rsi_ok = 25 < sig.get("rsi", 50) < 78
-                elif spy_trend == "CAUTIOUS":
-                    macd_ok = sig.get("macd_hist", 0) > -1.5
-                    rsi_ok = 30 < sig.get("rsi", 50) < 72
-                else:
-                    macd_ok = sig.get("macd_hist", 0) > 0.001
-                    rsi_ok = 35 < sig.get("rsi", 50) < 68
-                trend_ok = sig.get("trend", "") in ("UP", "WEAK_UP")
-
-                quality_score = (
-                    quality_factors * 20 +
-                    (10 if macd_ok else 0) +
-                    (10 if trend_ok else 0) +
-                    (5 if rsi_ok else 0) -
-                    (30 if factor_score < 0.30 else 0)
-                )
-
-                veto_threshold = 25 if spy_trend == "BULL" else (35 if spy_trend == "CAUTIOUS" else 50)
-                if quality_score < veto_threshold:
-                    ai_veto_map[sym] = True
-                    logger.info(f"🚫 否决 {sym}: Q={quality_score} (因子{quality_factors}/4 macd={macd_ok} trend={trend_ok} rsi={rsi_ok}) [{spy_trend}]")
-                else:
-                    ai_veto_map[sym] = False
-            vetoed_count = sum(1 for v in ai_veto_map.values() if v)
-            logger.info(f"🎯 质量门控({spy_trend}): {len(ai_veto_map)}候选中 {vetoed_count}否决 {len(ai_veto_map)-vetoed_count}通过")
-        except Exception as e:
-            logger.warning(f"质量门控跳过: {e}")
+        ai_veto_map = compute_quality_gate(top_picks, signals, spy_trend)
 
     # ── 5b. 🆕 实时情报简报（每周期运行，AI决策前优先参考）──
-    intel_briefing = None
-    try:
-        from atos.intel.briefing import get_pre_trade_briefing, briefing_to_prompt
-        INTEL_INTERVAL = 6  # 每6周期（30分钟）刷新一次情报
-        _last_intel = getattr(run_shadow_cycle, '_last_intel_cycle', -999)
-        if account.cycle_count - _last_intel >= INTEL_INTERVAL:
-            watchlist = [p["symbol"] for p in top_picks[:8]] if top_picks else \
-                        list(signals.keys())[:10]
-            intel_briefing = get_pre_trade_briefing(symbols=watchlist, max_news=12)
-            run_shadow_cycle._last_intel_cycle = account.cycle_count
-            # 记录情报摘要到日志
-            sentiment = intel_briefing.get("market_sentiment", {})
-            flags = intel_briefing.get("risk_flags", [])
-            logger.info(f"📡 情报简报: 情绪={sentiment.get('bias','?')} "
-                       f"新闻={len(intel_briefing.get('top_news',[]))}条 "
-                       f"风险={len(flags)}个")
-    except Exception as e:
-        logger.debug(f"情报简报跳过: {e}")
+    intel_briefing = fetch_intel_briefing(top_picks, signals, account.cycle_count)
 
     # ── 5c. 🆕 增强AI决策 (每8周期≈40分钟, 轻量快速) ──
     # v6: 替换低胜率(6.4%)的旧AI辩论，使用硬规则+信心评分+情报融合
-    AI_ENHANCED_INTERVAL = 8
-    ai_enhanced_advice = None
-    if account.cycle_count % AI_ENHANCED_INTERVAL == 0:
-        try:
-            from atos.ai.advisor_enhanced import get_enhanced_advice
-
-            # Build candidate list from top picks
-            ai_candidates = []
-            for pick in (top_picks or [])[:8]:
-                sym = pick["symbol"]
-                sig = signals.get(sym, {})
-                ai_candidates.append({
-                    "symbol": sym,
-                    "price": sig.get("price", 0),
-                    "rsi": sig.get("rsi", 50),
-                    "trend": sig.get("trend", "NEUTRAL"),
-                    "factor_score": pick.get("score", 0),
-                    "macd_hist": sig.get("macd_hist", 0),
-                    "volume_ratio": sig.get("volume_ratio", 1.0),
-                    "ma50": sig.get("ma50", 0),
-                    "bollinger": sig.get("bollinger", {}),
-                })
-
-            ai_snapshot = {
-                "market": {
-                    "spy_price": spy_c[-1] if spy_c else 745,
-                    "vix": round(current_vix, 1),
-                    "regime": regime.get("regime", "UNKNOWN") if isinstance(regime, dict) else "UNKNOWN",
-                    "spy_trend": spy_trend,
-                },
-                "total_equity": account.total_equity,
-                "cash": account.cash,
-                "candidates": ai_candidates,
-                "positions": account.position_list,
-            }
-
-            ai_enhanced_advice = get_enhanced_advice(ai_snapshot, intel_briefing)
-
-            # Apply decisions
-            buy_count = ai_enhanced_advice.get("buy_count", 0)
-            skip_count = ai_enhanced_advice.get("skip_count", 0)
-            risk_adj = ai_enhanced_advice.get("risk_adjustment", 1.0)
-            logger.info(f"🧠 AI v6: {buy_count}买/{skip_count}跳过 | "
-                       f"风险系数={risk_adj:.0%} | "
-                       f"{ai_enhanced_advice.get('market_read','')}")
-
-            # If AI says no trading, override
-            if not ai_enhanced_advice.get("trading_allowed", True):
-                logger.warning(f"🚫 AI暂停交易: {ai_enhanced_advice.get('risk_reasons',[])}")
-                is_market_hours = False
-
-            # Apply risk adjustment to position sizing
-            if risk_adj < 0.5:
-                account.max_positions = max(3, account.max_positions // 2)
-                logger.info(f"🛡️ AI降低仓位上限至 {account.max_positions}")
-
-            # Build AI decision map for factor-based buying
-            ai_decisions = ai_enhanced_advice.get("decisions", [])
-            ai_veto_map = {}
-            for d in ai_decisions:
-                sym = d["symbol"]
-                if d["action"] == "SKIP":
-                    ai_veto_map[sym] = True
-                elif d["action"] == "BUY":
-                    ai_veto_map[sym] = False
-            # Only veto SKIPs, WATCH passes through to factor engine
-            vetoed_count = sum(1 for v in ai_veto_map.values() if v)
-            if vetoed_count > 0:
-                logger.info(f"🧠 AI v6 否决: {vetoed_count}/{len(ai_decisions)}只")
-
-        except Exception as e:
-            logger.warning(f"AI v6跳过: {e}")
-            ai_enhanced_advice = None
-            ai_veto_map = {}
+    counsel_map, counsel_hours = run_ai_counsel(
+        account, top_picks, signals, spy_c, current_vix,
+        regime, spy_trend, intel_briefing)
+    if counsel_map is not None:
+        ai_veto_map = counsel_map
+    is_market_hours = is_market_hours and counsel_hours
 
     # ---- 6. v28: QQQ Core + Alpha 策略开仓 ----
     # 回测验证: 60% QQQ + 40% 动量股(5只), 年化26.8%, 跑赢SPY 11.7%
@@ -1359,254 +355,18 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
 
 
 # ============================================================
-# ============================================================
-# v29: QQQ Core + Alpha 策略 (优化: 7只 + 动量权重0.6)
-# 回测v7: 60% QQQ + 40% 动量股(7只), 年化30.7%, 跑赢SPY 15.6%
-# ============================================================
-V28_ALPHA_UNIVERSE = [
-    "NVDA", "AAPL", "MSFT", "GOOGL", "META", "AMZN", "AVGO", "AMD",
-    "CRM", "NFLX", "PLTR", "MU", "TSLA",
-]
-V28_CORE_PCT = 0.60      # QQQ 核心仓位比例
-V28_ALPHA_COUNT = 7       # alpha 个股数量 (v29: 5→7)
-V28_REBALANCE_DAYS = 63   # 每季度再平衡
-V28_STOP_LOSS = 0.05      # 个股止损 5%
-V28_TRAILING_STOP = 0.08  # 移动止损 8%
-V28_QQQ_TRAILING = 0.12   # QQQ 移动止损 12%
-
-
-def _v28_qqq_core_alpha(account, signals, regime, spy_trend):
-    """v29 策略: QQQ 核心 + 动量个股 alpha (优化: 7只 + 动量权重0.6)
-
-    规则:
-    1. 60% 资金买 QQQ（始终持有，不择时）
-    2. 40% 资金买 7 只最强动量股 (21日动量 + 距20日高点)
-    3. 每季度再平衡
-    4. 个股止损 5%, 移动止损 8%
-    5. QQQ 移动止损 12%
-    """
-    equity = account.total_equity
-    cash = account.cash
-
-    # ── 卖出检查 ──
-    for sym in list(account.positions.keys()):
-        pos = account.positions[sym]
-        qty = pos.get("qty", pos.get("shares", 0))
-        if qty <= 0:
-            continue
-        avg_price = pos.get("avg_price", 0)
-        if avg_price <= 0:
-            continue
-
-        price = signals.get(sym, {}).get("price", pos.get("last_price", 0))
-        if price <= 0:
-            continue
-
-        pnl_pct = (price - avg_price) / avg_price
-
-        # 更新峰值
-        peak = pos.get("peak_price", avg_price)
-        if price > peak:
-            pos["peak_price"] = price
-            peak = price
-
-        sell_reason = None
-
-        if sym == "QQQ":
-            # QQQ: 移动止损 12%
-            if peak > avg_price * 1.05:
-                ts_drop = (peak - price) / peak
-                if ts_drop >= V28_QQQ_TRAILING:
-                    sell_reason = f"QQQ移动止损{ts_drop:.1%}"
-        else:
-            # 个股: 止损 5%
-            if pnl_pct <= -V28_STOP_LOSS:
-                sell_reason = f"止损{pnl_pct:.1%}"
-            # 移动止损 8%
-            elif peak > avg_price * 1.03:
-                ts_drop = (peak - price) / peak
-                if ts_drop >= V28_TRAILING_STOP:
-                    sell_reason = f"移动止损{ts_drop:.1%}"
-
-        if sell_reason:
-            account.execute(sym, "SELL", qty, price, reason=sell_reason)
-            logger.info(f"🔴 v28卖出 {sym}: {sell_reason} PnL={pnl_pct:.1%}")
-
-    # ── 再平衡检查 ──
-    last_rebal = getattr(account, '_v28_last_rebalance', None)
-    now = datetime.datetime.now()
-    days_since = (now - last_rebal).days if last_rebal else 999
-
-    # v28c: 如果 QQQ 配比远低于目标，每天都再平衡直到到位
-    qqq_pos = account.positions.get("QQQ", {})
-    qqq_qty = qqq_pos.get("qty", qqq_pos.get("shares", 0))
-    qqq_px = signals.get("QQQ", {}).get("price", 0)
-    qqq_val = qqq_qty * qqq_px if qqq_px > 0 else 0
-    qqq_pct = qqq_val / equity if equity > 0 else 0
-
-    if qqq_pct < V28_CORE_PCT * 0.80:
-        should_rebalance = True  # QQQ 严重不足，立即再平衡
-        if days_since > 0:
-            logger.info(f"📊 v28 QQQ配比{qqq_pct:.0%} << 目标{V28_CORE_PCT:.0%} — 加速再平衡")
-    else:
-        should_rebalance = days_since >= V28_REBALANCE_DAYS
-
-    if not should_rebalance:
-        return
-
-    logger.info(f"📊 v28 季度再平衡 | Equity=${equity:,.0f}")
-
-    # ── 核心仓: QQQ ──
-    target_qqq_value = equity * V28_CORE_PCT
-    qqq_price = signals.get("QQQ", {}).get("price", 0)
-
-    if qqq_price > 0:
-        current_qqq = account.positions.get("QQQ", {})
-        current_qqq_qty = current_qqq.get("qty", current_qqq.get("shares", 0))
-        current_qqq_value = current_qqq_qty * qqq_price
-
-        if current_qqq_value < target_qqq_value * 0.90:
-            # 需要加仓 QQQ — 允许多批次买入直到达到目标
-            buy_value = target_qqq_value - current_qqq_value
-            # 刷新现金（可能刚卖了其他持仓）
-            cash = account.cash
-            max_affordable = int(cash * 0.98 / qqq_price)
-            buy_qty = max(1, min(int(buy_value / qqq_price), max_affordable))
-            if buy_qty > 0 and buy_qty * qqq_price < cash * 0.98:
-                ok = account.execute("QQQ", "BUY", buy_qty, qqq_price,
-                              reason=f"v28核心仓 目标${target_qqq_value:,.0f}")
-                if ok:
-                    logger.info(f"🟢 v28买入 QQQ: {buy_qty}股 @${qqq_price:.2f} (现有{current_qqq_qty}股)")
-                else:
-                    logger.warning(f"⚠️ v28 QQQ买入被拒绝: {buy_qty}股 @${qqq_price:.2f} — 检查单仓/总仓上限")
-        elif current_qqq_value > target_qqq_value * 1.10:
-            # H10: 对称减持 — QQQ 超配 >10% 时卖回目标仓位
-            sell_value = current_qqq_value - target_qqq_value
-            sell_qty = int(sell_value / qqq_price)
-            if sell_qty > 0:
-                sell_qty = min(sell_qty, current_qqq_qty)
-                ok = account.execute("QQQ", "SELL", sell_qty, qqq_price,
-                              reason=f"v28核心仓减持 目标${target_qqq_value:,.0f}")
-                if ok:
-                    logger.info(f"🟢 v28减持 QQQ: {sell_qty}股 @${qqq_price:.2f} (现有{current_qqq_qty}股)")
-                else:
-                    logger.warning(f"⚠️ v28 QQQ减持被拒绝: {sell_qty}股 @${qqq_price:.2f}")
-
-    # ── Alpha 仓: 动量股 ──
-    target_alpha_value = equity * (1 - V28_CORE_PCT)
-    per_stock_value = target_alpha_value / V28_ALPHA_COUNT
-
-    # 计算动量分 (v28i: 行业动量 — 1日变动 + 距20日高点距离)
-    alpha_candidates = []
-    for sym in V28_ALPHA_UNIVERSE:
-        sig = signals.get(sym, {})
-        price = sig.get("price", 0)
-        if price <= 0:
-            continue
-
-        # 动量指标 (v29: 用真实字段 mom_21 + dist_20d_high，修复 phantom-field bug)
-        mom_21 = sig.get("mom_21", 0) or 0        # 21日动量 (%)
-        dist_high = sig.get("dist_20d_high", -10) or -10  # 距20日高点 (%)
-        ma50 = sig.get("ma50", 0)
-        rsi = sig.get("rsi", 50)
-
-        # v29: 行业动量评分 = 60% 21日动量 + 40% 趋势强度(距高点)
-        # 回测v7: 0.6/0.4 权重最优 (30.7% vs 27.4% baseline)
-        trend_score = max(0, 1 + dist_high / 20)  # -20→0, 0→1
-        mom_score = max(0, min(1, (mom_21 + 5) / 10))  # -5%→0, +5%→1
-        score = mom_score * 0.6 + trend_score * 0.4
-
-        # 过滤
-        if rsi > 78:  # 超买
-            continue
-        if ma50 > 0 and price < ma50 * 0.92:  # 远低于MA50
-            continue
-
-        alpha_candidates.append((sym, score, price))
-
-    # 排序选 top N
-    alpha_candidates.sort(key=lambda x: -x[1])
-
-    # 当前 alpha 持仓
-    current_alpha = [s for s in account.positions if s != "QQQ"]
-
-    # 卖出不在 top N 的持仓
-    top_syms = {c[0] for c in alpha_candidates[:V28_ALPHA_COUNT]}
-    for sym in current_alpha:
-        if sym not in top_syms:
-            pos = account.positions[sym]
-            qty = pos.get("qty", pos.get("shares", 0))
-            price = signals.get(sym, {}).get("price", pos.get("last_price", 0))
-            if qty > 0 and price > 0:
-                account.execute(sym, "SELL", qty, price,
-                              reason=f"v28再平衡换仓")
-                logger.info(f"🔄 v28换仓卖出 {sym}")
-
-    # 买入新候选
-    cash = account.cash  # 刷新
-    for sym, score, price in alpha_candidates[:V28_ALPHA_COUNT]:
-        if sym in account.positions:
-            continue  # 已持有
-        qty = max(1, int(per_stock_value / price))
-        if qty * price < cash * 0.85:
-            ok = account.execute(sym, "BUY", qty, price,
-                          reason=f"v28动量alpha score={score:.3f}")
-            if ok:
-                logger.info(f"🟢 v28买入 {sym}: {qty}股 @${price:.2f} score={score:.3f}")
-            else:
-                logger.warning(f"⚠️ v28买入被拒绝: {sym} {qty}股 @${price:.2f} — 检查单仓/总仓/现金/冷却上限")
-
-    account._v28_last_rebalance = now
-    logger.info(f"✅ v28再平衡完成 | 持仓: {len(account.positions)}只")
-
-
-# ============================================================
-# 周期结束
+# 周期结束 — 结算编排 (实现下沉至 equity_tracker / state_store)
 # ============================================================
 def _finalize_cycle(account, cycle, regime, current_vix, signals, top_picks,
                     ai_veto_map, mode, spy_trend):
     """每个周期结束前的最终处理"""
     # 记录周期收益 — 从 equity_history 精确计算
     current_eq = round(account.total_equity, 2)
+    cycle_ret = compute_cycle_return(account, current_eq)
+    record_cycle_equity(account, current_eq, cycle_ret)
 
-    # 找前一个有效 equity 值
-    prev_eq = None
-    # 从 equity_history 最近的非当前条目回溯
-    for e in reversed(account.equity_history):
-        eq_val = e.get("equity") if isinstance(e, dict) else e
-        if isinstance(eq_val, (int, float)) and eq_val > 0:
-            prev_eq = eq_val
-            break
-    
-    if prev_eq is None:
-        prev_eq = account.initial_cash
-    
-    # 精确计算 cycle return
-    cycle_ret = (current_eq - prev_eq) / prev_eq if prev_eq > 0 else 0
-    # 防御 nan
-    if isinstance(cycle_ret, float) and str(cycle_ret) in ("nan", "inf", "-inf"):
-        cycle_ret = 0.0
-    
-    account.cycle_returns.append(round(cycle_ret, 6))
-    # 只保留最近 1000 个周期收益
-    if len(account.cycle_returns) > 1000:
-        account.cycle_returns = account.cycle_returns[-1000:]
-    
-    account.equity_history.append({
-        "time": datetime.datetime.now().isoformat(),
-        "equity": current_eq,
-    })
-    # 只保留最近 500 个历史点
-    if len(account.equity_history) > 500:
-        account.equity_history = account.equity_history[-500:]
-    
-    account.prev_equity = current_eq
-
-    # 更新峰值
-    account.peak_equity = max(account.peak_equity, current_eq)
     # 更新回撤
     current_dd = (account.peak_equity - current_eq) / account.peak_equity if account.peak_equity > 0 else 0
-    from atos.live.risk_manager import update_drawdown
     update_drawdown(current_eq, account.peak_equity)
 
     logger.info(f"Cycle {cycle} done | Equity=${current_eq:,.0f} | "
@@ -1614,107 +374,19 @@ def _finalize_cycle(account, cycle, regime, current_vix, signals, top_picks,
                 f"DD={current_dd:.2%} | Peak=${account.peak_equity:,.0f}")
 
     # ── v17: 统一绩效追踪 — 每20周期汇报 ──
-    try:
-        from atos.core.performance import get_tracker, init_tracker
-        if getattr(run_shadow_cycle, '_perf_inited', False) is False:
-            init_tracker(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-            run_shadow_cycle._perf_inited = True
-        perf = get_tracker()
-        perf.update(current_eq, cycle_ret)
-        if cycle % 20 == 0:
-            m = perf.get_metrics()
-            logger.info(f"📊 绩效#{cycle}: Sharpe={m.get('sharpe',0):.2f} Sortino={m.get('sortino',0):.2f} "
-                       f"Calmar={m.get('calmar',0):.2f} WR={m.get('win_rate',0):.1f}% "
-                       f"PF={m.get('profit_factor',0):.2f} 评级={m.get('grade','?')}")
-        perf.save()
-    except Exception as e:
-        logger.debug(f"绩效追踪跳过: {e}")
+    update_perf_tracker(current_eq, cycle_ret, cycle)
 
     # 记录每日收益
-    try:
-        from atos.core.daily_returns import record_daily
-        record_daily(current_eq, len(account.trade_history), len(account.positions))
-    except Exception:
-        pass
+    record_daily_returns(current_eq, account)
 
-    # 保存状态
-    state_file = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-        "data", "shadow_state.json"
-    )
-    state = {
-        "initial_cash": account.initial_cash,
-        "cash": account.cash,
-        "positions": account.positions,
-        "trade_history": account.trade_history,
-        "cycle_returns": account.cycle_returns,
-        "cycle_count": account.cycle_count,
-        "equity": account.total_equity,
-        "peak_equity": account.peak_equity,
-        "equity_history": account.equity_history,
-        "last_cycle": datetime.datetime.now().isoformat(),
-        "stop_loss_blacklist": account.stop_loss_blacklist,
-        "strategy_decay_factor": account.strategy_decay_factor,
-        # 序列化后的追踪止损（Dashboard 显示用）
-        "trailing_stops": {
-            sym: {
-                "trail_pct": round(ts.trail_pct, 4),
-                "highest_price": round(ts.highest_price, 2),
-                "stop_price": round(ts.stop_price, 2),
-                "entry_price": round(ts.entry_price, 2),
-                "activation_price": round(ts.activation_price, 2) if ts.activation_price is not None else None,
-                "breach_count": ts._breach_count,
-                "confirm_cycles": ts.confirm_cycles,
-            }
-            for sym, ts in account.trailing_stops.items()
-        } if hasattr(account, "trailing_stops") else {},
-    }
+    # 保存状态 (单一 schema 构造点: state_store.build_state_dict)
+    state_file = get_state_file_path()
+    state = build_state_dict(account)
     os.makedirs(os.path.dirname(state_file), exist_ok=True)
     atomic_write(state_file, json.dumps(state, indent=2))
 
     # v5.1: 写日内涨跌数据供 Dashboard 读取（从 Futu OpenD 获取 prev_close）
-    try:
-        dc_file = os.path.join(os.path.dirname(state_file), "day_changes.json")
-        day_data = {}
-        # 尝试从 Futu OpenD 批量获取日内涨跌
-        try:
-            # v28i: 先 TCP 检查，避免 OpenQuoteContext 内部重试阻塞
-            # v28k: 再加线程超时兜底 — TCP 通但需验证码时构造函数仍会无限重试
-            import socket as _sock
-            _s = _sock.create_connection(('127.0.0.1', 11111), timeout=2)
-            _s.close()
-            from futu import RET_OK
-            from atos.live.realtime_feeds import open_quote_context_with_timeout
-            pos_syms = [s for s in account.positions if isinstance(account.positions.get(s), dict)]
-            if pos_syms:
-                ctx = open_quote_context_with_timeout('127.0.0.1', 11111, timeout=5.0)
-                if ctx is None:
-                    raise RuntimeError("OpenQuoteContext timeout (验证码/登录过期)")
-                ret, data = ctx.get_market_snapshot([f'US.{s}' for s in pos_syms])
-                ctx.close()
-                if ret == RET_OK:
-                    for _, row in data.iterrows():
-                        sym = row['code'].replace('US.', '')
-                        day_data[sym] = {
-                            'prev_close': round(float(row.get('prev_close_price', 0) or 0), 2),
-                            'day_chg': round(float(row.get('change_val', 0) or 0), 2),
-                            'day_pct': round(float(row.get('change_rate', 0) or 0), 2),
-                        }
-        except Exception:
-            pass  # Futu 不可用时 fallback 到零值
-        
-        # Fallback: 对 Futu 没覆盖的持仓用 current price
-        for sym, pos in account.positions.items():
-            if sym in day_data: continue
-            if not isinstance(pos, dict): continue
-            px = pos.get('last_price', 0) or 0
-            if px > 0:
-                day_data[sym] = {'prev_close': round(px,2), 'day_chg': 0.0, 'day_pct': 0.0}
-        
-        with open(dc_file, 'w') as f:
-            json.dump(day_data, f)
-    except Exception:
-        pass
+    write_day_changes(account)
 
     # 生成透明报告
     try:
@@ -1731,57 +403,6 @@ def _finalize_cycle(account, cycle, regime, current_vix, signals, top_picks,
 # ============================================================
 # 主入口
 # ============================================================
-def _save_account_state(account: ShadowAccount):
-    """P0 修复: 原子化保存账户状态（含备份机制）"""
-    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    state_file = os.path.join(base_dir, "data", "shadow_state.json")
-    bak_file = state_file + ".bak"
-    os.makedirs(os.path.dirname(state_file), exist_ok=True)
-
-    state = {
-        "initial_cash": account.initial_cash,
-        "cash": account.cash,
-        "positions": account.positions,
-        "trade_history": account.trade_history,
-        "cycle_returns": account.cycle_returns,
-        "cycle_count": account.cycle_count,
-        "equity": account.total_equity,
-        "peak_equity": account.peak_equity,
-        "drawdown": round((account.peak_equity - account.total_equity) / account.peak_equity, 6) if account.peak_equity > 0 else 0,
-        "equity_history": getattr(account, "equity_history", []),
-        "last_cycle": datetime.datetime.now().isoformat(),
-        "stop_loss_blacklist": account.stop_loss_blacklist,
-        "strategy_decay_factor": account.strategy_decay_factor,
-        "trailing_stops": {
-            sym: {
-                "trail_pct": round(ts.trail_pct, 4),
-                "highest_price": round(ts.highest_price, 2),
-                "stop_price": round(ts.stop_price, 2),
-                "entry_price": round(ts.entry_price, 2),
-                "activation_price": round(ts.activation_price, 2) if ts.activation_price is not None else None,
-                "breach_count": ts._breach_count,
-                "confirm_cycles": ts.confirm_cycles,
-            }
-            for sym, ts in account.trailing_stops.items()
-        } if hasattr(account, "trailing_stops") and account.trailing_stops else {},
-    }
-    # 原子写入: 先备份旧文件, 再写临时文件, 最后 rename
-    try:
-        if os.path.exists(state_file):
-            os.replace(state_file, bak_file)
-    except Exception:
-        pass
-    try:
-        atomic_write(state_file, json.dumps(state, indent=2))
-    except Exception:
-        logger.warning("状态保存失败，尝试直接写入")
-        try:
-            with open(state_file, "w") as f:
-                json.dump(state, f, indent=2)
-        except Exception:
-            logger.error("状态保存完全失败!")
-
-
 def main():
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     lock_file = os.path.join(base_dir, "data", ".shadow_trader.lock")
@@ -1820,15 +441,14 @@ def main():
     from atos.live.risk_manager import load_risk_state
     load_risk_state()
 
-    state_file = os.path.join(base_dir, "data", "shadow_state.json")
+    state_file = get_state_file_path()
 
     # v11: 短线资金上限
     max_short_capital = ALLOCATION.get("short_term", 300_000)
 
     # 恢复状态
-    if os.path.exists(state_file):
-        with open(state_file) as f:
-            saved = json.load(f)
+    saved = load_saved_state()
+    if saved is not None:
         # v11: 强制上限 — 防止旧状态$1M覆盖配置的$300K
         # v24 FIX: 允许利润累积 — cap改为initial*1.5（允许50%利润），不再吞掉收益
         max_allowed = max_short_capital * 1.50  # 允许最多50%利润
@@ -1836,14 +456,8 @@ def main():
         account = ShadowAccount(initial_cash=initial)
         account.cash = min(saved.get("cash", account.initial_cash), max_allowed)
         account.positions = saved.get("positions", {})
-        # Fix: 标准化持仓键名（shares ↔ qty 一致性）
-        for sym, p in account.positions.items():
-            if "shares" in p and "qty" not in p:
-                p["qty"] = p["shares"]
-            elif "qty" in p and "shares" not in p:
-                p["shares"] = p["qty"]
-            elif "quantity" in p:
-                p["shares"] = p["qty"] = p["quantity"]
+        # Fix: 标准化持仓键名（shares ↔ qty 一致性）— 单一实现 position_schema
+        normalize_positions(account.positions)
         account.trade_history = saved.get("trade_history", [])
         account.cycle_returns = saved.get("cycle_returns", [])
         account.cycle_count = saved.get("cycle_count", 0)
@@ -1919,36 +533,7 @@ def main():
                 logger.critical("🔴 EMERGENCY STOP detected — halting all trading")
                 stop_scheduler()  # 🆕 停止调度器
                 # Save final state before exiting
-                state = {
-                    "initial_cash": account.initial_cash,
-                    "cash": account.cash,
-                    "positions": account.positions,
-                    "trade_history": account.trade_history,
-                    "cycle_returns": account.cycle_returns,
-                    "cycle_count": account.cycle_count,
-                    "equity": account.total_equity,
-                    "peak_equity": account.peak_equity,
-                    "equity_history": getattr(account, "equity_history", []),
-                    "stopped_at": datetime.datetime.now().isoformat(),
-                    "stop_loss_blacklist": account.stop_loss_blacklist,
-                    "strategy_decay_factor": account.strategy_decay_factor,
-                    "trailing_stops": {
-                        sym: {
-                            "trail_pct": round(ts.trail_pct, 4),
-                            "highest_price": round(ts.highest_price, 2),
-                            "stop_price": round(ts.stop_price, 2),
-                            "entry_price": round(ts.entry_price, 2),
-                            "breach_count": ts._breach_count,
-                            "confirm_cycles": ts.confirm_cycles,
-                        }
-                        for sym, ts in account.trailing_stops.items()
-                    } if hasattr(account, "trailing_stops") else {},
-                }
-                os.makedirs(os.path.dirname(state_file), exist_ok=True)
-                try:
-                    atomic_write(state_file, json.dumps(state, indent=2))
-                except Exception:
-                    pass
+                save_emergency_state(account, reason="EMERGENCY_STOP")
                 sys.exit(0)
 
             cycle += 1
@@ -1975,7 +560,7 @@ def main():
                         top = alerts[0]
                         reduce_sym = top.get("reduce_symbol", "")
                         # v29: 跳过 v28 持仓 — v28 策略有意持有高相关科技股组合
-                        if reduce_sym and reduce_sym in account.positions and not (reduce_sym == "QQQ" or reduce_sym in V28_ALPHA_UNIVERSE):
+                        if reduce_sym and reduce_sym in account.positions and not is_v28_position(reduce_sym):
                             rpos = account.positions[reduce_sym]
                             rprice = rpos.get("last_price", rpos.get("avg_price", 0))
                             if rprice > 0:
@@ -2014,7 +599,7 @@ def main():
 
             if is_permanent:
                 logger.critical(f"💀 永久性错误: {err_type}: {err}")
-                _save_account_state(account)
+                save_account_state(account)
                 # Don't exit — just sleep and retry. LaunchAgent will restart if needed.
                 logger.info("⏸ 等待 5 分钟后重试...")
                 time.sleep(300)
@@ -2032,26 +617,7 @@ def main():
                 time.sleep(60)
 
     # 保存最终状态
-    state = {
-        "initial_cash": account.initial_cash,
-        "cash": account.cash,
-        "positions": account.positions,
-        "trade_history": account.trade_history,
-        "cycle_returns": account.cycle_returns,
-        "cycle_count": account.cycle_count,
-        "equity": account.total_equity,
-        "peak_equity": account.peak_equity,
-        "equity_history": getattr(account, "equity_history", []),
-        "stopped_at": datetime.datetime.now().isoformat(),
-        "stop_loss_blacklist": account.stop_loss_blacklist,
-        "strategy_decay_factor": account.strategy_decay_factor,
-    }
-    os.makedirs(os.path.dirname(state_file), exist_ok=True)
-    try:
-        with open(state_file, "w") as f:
-            json.dump(state, f, indent=2)
-    except Exception:
-        pass
+    save_emergency_state(account, reason="STOPPED")
     logger.info(f"最终权益: ${account.total_equity:,.0f} | 交易数: {len(account.trade_history)}")
 
 

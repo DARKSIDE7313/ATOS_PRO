@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# ⚠️ DEPRECATED — Phase 5 框架重塑 (2026-08-22) 归档。回测引擎 v4, 当前唯一活跃实现: atos/backtest/engine_v7.py。
+# 归档前已确认全仓库零 import 引用; 保留仅为历史参考, 生产代码不得引用。
 """
 ATOS Backtest v4 — QQQ Core + Alpha Stock Picks
 ================================================

@@ -12,10 +12,24 @@ except ImportError:
     PORT = 11111
     TRD_ENV = TrdEnv.SIMULATE
 
+def _tcp_ok(host: str, port: int) -> bool:
+    """H7: TCP 预检查 — 防止 Futu Context 构造函数内部重试阻塞 (Pattern 92/94)"""
+    import socket
+    try:
+        s = socket.create_connection((host, port), timeout=2)
+        s.close()
+        return True
+    except Exception:
+        return False
+
+
 def place_order(ticker, side, quantity):
     """
     side: 'BUY' or 'SELL'
     """
+    if not _tcp_ok(HOST, PORT):
+        print(f"[错误] FutuOpenD 不可达 {HOST}:{PORT}")
+        return None
     trd_side = TrdSide.BUY if side == 'BUY' else TrdSide.SELL
     symbol = f"US.{ticker}"
 
@@ -60,6 +74,9 @@ def place_order(ticker, side, quantity):
 
 def get_positions():
     """查看当前持仓"""
+    if not _tcp_ok(HOST, PORT):
+        print(f"[错误] FutuOpenD 不可达 {HOST}:{PORT}")
+        return None
     ctx = OpenSecTradeContext(
         filter_trdmarket=TrdMarket.US,
         host=HOST,
@@ -82,6 +99,9 @@ def get_positions():
 
 def get_account_info():
     """查看账户资金"""
+    if not _tcp_ok(HOST, PORT):
+        print(f"[错误] FutuOpenD 不可达 {HOST}:{PORT}")
+        return None
     ctx = OpenSecTradeContext(
         filter_trdmarket=TrdMarket.US,
         host=HOST,

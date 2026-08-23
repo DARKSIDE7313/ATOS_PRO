@@ -12,6 +12,11 @@ def run_backtest(ticker="TSLA"):
         print(f"[错误] 无法获取 {ticker} 的数据，请检查股票代码")
         return
 
+    # L8 修复: yf.download 单标的可能返回 MultiIndex columns，
+    # 直接 df["Close"] 会得到 DataFrame 而非 Series，squeeze().tolist() 报错/错值。
+    import pandas as pd
+    if isinstance(df.columns, pd.MultiIndex):
+        df = df.xs(ticker, axis=1, level=1)
     closes = df["Close"].squeeze().tolist()
     print(f"数据下载完成，共 {len(closes)} 根K线")
 

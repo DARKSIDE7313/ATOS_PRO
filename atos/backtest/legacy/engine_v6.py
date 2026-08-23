@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# ⚠️ DEPRECATED — Phase 5 框架重塑 (2026-08-22) 归档。回测引擎 v6, 当前唯一活跃实现: atos/backtest/engine_v7.py。
+# 归档前已确认全仓库零 import 引用; 保留仅为历史参考, 生产代码不得引用。
 """ATOS Backtest v6 — Unified Strategy Comparison"""
 import yfinance as yf
 import pandas as pd
@@ -10,21 +12,26 @@ from atos.core.fee_model import futu_buy_fee, futu_sell_fee
 POOL = ['NVDA','AAPL','MSFT','GOOGL','META','AMZN','AVGO','AMD','CRM','NFLX','PLTR','MU','TSLA']
 ALL = ['QQQ','SPY'] + POOL
 
+# Phase 5 归档时补 __main__ 保护: import 不再下载数据/跑回测
 data = {}
-for sym in ALL:
-    df = yf.download(sym, start='2016-01-01', end='2026-08-01', progress=False, auto_adjust=True)
-    if not df.empty:
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
-        data[sym] = df
-print(f"Downloaded {len(data)} symbols")
 
-for sym in data:
-    df = data[sym]
-    df['mom_21'] = df['Close'].pct_change(21)
-    df['rsi'] = 100 - 100/(1 + df['Close'].diff().clip(lower=0).rolling(14).mean() / df['Close'].diff().clip(upper=0).abs().rolling(14).mean())
-    df['ma50'] = df['Close'].rolling(50).mean()
-    df['dist_high'] = (df['Close'] / df['Close'].rolling(20).max() - 1) * 100
+def _prepare_data():
+    global data
+    data = {}
+    for sym in ALL:
+        df = yf.download(sym, start='2016-01-01', end='2026-08-01', progress=False, auto_adjust=True)
+        if not df.empty:
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+            data[sym] = df
+    print(f"Downloaded {len(data)} symbols")
+
+    for sym in data:
+        df = data[sym]
+        df['mom_21'] = df['Close'].pct_change(21)
+        df['rsi'] = 100 - 100/(1 + df['Close'].diff().clip(lower=0).rolling(14).mean() / df['Close'].diff().clip(upper=0).abs().rolling(14).mean())
+        df['ma50'] = df['Close'].rolling(50).mean()
+        df['dist_high'] = (df['Close'] / df['Close'].rolling(20).max() - 1) * 100
 
 def _next_open(df, dates, i):
     """M12: T+1 开盘价（消除未来函数：T 日收盘信号 -> T+1 日开盘成交）。无下一天返回 None。"""
@@ -118,30 +125,36 @@ def run(core_pct, alpha_pct, cash_pct, n_stocks, label):
     return {'label':label,'annual':round(ar,2),'max_dd':round(mdd,1),'sharpe':round(sr,2),
             'trades':trades,'fees':round(total_fees),'fee_yr':round(total_fees/300000/yrs*100,2),'final':round(fv)}
 
-configs = [
-    (0.60, 0.40, 0.00, 5, 'A: v28i (60/40/0)'),
-    (0.60, 0.30, 0.10, 5, 'B: v29 unified (60/30/10)'),
-    (0.65, 0.25, 0.10, 5, 'C: defensive (65/25/10)'),
-    (0.55, 0.35, 0.10, 5, 'D: aggressive (55/35/10)'),
-    (0.60, 0.30, 0.10, 7, 'E: diversified 7 (60/30/10)'),
-    (0.50, 0.40, 0.10, 5, 'F: balanced (50/40/10)'),
-    (0.70, 0.20, 0.10, 5, 'G: conservative (70/20/10)'),
-]
+def main():
+    _prepare_data()
+    configs = [
+        (0.60, 0.40, 0.00, 5, 'A: v28i (60/40/0)'),
+        (0.60, 0.30, 0.10, 5, 'B: v29 unified (60/30/10)'),
+        (0.65, 0.25, 0.10, 5, 'C: defensive (65/25/10)'),
+        (0.55, 0.35, 0.10, 5, 'D: aggressive (55/35/10)'),
+        (0.60, 0.30, 0.10, 7, 'E: diversified 7 (60/30/10)'),
+        (0.50, 0.40, 0.10, 5, 'F: balanced (50/40/10)'),
+        (0.70, 0.20, 0.10, 5, 'G: conservative (70/20/10)'),
+    ]
 
-results = []
-for core, alpha, cb, n, label in configs:
-    r = run(core, alpha, cb, n, label)
-    results.append(r)
-    print(f"  {label}: {r['annual']}% dd={r['max_dd']}% sharpe={r['sharpe']}")
+    results = []
+    for core, alpha, cb, n, label in configs:
+        r = run(core, alpha, cb, n, label)
+        results.append(r)
+        print(f"  {label}: {r['annual']}% dd={r['max_dd']}% sharpe={r['sharpe']}")
 
-results.sort(key=lambda x:-x['annual'])
-print(f"\n{'='*70}")
-print(f"{'Strategy':>38} {'Annual':>8} {'MaxDD':>7} {'Sharpe':>6} {'Fee/yr':>7}")
-print(f"{'-'*70}")
-for r in results:
-    print(f"{r['label']:>38} {r['annual']:>7.2f}% {r['max_dd']:>6.1f}% {r['sharpe']:>6.2f} {r['fee_yr']:>6.2f}%")
+    results.sort(key=lambda x:-x['annual'])
+    print(f"\n{'='*70}")
+    print(f"{'Strategy':>38} {'Annual':>8} {'MaxDD':>7} {'Sharpe':>6} {'Fee/yr':>7}")
+    print(f"{'-'*70}")
+    for r in results:
+        print(f"{r['label']:>38} {r['annual']:>7.2f}% {r['max_dd']:>6.1f}% {r['sharpe']:>6.2f} {r['fee_yr']:>6.2f}%")
 
-out = {'timestamp': str(pd.Timestamp.now()), 'results': results}
-with open(os.path.join(os.path.dirname(__file__),'..','..','data','backtest_v6_result.json'),'w') as f:
-    json.dump(out, f, indent=2, default=str)
-print(f"\nSaved to data/backtest_v6_result.json")
+    out = {'timestamp': str(pd.Timestamp.now()), 'results': results}
+    with open(os.path.join(os.path.dirname(__file__),'..','..','data','backtest_v6_result.json'),'w') as f:
+        json.dump(out, f, indent=2, default=str)
+    print(f"\nSaved to data/backtest_v6_result.json")
+
+
+if __name__ == '__main__':
+    main()

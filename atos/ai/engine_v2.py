@@ -1,4 +1,6 @@
 """ATOS PRO v3 — AI 决策引擎 v3（重写版）
+⚠️ DEPRECATED (Phase 5, 2026-08-22): 当前活跃实现 atos/ai/advisor_enhanced.py (v6)。
+本文件仅因 atos/ai/__init__ 兼容链保持可导入, 生产路径不再直接调用。
 ===================================
 核心变更（v3大改）:
   1. AI 只有否决权（veto），不能生成交易指令

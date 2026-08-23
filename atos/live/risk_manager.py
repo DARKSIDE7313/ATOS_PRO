@@ -159,6 +159,12 @@ def check_daily_limits(total_equity: float) -> dict:
     # 日亏损熔断
     if total_equity > 0 and _daily_pnl_pct <= -MAX_DAILY_LOSS_PCT:
         _trade_circuit_open = True
+        # Phase 5: 熔断打开立即联动 v29 状态机 (不等下次 save_risk_state)
+        try:
+            from atos.core.risk_coordinator import sync_from_legacy
+            sync_from_legacy(get_state())
+        except Exception:
+            pass
         return {
             "can_trade": False,
             "reason": f"日亏损{_daily_pnl_pct:.2%}达到熔断线{MAX_DAILY_LOSS_PCT:.0%}",
@@ -273,6 +279,8 @@ def load_risk_state():
     """从 risk_state.json 加载持久化的风险状态。
 
     在系统启动时调用，以恢复熔断/回撤等状态。
+    Phase 5c: 跨天启动时复位日级熔断状态，并在恢复后联动 v29 状态机
+    (sync_from_legacy)，修复"熔断已触发但 system_state 仍 PAPER"的双轨不一致。
     """
     global _daily_pnl_pct, _daily_pnl, _orders_this_cycle, _orders_this_day
     global _consecutive_losses, _current_drawdown, _trade_circuit_open
@@ -280,6 +288,13 @@ def load_risk_state():
     path = _get_risk_state_path()
     if not os.path.exists(path):
         return  # First run, nothing to restore
+
+    logger = None
+    try:
+        from atos.core.logging import get_logger
+        logger = get_logger("risk_manager")
+    except Exception:
+        pass
 
     try:
         with open(path, "r") as f:
@@ -292,25 +307,39 @@ def load_risk_state():
         _current_drawdown = data.get("current_drawdown", 0.0)
         _trade_circuit_open = data.get("circuit_open", False)
 
+        # Phase 5c: 跨天复位日级熔断 — 日亏损/日熔断只属于当天。
+        # 跨天启动时应清零，避免历史某天的 -7.38% 日亏熔断延续到新交易日。
+        # consecutive_losses / current_drawdown 是跨日指标，保留。
+        import datetime as _dt
+        try:
+            _saved_date = _dt.datetime.fromisoformat(data.get("saved_at", "")).date()
+            _is_today = (_saved_date == _dt.date.today())
+        except Exception:
+            _is_today = True  # 日期无法解析时保守视为当天，不误复位
+        if not _is_today:
+            _daily_pnl_pct = 0.0
+            _daily_pnl = 0.0
+            _orders_this_day = 0
+            _trade_circuit_open = False
+            if logger:
+                logger.info(f"跨天启动: 日级熔断状态已复位 (saved_at={data.get('saved_at')})")
+
         # Don't restore _orders_this_cycle — it resets every cycle anyway
 
-        logger = None
-        try:
-            from atos.core.logging import get_logger
-            logger = get_logger("risk_manager")
-        except Exception:
-            pass
         if logger:
             logger.info(f"风险状态恢复: 日PnL={_daily_pnl:.2f} 回撤={_current_drawdown:.2%} 熔断={_trade_circuit_open}")
     except Exception as e:
-        logger = None
-        try:
-            from atos.core.logging import get_logger
-            logger = get_logger("risk_manager")
-        except Exception:
-            pass
         if logger:
             logger.warning(f"风险状态加载失败: {e}")
+        return
+
+    # Phase 5c: 恢复完成后立即联动 v29 状态机 —
+    # 修复"熔断已触发但 system_state 仍 PAPER"的双轨不一致 (启动路径此前漏掉 sync)。
+    try:
+        from atos.core.risk_coordinator import sync_from_legacy
+        sync_from_legacy(get_state())
+    except Exception:
+        pass
 
 
 def save_risk_state():
@@ -337,3 +366,11 @@ def save_risk_state():
         os.replace(tmp_path, path)
     except Exception:
         pass  # Silent fail — state is not critical for correctness
+
+    # Phase 5: 双风控轨联动 — legacy 熔断状态同步到 v29 状态机 (单一决策源:
+    # atos.core.risk_coordinator)。熔断打开 → 状态机强制 HALT_NEW_ORDERS。
+    try:
+        from atos.core.risk_coordinator import sync_from_legacy
+        sync_from_legacy(get_state())
+    except Exception:
+        pass  # 联动失败不阻塞风控持久化
