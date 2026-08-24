@@ -80,6 +80,8 @@ def normalize_position(pos: dict) -> dict:
 
 def normalize_positions(positions: dict) -> dict:
     """批量标准化持仓字典 (状态加载时调用一次)"""
+    if not positions:
+        return positions or {}
     for sym, pos in positions.items():
         normalize_position(pos)
     return positions

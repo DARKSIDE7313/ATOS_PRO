@@ -59,6 +59,9 @@ def sync_from_legacy(rm_state: dict) -> bool:
         logger.warning(f"risk_coordinator: 状态机不可用, 跳过联动: {e}")
         return False
 
+    if not isinstance(rm_state, dict):
+        rm_state = rm_state or {}
+
     circuit_open = bool(rm_state.get("circuit_open", False))
 
     # ── 熔断打开 → 强制 HALT_NEW_ORDERS ──
