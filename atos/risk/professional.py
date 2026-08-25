@@ -140,13 +140,13 @@ class TrailingStop:
         self.confirm_cycles = confirm_cycles
         self._breach_count = 0
         self._min_trail_pct = 0.03   # 最低追踪 3%（保护利润）
-        self._max_trail_pct = 0.08   # 最高追踪 8%（防止止损太宽）
+        self._max_trail_pct = 0.20   # 最高追踪 20%（v4pro: 原 8% 击穿趋势自适应意图，放宽至 20%）
         self.activation_price = None  # M18: 激活价（保本线），在 __init__ 声明避免 AttributeError
 
     def init(self, entry_price: float):
         self.entry_price = entry_price
         self.highest_price = entry_price
-        # 夹紧 trail_pct 到 [3%, 8%]
+        # 夹紧 trail_pct 到 [3%, 20%]
         effective_trail = max(self._min_trail_pct, min(self._max_trail_pct, self.trail_pct))
         self.stop_price = entry_price * (1 - effective_trail)
         self.trail_pct = effective_trail
