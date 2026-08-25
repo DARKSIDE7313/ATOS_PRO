@@ -212,7 +212,7 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
                 _pos = account.positions[_sym]
                 _qty = get_qty(_pos)
                 if _qty > 0:
-                    _price = signals.get(_sym, {}).get("price", _pos.get("last_price", 0)) if 'signals' in dir() else _pos.get("last_price", 0)
+                    _price = _pos.get("last_price", 0)
                     if _price > 0:
                         account.execute(_sym, "SELL", _qty, _price, reason=f"安全层清仓: {_safety['reasons'][0]}")
             return
@@ -468,12 +468,12 @@ def main():
     state_file = get_state_file_path()
 
     # v11: 短线资金上限
-    max_short_capital = ALLOCATION.get("short_term", 300_000)
+    max_short_capital = ALLOCATION.get("short_term", 1_000_000)
 
     # 恢复状态
     saved = load_saved_state()
     if saved is not None:
-        # v11: 强制上限 — 防止旧状态$1M覆盖配置的$300K
+        # v11: 强制上限 — 防止旧状态覆盖当前 $1M 配置
         # v24 FIX: 允许利润累积 — cap改为initial*1.5（允许50%利润），不再吞掉收益
         max_allowed = max_short_capital * 1.50  # 允许最多50%利润
         initial = min(saved.get("initial_cash", max_short_capital), max_short_capital)

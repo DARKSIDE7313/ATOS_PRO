@@ -21,6 +21,7 @@ from atos.debugger.safety_net import safe_price, is_duplicate_order
 from atos.shadow.state_store import save_account_state
 from atos.config_shared import POSITION_CAPS
 from atos.core.position_schema import get_qty, set_qty
+from atos.core.fee_model import futu_buy_fee, futu_sell_fee
 
 logger = get_logger("shadow_trader")
 
@@ -278,11 +279,7 @@ class ShadowAccount:
         # 硬性现金下限
         if action == "BUY":
             min_cash = self.total_equity * self.min_cash_pct
-            try:
-                from atos.core.fee_model import futu_buy_fee
-                estimated_cost = price * shares + futu_buy_fee(shares, price)
-            except ImportError:
-                estimated_cost = price * shares + max(self.min_commission, shares * self.commission_per_share)
+            estimated_cost = price * shares + futu_buy_fee(shares, price)
             if self.cash - estimated_cost < min_cash:
                 affordable = int((self.cash - min_cash) / (price * 1.001))
                 if affordable <= 0:
@@ -326,11 +323,7 @@ class ShadowAccount:
         slip = price * dynamic_slip
         fill = price + slip if action == "BUY" else price - slip
         # v28: Futu 真实费用模型
-        try:
-            from atos.core.fee_model import futu_buy_fee, futu_sell_fee
-            comm = futu_buy_fee(shares, fill) if action == "BUY" else futu_sell_fee(shares, fill)
-        except ImportError:
-            comm = max(self.min_commission, shares * self.commission_per_share)
+        comm = futu_buy_fee(shares, fill) if action == "BUY" else futu_sell_fee(shares, fill)
         pnl = 0.0  # Fix: 声明在外层，log_trade 可以访问
 
         if action == "BUY":

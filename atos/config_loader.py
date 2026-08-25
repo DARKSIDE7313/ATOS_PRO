@@ -68,7 +68,7 @@ def current_scenario() -> str:
 def get_capital() -> dict:
     """获取资金配置"""
     cfg = load_config()
-    return cfg.get("capital", {"short_term": 300000, "long_term": 1000000, "total": 1300000})
+    return cfg.get("capital", {"short_term": 1000000, "long_term": 0, "total": 1000000})
 
 
 def get_factor_config() -> dict:

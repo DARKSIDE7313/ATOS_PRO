@@ -22,7 +22,7 @@ if os.path.exists(STATE_FILE):
         last = p.get("last_price", 0)
         avg = p.get("avg_price", 0)
         if last is None or (isinstance(last, float) and math.isnan(last)):
-            p["last_price"] = avg if avg and str(avg) != "nan" else 0
+            p["last_price"] = avg if avg and not (isinstance(avg, float) and math.isnan(avg)) else 0
             fixed += 1
     
     state["equity"] = state.get("cash", 0) + sum(

@@ -14,6 +14,7 @@ ATOS PRO — 权益追踪与周期结算 (Phase 5 框架重塑)
 import os
 import json
 import datetime
+import math
 
 from atos.core.logging import get_logger
 from atos.shadow.cycle_state import CycleState
@@ -36,7 +37,7 @@ def compute_cycle_return(account, current_eq: float) -> float:
     # 精确计算 cycle return
     cycle_ret = (current_eq - prev_eq) / prev_eq if prev_eq > 0 else 0
     # 防御 nan
-    if isinstance(cycle_ret, float) and str(cycle_ret) in ("nan", "inf", "-inf"):
+    if isinstance(cycle_ret, float) and (math.isnan(cycle_ret) or math.isinf(cycle_ret)):
         cycle_ret = 0.0
     return cycle_ret
 
