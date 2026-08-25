@@ -48,7 +48,7 @@ from atos.config_shared import ALLOCATION
 from atos.core.logging import get_logger, log_trade, log_risk
 from atos.live.signal_engine import get_signals, get_realtime_signals
 from atos.live.risk_manager import (
-    check_all_stops, record_fill, reset_cycle, update_drawdown,
+    check_all_stops, record_fill, reset_cycle, reset_daily, update_drawdown,
     get_state as get_risk_state, COOLDOWN_CYCLES,
 )
 from atos.market.regime.regime_engine import RegimeEngine
@@ -122,6 +122,29 @@ logger = get_logger("shadow_trader")
 
 
 # ============================================================
+# P0-1: 日级风控重置 — 活跃循环跨天边界调用 risk_manager.reset_daily()
+# 修复 B1: reset_daily() 原本只在死代码 live_trader.py 调用，活跃循环从不调用，
+# 导致 _daily_pnl_pct / _orders_this_day 跨天无限累积 (追踪止损永久加宽)。
+# reset_daily() 内部保留 consecutive_losses / current_drawdown 等跨日指标。
+# ============================================================
+_last_daily_reset_date = None
+
+
+def _run_daily_reset_if_new_day():
+    """在每日边界（美东市场日期跨天）调用 reset_daily()。"""
+    global _last_daily_reset_date
+    try:
+        from atos.core.market_clock import get_market_date
+        _today = get_market_date()
+    except Exception:
+        _today = datetime.date.today()
+    if _last_daily_reset_date != _today:
+        reset_daily()
+        _last_daily_reset_date = _today
+        logger.info(f"🌅 日级风控状态已重置（新交易日 {_today}）")
+
+
+# ============================================================
 # 主交易循环 — 周期编排
 # ============================================================
 def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
@@ -129,6 +152,7 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
     state = CycleState.get()
     account.cycle_count += 1
     reset_cycle()
+    _run_daily_reset_if_new_day()  # P0-1: 跨天日级重置 (保留跨日指标)
     logger.info(f"Cycle {cycle} (#{account.cycle_count}) | "
                 f"Equity=${account.total_equity:,.0f} | "
                 f"Cash=${account.cash:,.0f} | "

@@ -81,6 +81,18 @@ def is_market_open() -> tuple:
     return True, "正常交易"
 
 
+def get_market_date() -> datetime.date:
+    """返回当前美东市场日期 (跨天检测单一真源)。
+
+    供日级风控重置等跨天逻辑使用 — 与 is_market_open() 用同一时区/假日基准。
+    """
+    from zoneinfo import ZoneInfo
+    try:
+        return datetime.datetime.now(ZoneInfo("America/New_York")).date()
+    except Exception:
+        return datetime.datetime.now().date()
+
+
 def is_open_now() -> bool:
     """布尔便捷接口 (供只关心 True/False 的调用方)"""
     return is_market_open()[0]

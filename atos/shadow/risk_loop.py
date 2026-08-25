@@ -64,50 +64,11 @@ def run_risk_phase(account, signals, spy_trend) -> tuple:
     # 仅保留止损(-5%)和止盈(+15%)作为退出机制
     ROTATION_DISABLED = True
 
-    # ── v24: 两阶段部分止盈 — 基于 GS 成功模式优化 ──
-    # GS 实证: 7次分批止盈各~9%, 共+$2,212 → 提前到+5%首次锁利
-    # Renaissance 核心: 让利润跑但分阶段锁定
-    # v28: 跳过 — v28 持仓不做分批止盈，让利润充分奔跑
-    for sym, pos in list(account.positions.items()):
-        if is_v28_position(sym):
-            continue  # v28 持仓跳过
-        qty_now = pos.get("shares", pos.get("qty", 0))
-        px = signals.get(sym, {}).get("price", pos.get("avg_price", 0))
-        if px <= 0: continue
-        pnl = (px - pos["avg_price"]) / pos["avg_price"] if pos["avg_price"] > 0 else 0
-
-        # Tier 1: +5% → 卖1/4锁利 (GS模式: 第一次止盈)
-        if pnl >= 0.05 and pnl < 0.15 and qty_now >= 4:
-            partial_key = f"_partial1_{sym}"
-            if not getattr(account, partial_key, False):
-                sell_qty = max(1, qty_now // 4)
-                if sell_qty > 0:
-                    account.execute(sym, "SELL", sell_qty, px,
-                                  reason=f"Tier1止盈 +{pnl:.1%} (卖1/4锁利@5%)")
-                    logger.info(f"💰 Tier1止盈: {sym} {sell_qty}/{qty_now}股 +{pnl:.1%}")
-                    setattr(account, partial_key, True)
-
-        # Tier 2: +15% → 再卖1/4 (原逻辑保留)
-        elif pnl >= 0.15 and qty_now >= 4:
-            sell_qty = max(1, qty_now // 4)
-            if sell_qty > 0:
-                account.execute(sym, "SELL", sell_qty, px,
-                              reason=f"Tier2止盈 +{pnl:.1%} (卖1/4锁利@15%)")
-                logger.info(f"💰 Tier2止盈: {sym} {sell_qty}/{qty_now}股 +{pnl:.1%}")
-
-        # ── v24: Citadel 动量衰减止盈 ──
-        # 浮盈>3%但MACD转负 → 动量衰减，提前锁利
-        if pnl > 0.03:
-            macd_val = signals.get(sym, {}).get("macd_hist", 0)
-            if macd_val < -0.3:
-                momentum_exit_key = f"_momexit_{sym}"
-                if not getattr(account, momentum_exit_key, False):
-                    sell_qty = max(1, qty_now // 3)
-                    if sell_qty > 0:
-                        account.execute(sym, "SELL", sell_qty, px,
-                                      reason=f"动量衰减止盈 +{pnl:.1%} MACD={macd_val:.2f} (卖1/3)")
-                        logger.info(f"📉 动量衰减止盈: {sym} {sell_qty}股 +{pnl:.1%} MACD转负")
-                        setattr(account, momentum_exit_key, True)
+    # ── P0-2: 循环1 两阶段部分止盈(+5%/+15%) 已合并入下方 4b 的单一非-v28 止盈状态机 ──
+    # 原循环1 的 Tier1/Tier2 (+5%/+15%, _partial1_ 旗标) 与 4b 的 Tier1/Tier2/Tier3
+    # (+3%/+5%/+8%, recent_partials) 是两套独立状态机，同仓会双倍部分止盈。
+    # 现统一为 4b 的单一三档止盈表 (单一 recent_partials 来源)。
+    # Citadel 动量衰减止盈 (MACD<0) 亦并入 4b (见下方)。
 
     # 4b. 追踪止损（每个标的独立判断）
     # BUGFIX 2026-06-11:
@@ -117,9 +78,18 @@ def run_risk_phase(account, signals, spy_trend) -> tuple:
     #   - 追踪止损本身已经有 confirm_cycles 保护，但确认完才触发
 
     # 检查日亏损状态：如果今天已经亏得多，加宽止损容忍度
+    # P0-1: dd_widen_factor 改用日级权益基准。主源 = kill_switch 的日级 _day_start_equity
+    # (mark-to-market 日内亏损)；兜底 = 复位后的 legacy _daily_pnl_pct
+    # (已由 shadow_trader 跨天 reset_daily() 保证日级，不再是跨天累积值)。
     from atos.live.risk_manager import get_state as get_rm_state
+    from atos.core.kill_switch import get_kill_switch
     rm_state = get_rm_state()
-    daily_pnl_pct = abs(rm_state.get("daily_pnl_pct", 0))
+    _ks = get_kill_switch()
+    _day_start_eq = _ks.get_day_start_equity()
+    if _day_start_eq and _day_start_eq > 0:
+        daily_pnl_pct = abs((account.total_equity - _day_start_eq) / _day_start_eq)
+    else:
+        daily_pnl_pct = abs(rm_state.get("daily_pnl_pct", 0))
     dd_widen_factor = 1.0
     if daily_pnl_pct > 0.035:  # v10: 日亏>3.5%才加宽 (原2.5%太敏感)
         dd_widen_factor = 1.4
@@ -189,6 +159,21 @@ def run_risk_phase(account, signals, spy_trend) -> tuple:
         # v28: 只用硬止损(5%) + 移动止损(8%) + 季度再平衡，不做分批止盈
         _v28_position = is_v28_position(sym)
         if not _v28_position:
+            # ── v24: Citadel 动量衰减止盈 (自循环1合并 — P0-2) ──
+            # 浮盈>3%但MACD转负 → 动量衰减，提前锁利
+            if pnl_pct > 0.03:
+                macd_val = signals.get(sym, {}).get("macd_hist", 0)
+                if macd_val < -0.3:
+                    momentum_exit_key = f"_momexit_{sym}"
+                    if not getattr(account, momentum_exit_key, False):
+                        sell_qty = max(1, pos["qty"] // 3)
+                        if sell_qty > 0:
+                            account.execute(sym, "SELL", sell_qty, price,
+                                          reason=f"动量衰减止盈 +{pnl_pct:.1%} MACD={macd_val:.2f} (卖1/3)")
+                            logger.info(f"📉 动量衰减止盈: {sym} {sell_qty}股 +{pnl_pct:.1%} MACD转负")
+                            setattr(account, momentum_exit_key, True)
+                            continue
+
             # ── v23: 利润保护 — 更早保本 + 分批止盈 ──
             # 0. v25: Renaissance 快速剥头皮 — 持仓<1天且盈利>2% → 快速锁利
             buy_time_str = pos.get("buy_time", "")

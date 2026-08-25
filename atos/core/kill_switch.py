@@ -78,6 +78,10 @@ class KillSwitch:
 
         return False
 
+    def get_day_start_equity(self):
+        """返回当前交易日的基准权益 (日级 _day_start_equity)。未初始化返回 None。"""
+        return self._day_start_equity
+
     def is_active(self) -> bool:
         return self.sm.state == SystemState.KILL_SWITCH or os.path.exists(KILL_FILE)
 
