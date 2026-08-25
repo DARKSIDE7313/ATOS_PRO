@@ -19,27 +19,15 @@ from dataclasses import dataclass, field, asdict
 from typing import Optional
 
 from atos.core.system_state import SystemStateMachine, SystemState
+from atos.config_shared import POSITION_CAPS as CAPS
+from atos.shadow.strategy_v28 import V28_CORE_SYMBOL
+from atos.core.position_schema import get_qty
 
 # 绕过 atos/core/logging.py 对标准库 logging 的遮蔽
 logger = _importlib.import_module('logging').getLogger(__name__)
 
 BASE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DECISIONS_FILE = os.path.join(BASE, 'data', 'risk_decisions.jsonl')
-
-# v28 策略持仓 (与 shadow_trader.V28_ALPHA_UNIVERSE 对齐)
-V28_CORE = {"QQQ"}
-V28_ALPHA = {"NVDA", "AAPL", "MSFT", "GOOGL", "META", "AMZN",
-             "AVGO", "AMD", "CRM", "NFLX", "PLTR", "MU", "TSLA"}
-
-# 仓位上限 (规格书 §7.3 hard caps)
-CAPS = {
-    'single_stock_pct': 0.12,   # 个股上限 12%
-    'etf_pct': 0.65,            # ETF 上限 65% (QQQ 核心仓设计如此)
-    'total_position_pct': 0.98, # 总仓位上限 98%
-    'min_cash_pct': 0.02,       # 最低现金 2%
-    'price_collar_pct': 0.05,   # 价格 collar ±5%
-    'max_order_notional': 200_000,  # 单笔名义上限 $200K
-}
 
 
 @dataclass
@@ -146,7 +134,7 @@ class PreTradeRiskGate:
                 # ── SELL 侧检查 ──
                 # 7. 持仓充足
                 pos = account.positions.get(intent.symbol, {})
-                held = pos.get('qty', pos.get('shares', 0))
+                held = get_qty(pos)
                 checks['has_position'] = held >= qty
                 if not checks['has_position']:
                     reasons.append(f"INSUFFICIENT_POSITION:held={held},req={qty}")
@@ -167,12 +155,12 @@ class PreTradeRiskGate:
                     qty = max(0, min(qty, affordable))
 
                 # 9. 单仓上限 (ETF vs 个股区分 — v28d 教训)
-                cap_pct = CAPS['etf_pct'] if intent.symbol in V28_CORE else CAPS['single_stock_pct']
+                cap_pct = CAPS['etf_pct'] if intent.symbol == V28_CORE_SYMBOL else CAPS['single_stock_pct']
                 max_val = equity * cap_pct
                 cur_val = 0
                 if intent.symbol in account.positions:
                     _pos = account.positions[intent.symbol]
-                    cur_val = _pos.get('qty', _pos.get('shares', 0)) * intent.price
+                    cur_val = get_qty(_pos) * intent.price
                 room = max_val - cur_val
                 checks['single_cap'] = room > 0
                 if room <= 0:
@@ -184,7 +172,7 @@ class PreTradeRiskGate:
 
                 # 10. 总仓位上限
                 total_pos = sum(
-                    p.get('qty', p.get('shares', 0)) * p.get('last_price', p.get('avg_price', 0))
+                    get_qty(p) * p.get('last_price', p.get('avg_price', 0))
                     for p in account.positions.values()
                 )
                 max_total = equity * CAPS['total_position_pct']

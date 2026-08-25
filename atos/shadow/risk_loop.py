@@ -29,6 +29,7 @@ from atos.core.logging import get_logger, log_trade, log_risk
 from atos.live.risk_manager import check_all_stops, update_drawdown
 from atos.risk.professional import TrailingStop, triple_barrier
 from atos.shadow.strategy_v28 import is_v28_position
+from atos.core.position_schema import get_qty
 
 logger = get_logger("shadow_trader")
 
@@ -46,7 +47,7 @@ def run_risk_phase(account, signals, spy_trend) -> tuple:
         px = signals.get(sym, {}).get("price", 0)
         if px <= 0:
             continue
-        qty = min(order["qty"], account.positions.get(sym, {}).get("qty", 0))
+        qty = min(order["qty"], get_qty(account.positions.get(sym, {})))
         if qty <= 0:
             continue
         account.execute(sym, "SELL", qty, px, reason=order["reason"])
@@ -145,12 +146,12 @@ def run_risk_phase(account, signals, spy_trend) -> tuple:
             tb = triple_barrier(pos["avg_price"], price, 0.0, hold_days,
                                volatility=max(0.01, atr_pct), max_hold_days=20)
             if tb["exit"] and tb["barrier"] == "time":
-                account.execute(sym, "SELL", pos["qty"], price,
+                account.execute(sym, "SELL", get_qty(pos), price,
                               reason=f"时间到期 {hold_days:.0f}天 (Triple-Barrier)")
                 logger.info(f"⏰ Triple-Barrier: {sym} 持仓{hold_days:.0f}天 到期退出")
                 continue
             if tb["exit"] and tb["barrier"] == "stop":
-                account.execute(sym, "SELL", pos["qty"], price,
+                account.execute(sym, "SELL", get_qty(pos), price,
                               reason=f"TB止损 (vol={atr_pct:.1%})")
                 logger.info(f"🛑 Triple-Barrier止损: {sym} PnL={pnl_pct:+.2%}")
                 continue
@@ -166,7 +167,7 @@ def run_risk_phase(account, signals, spy_trend) -> tuple:
                 if macd_val < -0.3:
                     momentum_exit_key = f"_momexit_{sym}"
                     if not getattr(account, momentum_exit_key, False):
-                        sell_qty = max(1, pos["qty"] // 3)
+                        sell_qty = max(1, get_qty(pos) // 3)
                         if sell_qty > 0:
                             account.execute(sym, "SELL", sell_qty, price,
                                           reason=f"动量衰减止盈 +{pnl_pct:.1%} MACD={macd_val:.2f} (卖1/3)")
@@ -182,7 +183,7 @@ def run_risk_phase(account, signals, spy_trend) -> tuple:
                     bought_dt = datetime.datetime.fromisoformat(str(buy_time_str))
                     hours_held = (datetime.datetime.now() - bought_dt).total_seconds() / 3600
                     if hours_held < 24 and pnl_pct >= 0.02:
-                        account.execute(sym, "SELL", pos["qty"], price, reason=f"快速剥头皮 +{pnl_pct:.1%} ({hours_held:.0f}h)")
+                        account.execute(sym, "SELL", get_qty(pos), price, reason=f"快速剥头皮 +{pnl_pct:.1%} ({hours_held:.0f}h)")
                         logger.info(f"⚡ 剥头皮: {sym} +{pnl_pct:.1%} {hours_held:.0f}h → 全卖")
                         continue
                 except (ValueError, TypeError):
@@ -199,30 +200,30 @@ def run_risk_phase(account, signals, spy_trend) -> tuple:
                 if t.get("symbol") == sym and "止盈" in t.get("reason", "")
             )
             if pnl_pct >= 0.03 and recent_partials == 0:
-                quarter = max(1, pos["qty"] // 4)
+                quarter = max(1, get_qty(pos) // 4)
                 account.execute(sym, "SELL", quarter, price, reason=f"Tier1止盈 +{pnl_pct:.1%} (卖1/4锁利@3%)")
                 logger.info(f"💰 Tier1止盈: {sym} +{pnl_pct:.1%} 卖{quarter}股")
                 continue
             if pnl_pct >= 0.05 and recent_partials == 1:
-                quarter = max(1, pos["qty"] // 4)
+                quarter = max(1, get_qty(pos) // 4)
                 account.execute(sym, "SELL", quarter, price, reason=f"Tier2止盈 +{pnl_pct:.1%} (卖1/4锁利@5%)")
                 logger.info(f"💰 Tier2止盈: {sym} +{pnl_pct:.1%} 卖{quarter}股")
                 continue
             if pnl_pct >= 0.08 and recent_partials == 2:
-                quarter = max(1, pos["qty"] // 4)
+                quarter = max(1, get_qty(pos) // 4)
                 account.execute(sym, "SELL", quarter, price, reason=f"Tier3止盈 +{pnl_pct:.1%} (卖1/4锁利@8%)")
                 logger.info(f"💰 Tier3止盈: {sym} +{pnl_pct:.1%} 卖{quarter}股")
                 continue
             # 3. 自适应止盈
             tp_level = 0.22 if spy_trend == "BULL" else (0.18 if spy_trend == "CAUTIOUS" else 0.12)
             if pnl_pct >= tp_level:
-                account.execute(sym, "SELL", pos["qty"], price, reason=f"止盈 +{pnl_pct:.1%}")
+                account.execute(sym, "SELL", get_qty(pos), price, reason=f"止盈 +{pnl_pct:.1%}")
                 logger.info(f"💰 止盈: {sym} +{pnl_pct:.1%}")
                 continue
             # 3b. Citadel超买主动止盈
             rsi_sell = signals.get(sym, {}).get("rsi", 50)
             if rsi_sell > 80 and pnl_pct > 0.02:
-                half = max(1, pos["qty"] // 2)
+                half = max(1, get_qty(pos) // 2)
                 account.execute(sym, "SELL", half, price, reason=f"超买止盈 RSI={rsi_sell:.0f} PnL={pnl_pct:+.1%}")
                 logger.info(f"📈 Citadel超买止盈: {sym} RSI={rsi_sell:.0f} PnL={pnl_pct:+.1%} 卖{half}股")
                 continue
@@ -248,7 +249,7 @@ def run_risk_phase(account, signals, spy_trend) -> tuple:
         else:
             sl_level = 0.12 if sym == "QQQ" else 0.05
         if pnl_pct <= -sl_level:
-            account.execute(sym, "SELL", pos["qty"], price, reason=f"硬止损 {pnl_pct:.1%} (上限{sl_level:.0%})")
+            account.execute(sym, "SELL", get_qty(pos), price, reason=f"硬止损 {pnl_pct:.1%} (上限{sl_level:.0%})")
             logger.info(f"🛑 止损: {sym} {pnl_pct:.1%} (上限{sl_level:.0%})")
             continue
 
@@ -259,7 +260,7 @@ def run_risk_phase(account, signals, spy_trend) -> tuple:
             score = signals.get(sym, {}).get("score", 0)
             macd_h = signals.get(sym, {}).get("macd_hist", 0)
             if score < 0.55 and macd_h <= 0:
-                account.execute(sym, "SELL", pos["qty"], price,
+                account.execute(sym, "SELL", get_qty(pos), price,
                               reason=f"Flat清理 {hold_days:.0f}天 PnL={pnl_pct:+.1%}")
                 logger.info(f"🗑 Flat清理: {sym} 持有{hold_days:.0f}天不涨 释放资金")
                 continue
@@ -299,7 +300,7 @@ def run_risk_phase(account, signals, spy_trend) -> tuple:
         result = account.trailing_stops[sym].update(price)
         if result["triggered"]:
             # v8: 不再给"额外机会"——触发就卖
-            account.execute(sym, "SELL", pos["qty"], price, reason=f"追踪止损 (确认{result['breach_count']}/{result['confirm_cycles']})")
+            account.execute(sym, "SELL", get_qty(pos), price, reason=f"追踪止损 (确认{result['breach_count']}/{result['confirm_cycles']})")
             log_risk("TRAILING_STOP", f"{sym}: {result['reason']}")
             logger.info(f"🎯 追踪止损: {sym} PnL={pnl_pct:+.2%}")
             continue
@@ -336,8 +337,8 @@ def run_risk_phase(account, signals, spy_trend) -> tuple:
             and macd_hist < 0.05
             and rsi < 55):
             reason = f"动量退出 (持{days_held}天, PnL{pnl_pct:+.1%}, MACD={macd_hist:.3f})"
-            account.execute(sym, "SELL", pos["qty"], lp, reason=reason)
-            log_trade("SELL", sym, pos["qty"], lp, reason)
+            account.execute(sym, "SELL", get_qty(pos), lp, reason=reason)
+            log_trade("SELL", sym, get_qty(pos), lp, reason)
             logger.info(f"🔄 {reason}: {sym}")
             continue
 
@@ -347,8 +348,8 @@ def run_risk_phase(account, signals, spy_trend) -> tuple:
             and macd_hist < 0
             and rsi < 40):
             reason = f"弱势退出 (持{days_held}天, PnL{pnl_pct:+.1%}, RSI={rsi:.0f})"
-            account.execute(sym, "SELL", pos["qty"], lp, reason=reason)
-            log_trade("SELL", sym, pos["qty"], lp, reason)
+            account.execute(sym, "SELL", get_qty(pos), lp, reason=reason)
+            log_trade("SELL", sym, get_qty(pos), lp, reason)
             logger.info(f"🔄 {reason}: {sym}")
             continue
 
@@ -369,14 +370,14 @@ def run_risk_phase(account, signals, spy_trend) -> tuple:
         if is_v28_position(sym):
             continue
         lp = pos.get("last_price", pos.get("avg_price", 0))
-        mkt_val = pos["qty"] * lp
+        mkt_val = get_qty(pos) * lp
         weight = mkt_val / account.total_equity if account.total_equity > 0 else 0
         if weight > _CONC_LIMIT and lp > 0:
             # 计算需要卖多少股才能回到12%
             target_val = account.total_equity * _CONC_TARGET
             excess_val = mkt_val - target_val
             sell_qty = max(1, int(excess_val / lp))
-            if sell_qty < pos["qty"]:
+            if sell_qty < get_qty(pos):
                 account.execute(sym, "SELL", sell_qty, lp,
                               reason=f"集中度熔断 {weight:.0%}>{_CONC_LIMIT:.0%} → 减至{_CONC_TARGET:.0%}")
                 logger.info(f"🛡️ 集中度熔断: {sym} {weight:.1%}>{_CONC_LIMIT:.0%} 卖{sell_qty}股")

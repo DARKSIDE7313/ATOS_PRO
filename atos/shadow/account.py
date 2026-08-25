@@ -19,6 +19,8 @@ from atos.core.logging import get_logger, log_trade
 from atos.live.risk_manager import record_fill, COOLDOWN_CYCLES
 from atos.debugger.safety_net import safe_price, is_duplicate_order
 from atos.shadow.state_store import save_account_state
+from atos.config_shared import POSITION_CAPS
+from atos.core.position_schema import get_qty, set_qty
 
 logger = get_logger("shadow_trader")
 
@@ -122,7 +124,7 @@ class ShadowAccount:
         pos_val = 0.0
         for p in self.positions.values():
             lp = p.get("last_price", p.get("avg_price", 0))
-            qty = p.get("shares", p.get("qty", p.get("quantity", 0)))  # Fix: 兼容 shares/qty/quantity 三个键名
+            qty = get_qty(p)  # Fix: 兼容 shares/qty/quantity 三个键名
             # 防御 nan / None / 负数
             if lp is None: lp = 0
             if isinstance(lp, float) and math.isnan(lp):
@@ -142,7 +144,7 @@ class ShadowAccount:
     def position_list(self) -> list:
         result = []
         for sym, p in self.positions.items():
-            qty = p.get("shares", p.get("qty", p.get("quantity", 0)))  # Fix: 兼容多键名
+            qty = get_qty(p)  # Fix: 兼容多键名
             last = p.get("last_price", p["avg_price"])
             pnl_pct = (last - p["avg_price"]) / p["avg_price"] if p["avg_price"] > 0 else 0
             result.append({
@@ -176,19 +178,19 @@ class ShadowAccount:
 
     @property
     def max_single_pct(self) -> float:
-        return 0.12          # v19: 单仓上限 12%（从 20% 降低，专业基金标准 ≤12%，
-                              # 防止单票黑天鹅事件造成过度集中损失）
+        # P1-2: 单一真源 config_shared.POSITION_CAPS (原 0.12 硬编码)
+        return POSITION_CAPS["single_stock_pct"]
 
     # v28: ETF 单仓上限（QQQ/SPY 是分散化ETF，不是单票）
-    ETF_MAX_PCT = 0.65       # QQQ 可以到 65%
+    ETF_MAX_PCT = POSITION_CAPS["etf_pct"]  # QQQ 可以到 65% (单一真源)
 
     @property
     def min_cash_pct(self) -> float:
-        return 0.02  # v28: 满仓策略，最低现金 2%
+        return POSITION_CAPS["min_cash_pct"]  # v28: 满仓策略，最低现金 2% (单一真源)
 
     def get_state(self) -> dict:
         pos_val = sum(
-            p.get("shares", p.get("qty", 0)) * p.get("last_price", p.get("avg_price", 0))
+            get_qty(p) * p.get("last_price", p.get("avg_price", 0))
             for p in self.positions.values()
         )
         return {
@@ -294,7 +296,7 @@ class ShadowAccount:
             max_single_val = self.total_equity * self.ETF_MAX_PCT
         else:
             max_single_val = self.total_equity * self.max_single_pct
-        current_val = self.positions[symbol].get("qty", self.positions[symbol].get("shares", 0)) * price if symbol in self.positions else 0
+        current_val = get_qty(self.positions[symbol]) * price if symbol in self.positions else 0
         max_buy = max_single_val - current_val
         if max_buy <= 0 and action == "BUY":
             logger.debug(f"  {symbol} 已达单仓上限 (${max_single_val:,.0f})")
@@ -302,9 +304,9 @@ class ShadowAccount:
 
         # 总仓位上限（v28: 满仓策略 98%，留 2% 现金缓冲）
         if action == "BUY" or action == "ADD":
-            total_pos_val = sum(p.get("qty", p.get("shares", 0)) * (p.get("last_price", p["avg_price"])) for p in self.positions.values())
+            total_pos_val = sum(get_qty(p) * (p.get("last_price", p["avg_price"])) for p in self.positions.values())
             estimated_buy = price * shares
-            max_total_pos = self.total_equity * 0.98
+            max_total_pos = self.total_equity * POSITION_CAPS["total_position_pct"]
             if total_pos_val + estimated_buy > max_total_pos:
                 available = max_total_pos - total_pos_val
                 if available <= 0:
@@ -350,7 +352,7 @@ class ShadowAccount:
             self.cash -= cost
             if symbol in self.positions:
                 old = self.positions[symbol]
-                old_shares = old.get("shares", old.get("qty", 0))
+                old_shares = get_qty(old)
                 total_qty = old_shares + shares
                 old_cost = old_shares * old["avg_price"]
                 self.positions[symbol] = {
@@ -377,7 +379,7 @@ class ShadowAccount:
             if symbol not in self.positions:
                 return False
             pos = self.positions[symbol]
-            actual_qty = pos.get("shares", pos.get("qty", 0))  # Fix: 用实际持仓量
+            actual_qty = get_qty(pos)  # Fix: 用实际持仓量
             if actual_qty < shares:
                 shares = actual_qty
 
@@ -396,8 +398,7 @@ class ShadowAccount:
             except Exception as e:
                 logger.warning(f"[Kelly] save_trade failed: {e}")
 
-            pos["qty"] -= shares
-            pos["shares"] = pos["qty"]  # Fix: 同步 shares 键
+            set_qty(pos, get_qty(pos) - shares)
 
             # v19 Fix: 反馈闭环 — 根据持仓中记录的AI决策ID追踪结果
             try:
@@ -411,7 +412,7 @@ class ShadowAccount:
             except Exception:
                 pass
 
-            if pos["qty"] <= 0:
+            if get_qty(pos) <= 0:
                 del self.positions[symbol]
                 if symbol in self.trailing_stops:
                     del self.trailing_stops[symbol]

@@ -15,10 +15,16 @@ ALLOCATION = {
     "reserve":    0,           # v30: 现金储备并入统一资金
 }
 
-# === 单策略限制 ===
-MAX_POSITION_PCT = {
-    "long_term":  0.15,      # 长期单仓 ≤15%
-    "short_term": 0.15,      # 短期单仓 ≤15% (从20%降为15%)
+# === 仓位上限 (Phase6 P1-2: 单一真源) ===
+# risk_gate.CAPS 与 account.max_single_pct/ETF_MAX_PCT/min_cash_pct 统一从这里读。
+# 修正: 原 MAX_POSITION_PCT["short_term"]=0.15 是误导性死配置, 实际单仓上限 = 12%。
+POSITION_CAPS = {
+    "single_stock_pct":   0.12,       # 个股单仓上限 12% (专业基金标准)
+    "etf_pct":            0.65,       # ETF 单仓上限 65% (QQQ 核心仓设计)
+    "total_position_pct": 0.98,       # 总仓位上限 98% (留 2% 现金缓冲)
+    "min_cash_pct":       0.02,       # 最低现金 2%
+    "price_collar_pct":   0.05,       # 价格 collar ±5%
+    "max_order_notional": 200_000,    # 单笔名义上限 $200K
 }
 
 MAX_POSITIONS = {

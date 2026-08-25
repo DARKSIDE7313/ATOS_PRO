@@ -16,6 +16,8 @@ import os
 import json
 
 from atos.config_shared import RISK
+from atos.shadow.strategy_v28 import is_v28_position
+from atos.core.position_schema import get_qty
 
 # H4: 风控参数统一从 config_shared.RISK 读取（消除 config_shared / risk_manager 双账本）
 MAX_DAILY_LOSS_PCT = RISK["max_daily_loss_pct"]        # 日亏损超过 2.5% → 熔断
@@ -86,12 +88,11 @@ def check_all_stops(positions: list, signals: dict) -> list:
     v29: v28 持仓(QQQ + alpha池)完全跳过 — 由主循环的 v28 止损逻辑处理
     """
     # v29: v28 持仓跳过此函数 (避免 18%止盈/ATR止损 干扰 v28 季度策略)
-    V28_SKIP = {"QQQ", "NVDA", "AAPL", "MSFT", "GOOGL", "META", "AMZN",
-                "AVGO", "AMD", "CRM", "NFLX", "PLTR", "MU", "TSLA"}
+    # P1-1: v28 宇宙单源化 — 统一走 strategy_v28.is_v28_position (不再硬编码)
     forced = []
     for p in positions:
         sym = p["symbol"]
-        if sym in V28_SKIP:
+        if is_v28_position(sym):
             continue  # v28 持仓由主循环处理止损
         px = signals.get(sym, {}).get("price", p.get("last", 0))
         if px <= 0:
@@ -101,7 +102,7 @@ def check_all_stops(positions: list, signals: dict) -> list:
         if avg <= 0:
             continue
         pnl_pct = (px - avg) / avg
-        qty = p["qty"]
+        qty = get_qty(p)
 
         # 1. 硬止盈（卖一半，最少1股 — v7修复: qty=1 也能退出）
         if pnl_pct >= TAKE_PROFIT_PCT:

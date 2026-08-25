@@ -56,3 +56,9 @@ dashboard.log
 phoenix_state.json
 .project/
 data/incidents/
+
+# Backup files (phase6)
+*.orig_bak
+*.orig_bak2
+*.phase6_bak
+*.pre_p0

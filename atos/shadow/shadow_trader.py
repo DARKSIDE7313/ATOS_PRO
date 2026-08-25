@@ -86,7 +86,7 @@ from atos.shadow.equity_tracker import (
     compute_cycle_return, record_cycle_equity, update_perf_tracker,
     record_daily_returns, write_day_changes,
 )
-from atos.core.position_schema import normalize_positions
+from atos.core.position_schema import normalize_positions, get_qty
 
 # ── 兼容旧导入路径的别名 (外部代码零改动) ──
 _save_account_state = save_account_state
@@ -210,7 +210,7 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
             # 卖光所有持仓
             for _sym in list(account.positions.keys()):
                 _pos = account.positions[_sym]
-                _qty = _pos.get("qty", _pos.get("shares", 0))
+                _qty = get_qty(_pos)
                 if _qty > 0:
                     _price = signals.get(_sym, {}).get("price", _pos.get("last_price", 0)) if 'signals' in dir() else _pos.get("last_price", 0)
                     if _price > 0:
@@ -571,10 +571,10 @@ def main():
                         lp = pos.get("last_price", pos.get("avg_price", 0))
                         pos_list.append({
                             "symbol": sym,
-                            "mkt_val": pos["qty"] * lp,
+                            "mkt_val": get_qty(pos) * lp,
                             "avg_price": pos.get("avg_price", 0),
                             "last_price": lp,
-                            "qty": pos["qty"],
+                            "qty": get_qty(pos),
                         })
                     alerts = check_concentration_risk(pos_list, correlation_threshold=0.75)
                     if alerts:
@@ -588,7 +588,7 @@ def main():
                             rpos = account.positions[reduce_sym]
                             rprice = rpos.get("last_price", rpos.get("avg_price", 0))
                             if rprice > 0:
-                                reduce_qty = max(1, int(rpos["qty"] * 0.30))
+                                reduce_qty = max(1, int(get_qty(rpos) * 0.30))
                                 reason = f"相关性减持 ({top['pair'][0]}-{top['pair'][1]} corr={top['correlation']:.0%})"
                                 account.execute(reduce_sym, "SELL", reduce_qty, rprice, reason=reason)
                                 logger.info(f"🔗 {reason} — 卖{reduce_sym} {reduce_qty}股")

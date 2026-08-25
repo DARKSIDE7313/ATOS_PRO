@@ -15,6 +15,7 @@ ATOS PRO — v29 QQQ Core + Alpha 策略模块 (Phase 5 框架重塑)
 import datetime
 
 from atos.core.logging import get_logger
+from atos.core.position_schema import get_qty
 
 logger = get_logger("shadow_trader")
 
@@ -26,6 +27,7 @@ V28_ALPHA_UNIVERSE = [
     "NVDA", "AAPL", "MSFT", "GOOGL", "META", "AMZN", "AVGO", "AMD",
     "CRM", "NFLX", "PLTR", "MU", "TSLA",
 ]
+V28_CORE_SYMBOL = "QQQ"  # v28 核心 ETF 标的 (单一真源, risk_gate/risk_manager 引用)
 V28_CORE_PCT = 0.60      # QQQ 核心仓位比例
 V28_ALPHA_COUNT = 7       # alpha 个股数量 (v29: 5→7)
 V28_REBALANCE_DAYS = 63   # 每季度再平衡
@@ -40,7 +42,7 @@ def is_v28_position(sym: str) -> bool:
     v28 持仓 = QQQ 核心仓 + alpha 动量池。旧卖出规则 (止损/分批止盈/
     剥头皮/Flat清理/动量退出/集中度熔断/Triple-Barrier) 一律跳过这些标的。
     """
-    return sym == "QQQ" or sym in V28_ALPHA_UNIVERSE
+    return sym == V28_CORE_SYMBOL or sym in V28_ALPHA_UNIVERSE
 
 
 def _v28_qqq_core_alpha(account, signals, regime, spy_trend):
@@ -59,7 +61,7 @@ def _v28_qqq_core_alpha(account, signals, regime, spy_trend):
     # ── 卖出检查 ──
     for sym in list(account.positions.keys()):
         pos = account.positions[sym]
-        qty = pos.get("qty", pos.get("shares", 0))
+        qty = get_qty(pos)
         if qty <= 0:
             continue
         avg_price = pos.get("avg_price", 0)
@@ -107,7 +109,7 @@ def _v28_qqq_core_alpha(account, signals, regime, spy_trend):
 
     # v28c: 如果 QQQ 配比远低于目标，每天都再平衡直到到位
     qqq_pos = account.positions.get("QQQ", {})
-    qqq_qty = qqq_pos.get("qty", qqq_pos.get("shares", 0))
+    qqq_qty = get_qty(qqq_pos)
     qqq_px = signals.get("QQQ", {}).get("price", 0)
     qqq_val = qqq_qty * qqq_px if qqq_px > 0 else 0
     qqq_pct = qqq_val / equity if equity > 0 else 0
@@ -130,7 +132,7 @@ def _v28_qqq_core_alpha(account, signals, regime, spy_trend):
 
     if qqq_price > 0:
         current_qqq = account.positions.get("QQQ", {})
-        current_qqq_qty = current_qqq.get("qty", current_qqq.get("shares", 0))
+        current_qqq_qty = get_qty(current_qqq)
         current_qqq_value = current_qqq_qty * qqq_price
 
         if current_qqq_value < target_qqq_value * 0.90:
@@ -203,7 +205,7 @@ def _v28_qqq_core_alpha(account, signals, regime, spy_trend):
     for sym in current_alpha:
         if sym not in top_syms:
             pos = account.positions[sym]
-            qty = pos.get("qty", pos.get("shares", 0))
+            qty = get_qty(pos)
             price = signals.get(sym, {}).get("price", pos.get("last_price", 0))
             if qty > 0 and price > 0:
                 account.execute(sym, "SELL", qty, price,
