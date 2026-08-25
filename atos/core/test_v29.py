@@ -9,13 +9,13 @@ ATOS Institutional v2 — Integration Test Matrix
 import os
 import sys
 import json
-import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from atos.core.system_state import SystemStateMachine, SystemState
 from atos.core.risk_gate import get_gate, OrderIntent, PreTradeRiskGate
 from atos.core.kill_switch import KillSwitch, KILL_FILE
+from atos.core.market_clock import get_market_date
 from atos.core.daily_session import (layer0_bootstrap, layer1_premarket,
                                       layer2_intraday_permission, us_market_phase)
 
@@ -98,7 +98,7 @@ check("正常不触发", not ks.check(acct2))
 # 日内亏损触发
 acct2.total_equity = 290_000
 ks._day_start_equity = 300_000
-ks._day_date = datetime.datetime.now().date()
+ks._day_date = get_market_date()
 check("日内亏损 -3.3% 触发", ks.check(acct2))
 check("触发后状态=KILL_SWITCH", sm.state == SystemState.KILL_SWITCH)
 

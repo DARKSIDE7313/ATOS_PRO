@@ -16,10 +16,10 @@ ATOS Institutional v2 — Kill Switch
 """
 import os
 import json
-import datetime
 import importlib as _importlib
 
 from atos.core.system_state import SystemStateMachine, SystemState
+from atos.core.market_clock import get_market_date
 
 logger = _importlib.import_module('logging').getLogger(__name__)
 
@@ -53,8 +53,7 @@ class KillSwitch:
 
         equity = account.total_equity
         peak = getattr(account, 'peak_equity', equity)
-        now = datetime.datetime.now()
-        today = now.date()
+        today = get_market_date()
 
         # ── 日内亏损 ──
         if self._day_date != today:
@@ -123,7 +122,7 @@ if __name__ == '__main__':
     # 2. 日内亏损触发
     acct.total_equity = 290_000  # -3.3%
     ks._day_start_equity = 300_000
-    ks._day_date = datetime.datetime.now().date()
+    ks._day_date = get_market_date()
     assert ks.check(acct)
     assert ks.sm.state == SystemState.KILL_SWITCH
     print("✅ 2. 日内亏损 -3.3% 触发 kill switch")

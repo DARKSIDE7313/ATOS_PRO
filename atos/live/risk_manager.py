@@ -18,6 +18,7 @@ import json
 from atos.config_shared import RISK
 from atos.shadow.strategy_v28 import is_v28_position
 from atos.core.position_schema import get_qty
+from atos.core.market_clock import get_market_date
 
 # H4: 风控参数统一从 config_shared.RISK 读取（消除 config_shared / risk_manager 双账本）
 MAX_DAILY_LOSS_PCT = RISK["max_daily_loss_pct"]        # 日亏损超过 2.5% → 熔断
@@ -314,7 +315,7 @@ def load_risk_state():
         import datetime as _dt
         try:
             _saved_date = _dt.datetime.fromisoformat(data.get("saved_at", "")).date()
-            _is_today = (_saved_date == _dt.date.today())
+            _is_today = (_saved_date == get_market_date())
         except Exception:
             _is_today = True  # 日期无法解析时保守视为当天，不误复位
         if not _is_today:

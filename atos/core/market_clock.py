@@ -49,7 +49,7 @@ def is_market_open() -> tuple:
     from zoneinfo import ZoneInfo
     now = datetime.datetime.now(datetime.timezone.utc)
     ny_now = now.astimezone(ZoneInfo("America/New_York"))
-    today = ny_now.date()  # M3: 用美东日期判断假日/周末（而非 UTC 日期）
+    today = get_market_date()  # M3: 用美东日期判断假日/周末（与 get_market_date 单一真源一致）
 
     # 周末（美东时间）
     if ny_now.weekday() >= 5:
