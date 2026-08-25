@@ -1,6 +1,11 @@
 """
 ⚠️ DEPRECATED (Phase 5, 2026-08-22): AI 引擎 v4, 生产路径不再使用。
 当前活跃实现: atos/ai/advisor_enhanced.py (v6)。本文件仅因子包兼容链保持可导入。
+
+⚠️ Phase 7 (2026-08-25): 暂保留未归档 — 因 atos/ai/legacy/engine_v5.py 反向引用本文件
+   (from atos.ai.engine_v4 import get_advice_v4 / veto_candidates)，且
+   experiment_optimizer.py 经由 engine_v5 间接依赖 (_call_deepseek / _extract_json)。
+   归档前须先解除该反向引用链。
 # ATOS PRO v4 — AI 决策引擎（重写版）
 # 所有 JSON 解析使用 _extract_json() 统一处理 DeepSeek 非结构化输出
 # BUGFIX 2026-06-12: 

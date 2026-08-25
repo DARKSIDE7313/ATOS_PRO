@@ -4,7 +4,7 @@ ATOS PRO v2 — 自动调试与自修复系统
 功能：
   1. 全量语法检查 — 所有 .py 文件逐个编译
   2. 导入链验证 — 确认所有 import 都能找到
-  3. 关键路径测试 — live_trader/shadow_trader/daily_pipeline 能否加载
+  3. 关键路径测试 — shadow_trader/daily_pipeline 能否加载 (live_trader 已归档)
   4. API Key 检查 — DeepSeek 是否能连通
   5. 日志分析 — 扫描最近的错误
   6. 自动修复 — 可自动修复的常见问题
@@ -63,7 +63,6 @@ def check_imports() -> dict:
         "risk": "atos.risk.advanced",
         "shadow": "atos.shadow",
         "iterate": "atos.iterate",
-        "live_trader": "atos.live.live_trader",
     }
     results = {}
     for name, mod in modules.items():

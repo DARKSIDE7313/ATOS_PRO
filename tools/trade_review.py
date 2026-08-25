@@ -358,7 +358,12 @@ def cmd_analyze():
 
 
 def cmd_clean():
-    """清理噪声数据"""
+    """清理噪声数据。
+
+    ⚠️ Phase 7 (2026-08-25) 失效标注: 下方"自动注入噪声防护到 engine_v4.py"
+    的自修改代码分支已失效 — engine_v4.py 已是 DEPRECATED (生产路径改用
+    advisor_enhanced v6)，且运行时自修改源码是反模式。保留仅供历史参考。
+    """
     n = clean_noise(dry_run=True)
     print(f'发现 {n} 条噪声记录')
     confirm = input(f'确认删除 {n} 条记录？(y/N): ')
@@ -366,7 +371,8 @@ def cmd_clean():
         clean_noise(dry_run=False)
         print('已完成清理')
     
-    # Fix the recording logic: add noise guard to the AI engine
+    # ⚠️ 失效分支 (Phase 7): 以下"注入 NOISE_GUARD 到 engine_v4.py"的自修改代码已废弃。
+    # engine_v4.py 已 DEPRECATED，噪声防护不再依赖此注入。勿再执行此段。
     engine_path = os.path.join(ATOS_HOME, 'atos', 'ai', 'engine_v4.py')
     if os.path.exists(engine_path):
         with open(engine_path) as f:
