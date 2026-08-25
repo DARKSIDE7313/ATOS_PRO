@@ -381,6 +381,25 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
 # ============================================================
 # 周期结束 — 结算编排 (实现下沉至 equity_tracker / state_store)
 # ============================================================
+def _count_ai_vetoes(ai_veto_map) -> int:
+    """归一化 ai_veto_map 值形状并统计否决数。
+
+    生产者 (compute_quality_gate / run_ai_counsel) 输出 {sym: bool}，
+    但下游报告读取曾假设 {sym: {'veto': bool}} 的形状，值形状漂移
+    触发 AttributeError 被 except 吞掉 → 整个透明报告静默跳过。
+    此处防御性归一化两种形状，确保报告不再因值形状漂移而跳过。
+    """
+    if not ai_veto_map:
+        return 0
+    n = 0
+    for v in ai_veto_map.values():
+        if isinstance(v, dict):
+            n += 1 if v.get("veto") else 0
+        else:
+            n += 1 if v else 0
+    return n
+
+
 def _finalize_cycle(account, cycle, regime, current_vix, signals, top_picks,
                     ai_veto_map, mode, spy_trend):
     """每个周期结束前的最终处理"""
@@ -418,7 +437,7 @@ def _finalize_cycle(account, cycle, regime, current_vix, signals, top_picks,
             account=account, cycle=cycle, regime=regime, vix=current_vix,
             factor_rankings=[{"symbol": p["symbol"], "score": p["score"]} for p in top_picks] if top_picks else [],
             trades=account.trade_history[-20:],
-            ai_risks=f"AI vetoes: {sum(1 for v in ai_veto_map.values() if v.get('veto'))}/{len(ai_veto_map)}",
+            ai_risks=f"AI vetoes: {_count_ai_vetoes(ai_veto_map)}/{len(ai_veto_map)}",
         )
     except Exception as e:
         logger.debug(f"报告跳过: {e}")
