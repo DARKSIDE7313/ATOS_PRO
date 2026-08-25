@@ -127,17 +127,26 @@ logger = get_logger("shadow_trader")
 # 导致 _daily_pnl_pct / _orders_this_day 跨天无限累积 (追踪止损永久加宽)。
 # reset_daily() 内部保留 consecutive_losses / current_drawdown 等跨日指标。
 # ============================================================
-_last_daily_reset_date = None
+
+
+def _get_market_date_safe():
+    """获取美东市场日期（单一真源 get_market_date），异常时回退本地日期。"""
+    try:
+        from atos.core.market_clock import get_market_date
+        return get_market_date()
+    except Exception:
+        return datetime.date.today()
+
+
+# C2: 初始化即记录当前市场日期 — 避免日中断重启后首周期误触发 reset_daily()
+# 清掉从 risk_state.json 恢复的当日累计 _daily_pnl。
+_last_daily_reset_date = _get_market_date_safe()
 
 
 def _run_daily_reset_if_new_day():
     """在每日边界（美东市场日期跨天）调用 reset_daily()。"""
     global _last_daily_reset_date
-    try:
-        from atos.core.market_clock import get_market_date
-        _today = get_market_date()
-    except Exception:
-        _today = datetime.date.today()
+    _today = _get_market_date_safe()
     if _last_daily_reset_date != _today:
         reset_daily()
         _last_daily_reset_date = _today

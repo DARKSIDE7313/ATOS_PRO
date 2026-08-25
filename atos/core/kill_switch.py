@@ -5,8 +5,8 @@ ATOS Institutional v2 — Kill Switch
 规格书 §3/§10.3: 自动与人工 kill switch，独立于策略逻辑。
 
 自动触发条件:
-- 日内亏损 > 阈值 (默认 -3%)
-- 回撤 > 12%
+- 日内亏损 > 阈值 (默认 -2.5%, 真源 config_shared.RISK)
+- 回撤 > 10% (真源 config_shared.RISK)
 - 重复订单异常
 - 对账失败
 
@@ -18,6 +18,7 @@ import os
 import json
 import importlib as _importlib
 
+from atos.config_shared import RISK
 from atos.core.system_state import SystemStateMachine, SystemState
 from atos.core.market_clock import get_market_date
 
@@ -26,9 +27,9 @@ logger = _importlib.import_module('logging').getLogger(__name__)
 BASE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 KILL_FILE = os.path.join(BASE, 'data', 'KILL_SWITCH')
 
-# 自动触发阈值
-DAILY_LOSS_LIMIT = -0.03      # 日内亏损 -3% → kill
-DRAWDOWN_LIMIT = 0.12         # 回撤 > 12% → kill
+# 自动触发阈值 — C1: 统一从 config_shared.RISK 真源读取 (消除 kill_switch 硬编码双账本)
+DAILY_LOSS_LIMIT = -RISK["max_daily_loss_pct"]   # 日内亏损 -2.5% → kill (真源: config_shared)
+DRAWDOWN_LIMIT = RISK["max_drawdown_pct"]        # 回撤 > 10% → kill (真源: config_shared)
 
 
 class KillSwitch:
