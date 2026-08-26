@@ -191,15 +191,15 @@ class TrailingStop:
 
 def kelly_after_drawdown(base_kelly_pct: float,
                           current_drawdown: float,
-                          max_drawdown_limit: float = 0.10) -> dict:
+                          max_drawdown_limit: float = 0.12) -> dict:
     """
     亏钱后自动缩小仓位 — 防止连亏时越亏越多。
 
     规则：
       - 回撤 < 2%  → 正常仓位
       - 回撤 2-5%  → 仓位减半
-      - 回撤 5-10% → 仓位减到 1/4
-      - 回撤 > 10% → 暂停新开仓
+      - 回撤 5-12% → 仓位减到 1/4
+      - 回撤 > 12% → 暂停新开仓
     """
     if current_drawdown < 0.02:
         scale = 1.0

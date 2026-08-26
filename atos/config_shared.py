@@ -35,7 +35,7 @@ MAX_POSITIONS = {
 # === 风控全局阈值 ===
 RISK = {
     "max_daily_loss_pct":   0.025,  # 日亏损2.5%熔断
-    "max_drawdown_pct":     0.10,   # 最大回撤10%
+    "max_drawdown_pct":     0.12,   # 最大回撤12% (恢复旧行为, 用户拍板 2026-08-25 Phase7 C2)
     "max_consecutive_losses": 3,    # 连续3次亏损降频
     "stop_loss_pct":        0.05,   # 硬止损5% (v16: 从6%收紧)
     "take_profit_pct":      0.18,   # 止盈18% (让赢家奔跑)

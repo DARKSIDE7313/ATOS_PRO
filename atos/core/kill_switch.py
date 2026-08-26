@@ -6,7 +6,7 @@ ATOS Institutional v2 — Kill Switch
 
 自动触发条件:
 - 日内亏损 > 阈值 (默认 -2.5%, 真源 config_shared.RISK)
-- 回撤 > 10% (真源 config_shared.RISK)
+- 回撤 > 12% (真源 config_shared.RISK)
 - 重复订单异常
 - 对账失败
 

@@ -22,7 +22,7 @@ from atos.core.market_clock import get_market_date
 
 # H4: 风控参数统一从 config_shared.RISK 读取（消除 config_shared / risk_manager 双账本）
 MAX_DAILY_LOSS_PCT = RISK["max_daily_loss_pct"]        # 日亏损超过 2.5% → 熔断
-MAX_DRAWDOWN_PCT = RISK["max_drawdown_pct"]            # 最大回撤 10% → 暂停新开仓
+MAX_DRAWDOWN_PCT = RISK["max_drawdown_pct"]            # 最大回撤 12% → 暂停新开仓
 MAX_CONSECUTIVE_LOSSES = RISK["max_consecutive_losses"]  # 连续 3 次亏损 → 降频
 COOLDOWN_CYCLES = RISK["cooldown_cycles"]              # 冷却周期
 STOP_LOSS_PCT = RISK["stop_loss_pct"]                  # 止损 5%

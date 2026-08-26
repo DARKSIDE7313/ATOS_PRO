@@ -5,7 +5,7 @@ ATOS Safety Layer — 多层风控系统
 目标: 保护本金，控制回撤，防止灾难性损失
 
 Layer 1: 组合级风控 (每日)
-  - 最大回撤 > 10% → 减仓 50%
+  - 最大回撤 > 12% → 减仓 50%
   - 最大回撤 > 15% → 清仓
   - 连续 3 日亏损 → 暂停开仓 1 天
 
@@ -98,10 +98,10 @@ def check_portfolio_risk(equity, peak_equity, positions, cash):
             logger.critical(f"🚨 熔断器触发! 回撤={drawdown:.1%} > 15%")
         return 'LIQUIDATE', f'回撤{drawdown:.1%}>15% 清仓', 0.0
 
-    # 减仓: 回撤 > 10%
-    if drawdown > 0.10:
-        logger.warning(f"⚠️ 回撤={drawdown:.1%} > 10% → 减仓50%")
-        return 'REDUCE', f'回撤{drawdown:.1%}>10% 减仓', 0.5
+    # 减仓: 回撤 > 12%
+    if drawdown > 0.12:
+        logger.warning(f"⚠️ 回撤={drawdown:.1%} > 12% → 减仓50%")
+        return 'REDUCE', f'回撤{drawdown:.1%}>12% 减仓', 0.5
 
     # 减仓: 回撤 > 7%
     if drawdown > 0.07:
