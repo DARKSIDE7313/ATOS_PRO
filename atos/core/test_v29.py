@@ -26,6 +26,8 @@ _ss.EVENTS_FILE = os.path.join(_TEST_TMP, "risk_events.jsonl")
 _ks.KILL_FILE = os.path.join(_TEST_TMP, "KILL_SWITCH")
 if hasattr(_rg, "DECISIONS_FILE"):
     _rg.DECISIONS_FILE = os.path.join(_TEST_TMP, "risk_decisions.jsonl")
+if hasattr(_rg, "SEEN_ORDERS_FILE"):
+    _rg.SEEN_ORDERS_FILE = os.path.join(_TEST_TMP, "seen_orders.json")
 
 from atos.core.system_state import SystemStateMachine, SystemState
 from atos.core.risk_gate import get_gate, OrderIntent, PreTradeRiskGate

@@ -28,6 +28,7 @@ logger = _importlib.import_module('logging').getLogger(__name__)
 
 BASE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DECISIONS_FILE = os.path.join(BASE, 'data', 'risk_decisions.jsonl')
+SEEN_ORDERS_FILE = os.path.join(BASE, 'data', 'seen_orders.json')  # P1-4: 可重定向，测试隔离用
 
 
 @dataclass
@@ -265,7 +266,7 @@ class PreTradeRiskGate:
             pass  # 审计失败不阻塞交易 (但决策已 fail closed)
 
     def _seen_file(self):
-        return os.path.join(BASE, 'data', 'seen_orders.json')
+        return SEEN_ORDERS_FILE
 
     def _load_seen(self):
         try:
