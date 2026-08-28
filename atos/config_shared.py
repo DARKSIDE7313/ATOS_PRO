@@ -44,6 +44,16 @@ RISK = {
     "cooldown_cycles":      24,     # 冷却周期 (v9: 从48→24)
 }
 
+# P2: 回撤风险阶梯 (单源化) — daily_session Layer1 从这里读取, 消除 0.03/0.06/0.09/0.12 硬编码。
+# 每档: dd < threshold 命中该档风险乘数; 最后一档 threshold 绑定 max_drawdown_pct,
+# dd >= max_drawdown_pct 时判定 kill (乘数 0, 触发 sm.kill) —— 保留旧行为。
+RISK["drawdown_tiers"] = [
+    {"threshold": 0.03,                     "tier": "normal",    "multiplier": 1.00},
+    {"threshold": 0.06,                     "tier": "caution",   "multiplier": 0.70},
+    {"threshold": 0.09,                     "tier": "defensive", "multiplier": 0.40},
+    {"threshold": RISK["max_drawdown_pct"], "tier": "critical",  "multiplier": 0.15},
+]
+
 # === 仪表盘配置 ===
 DASHBOARD = {
     "initial_capital": TOTAL_CAPITAL,  # 与总资金一致

@@ -25,6 +25,35 @@ BASE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 SESSION_DIR = os.path.join(BASE, 'data', 'sessions')
 
 
+# ── P2: 回撤风险阶梯单源化 (config_shared.RISK.drawdown_tiers) ──
+# 真源: atos.config_shared.RISK。缺省兜底复刻旧硬编码 (0.03/0.06/0.09/0.12),
+# 配置缺失时行为零变化。
+try:
+    from atos.config_shared import RISK as _RISK
+except Exception:
+    _RISK = {}
+
+_DEFAULT_DRAWDOWN_TIERS = [
+    {"threshold": 0.03, "tier": "normal",    "multiplier": 1.00},
+    {"threshold": 0.06, "tier": "caution",   "multiplier": 0.70},
+    {"threshold": 0.09, "tier": "defensive", "multiplier": 0.40},
+    {"threshold": 0.12, "tier": "critical",  "multiplier": 0.15},
+]
+
+
+def _drawdown_tier(dd: float):
+    """回撤 dd → (risk_multiplier, tier)。真源 config_shared.RISK.drawdown_tiers。
+
+    阶梯: dd < threshold 命中该档; 全部未命中 (dd >= 最后一档 threshold == max_drawdown_pct)
+    → kill (乘数 0, 触发 sm.kill)。缺省兜底与旧硬编码完全一致。
+    """
+    tiers = _RISK.get("drawdown_tiers") or _DEFAULT_DRAWDOWN_TIERS
+    for t in tiers:
+        if dd < t["threshold"]:
+            return t["multiplier"], t["tier"]
+    return 0.00, "kill"
+
+
 # ── 美股日历 (简化版 — 用 UTC 时间推算 session) ─────────────
 def us_market_phase(now_utc: datetime.datetime = None) -> str:
     """返回当前美股阶段: PRE_MARKET / OPEN / CLOSING / POST_MARKET / CLOSED
@@ -117,20 +146,11 @@ def layer1_premarket(account, data_quality_score: float = 0.95) -> dict:
     # 数据质量 (规格书 §4.2: Q>=0.95 正常)
     items['data_quality'] = data_quality_score >= 0.85
 
-    # 回撤档位 → 风险乘数 (规格书 §7.4)
+    # 回撤档位 → 风险乘数 (规格书 §7.4) — 真源 config_shared.RISK, 缺省兜底保持旧行为
     equity = account.total_equity
     peak = getattr(account, 'peak_equity', equity)
     dd = (peak - equity) / peak if peak > 0 else 0
-    if dd < 0.03:
-        risk_mult, tier = 1.00, 'normal'
-    elif dd < 0.06:
-        risk_mult, tier = 0.70, 'caution'
-    elif dd < 0.09:
-        risk_mult, tier = 0.40, 'defensive'
-    elif dd < 0.12:
-        risk_mult, tier = 0.15, 'critical'
-    else:
-        risk_mult, tier = 0.00, 'kill'
+    risk_mult, tier = _drawdown_tier(dd)
     items['risk_tier'] = tier
     items['risk_multiplier'] = risk_mult
 
