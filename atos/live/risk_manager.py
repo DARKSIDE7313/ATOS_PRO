@@ -15,7 +15,7 @@
 import os
 import json
 
-from atos.config_shared import RISK
+from atos.config_shared import RISK, POSITION_CAPS
 from atos.shadow.strategy_v28 import is_v28_position
 from atos.core.position_schema import get_qty
 from atos.core.market_clock import get_market_date
@@ -202,7 +202,8 @@ def filter_orders(proposed: list, account_state: dict, regime: dict) -> list:
     total = account_state["total"]
     cash = account_state["cash"]
     min_cash = account_state.get("constraints", {}).get("min_cash", total * 0.10)
-    max_pct = account_state.get("constraints", {}).get("max_single_pct", 0.12)
+    max_pct = account_state.get("constraints", {}).get(
+        "max_single_pct", POSITION_CAPS["single_stock_pct"])
 
     safe = []
 

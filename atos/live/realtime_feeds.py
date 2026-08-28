@@ -464,7 +464,12 @@ class FutuRealtimeFeed:
             # 设置 WebSocket 推送处理器
             self._setup_push_handler()
 
-            # 启动 keepalive 线程
+            # 启动 keepalive 线程 — 先停旧线程防泄漏 (审计 P2: 每次重连都会 spawn 新线程,
+            # 旧线程因只检查 _keepalive_stop 而永不退出, 长期运行会线程堆积)
+            if self._keepalive_thread is not None and self._keepalive_thread.is_alive():
+                self._keepalive_stop.set()
+                if self._keepalive_thread is not threading.current_thread():
+                    self._keepalive_thread.join(timeout=2.0)
             self._keepalive_stop.clear()
             self._keepalive_thread = threading.Thread(
                 target=self._keepalive_loop,

@@ -28,7 +28,9 @@ from typing import Optional
 from atos.core.logging import get_logger, log_trade, log_risk
 from atos.live.risk_manager import check_all_stops, update_drawdown
 from atos.risk.professional import TrailingStop, triple_barrier
-from atos.shadow.strategy_v28 import is_v28_position
+from atos.shadow.strategy_v28 import (
+    is_v28_position, V28_CORE_SYMBOL, V28_QQQ_TRAILING, V28_STOP_LOSS,
+)
 from atos.core.position_schema import get_qty
 
 logger = get_logger("shadow_trader")
@@ -241,13 +243,14 @@ def run_risk_phase(account, signals, spy_trend) -> tuple:
             else:
                 sl_mult = 2.0
             sl_atr = sl_mult * atr_pct_stop
-            # v28: QQQ 用 12% 止损，个股用 5%
-            if sym == "QQQ":
-                sl_level = max(0.08, min(0.12, sl_atr))
+            # v28: QQQ/ETF 止损与个股止损 — 单源化到 strategy_v28 (V28_QQQ_TRAILING/V28_STOP_LOSS)
+            # 值不变 (12%/5%)，消除此处与 strategy_v28 的双处不一致
+            if sym == V28_CORE_SYMBOL:
+                sl_level = max(0.08, min(V28_QQQ_TRAILING, sl_atr))
             else:
-                sl_level = max(0.04, min(0.05, sl_atr))
+                sl_level = max(0.04, min(V28_STOP_LOSS, sl_atr))
         else:
-            sl_level = 0.12 if sym == "QQQ" else 0.05
+            sl_level = V28_QQQ_TRAILING if sym == V28_CORE_SYMBOL else V28_STOP_LOSS
         if pnl_pct <= -sl_level:
             account.execute(sym, "SELL", get_qty(pos), price, reason=f"硬止损 {pnl_pct:.1%} (上限{sl_level:.0%})")
             logger.info(f"🛑 止损: {sym} {pnl_pct:.1%} (上限{sl_level:.0%})")

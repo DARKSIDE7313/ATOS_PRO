@@ -75,7 +75,7 @@ from atos.shadow.cycle_state import CycleState
 from atos.shadow.strategy_v28 import (
     V28_ALPHA_UNIVERSE, V28_CORE_PCT, V28_ALPHA_COUNT, V28_REBALANCE_DAYS,
     V28_STOP_LOSS, V28_TRAILING_STOP, V28_QQQ_TRAILING,
-    is_v28_position, _v28_qqq_core_alpha,
+    is_v28_position, _v28_qqq_core_alpha, v28_check_exits,
 )
 from atos.shadow.risk_loop import run_risk_phase
 from atos.shadow.decision_layers import (
@@ -200,19 +200,42 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
     safety_exposure = 1.0  # P0-3: 安全层减仓系数默认值（异常/未触发减仓时为 1.0）
     try:
         from atos.core.safety_layer import full_safety_check
+        # 统一数据源（Futu优先，10分钟缓存）取真实 VIX / SPY，修复原硬编码旁路：
+        #   原 _vix 用 yf.Ticker 单独拉取失败即 None（VIX层旁路）；
+        #   原 spy_above_ma50=True 硬编码（SPY<MA50 减仓永不触发）。
+        _spy_df, _vix_df = get_market_data_cached()
+        # VIX：取最新真实收盘价；取不到时不假值兜底，仅记 WARNING
         _vix = None
         try:
-            import yfinance as yf
-            _vix = yf.Ticker("^VIX").history(period="1d")["Close"].iloc[-1]
+            _vix_c = _vix_df["Close"].squeeze().dropna()
+            if len(_vix_c) > 0:
+                _vix = float(_vix_c.iloc[-1])
         except Exception:
-            pass
+            _vix = None
+        if _vix is None:
+            logger.warning("安全层: VIX 数据缺失，本次 VIX 风控层未生效（未用假值兜底）")
+        # SPY > MA50：真实计算；数据不足/失败时保守判 False（触发减仓保护，不绕过）
+        _spy_above_ma50 = True
+        try:
+            _spy_c = _spy_df["Close"]
+            if isinstance(_spy_c, pd.DataFrame):
+                _spy_c = _spy_c.squeeze()
+            _spy_c = _spy_c.dropna()
+            if len(_spy_c) >= 50:
+                _spy_above_ma50 = float(_spy_c.iloc[-1]) > float(_spy_c.iloc[-50:].mean())
+            else:
+                _spy_above_ma50 = False
+                logger.warning(f"安全层: SPY 数据不足({len(_spy_c)}根)，SPY>MA50 保守判 False")
+        except Exception as e:
+            _spy_above_ma50 = False
+            logger.warning(f"安全层: SPY 趋势计算失败，保守判 False: {e}")
         _safety = full_safety_check(
             equity=account.total_equity,
             peak_equity=account.peak_equity,
             positions=account.positions,
             cash=account.cash,
             vix_level=_vix,
-            spy_above_ma50=True,  # 简化，下面 regime 会精确判断
+            spy_above_ma50=_spy_above_ma50,
             daily_returns=getattr(account, '_daily_returns', None),
         )
         if _safety['action'] == 'LIQUIDATE':
@@ -271,8 +294,9 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
     spy_trend = compute_spy_trend(spy)
 
     # 🆕 v4: RGVH 风格宏观门控（3独立过滤器）
+    # 传入真实 current_vix（替代原 regime_gate 内部从未写入的 19.0 假值缓存）
     try:
-        gate_result = evaluate_regime_gate()
+        gate_result = evaluate_regime_gate(vix_level=current_vix)
         gate_exposure = gate_result["exposure"]
         if gate_exposure < 1.0:
             logger.info(f"📊 宏观门控: {gate_result['description']} → 暴露系数×{gate_exposure:.0%}")
@@ -385,7 +409,12 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
     if is_market_hours:
         _v28_qqq_core_alpha(account, signals, regime, spy_trend)
     else:
-        logger.info("🏁 闭市时段: 仅维持风控，不开新仓")
+        # 审计 P2: 闭市无止损 — 闭市时段 v28 持仓仍执行止损/移动止损 (不做再平衡/开仓)
+        try:
+            v28_check_exits(account, signals)
+        except Exception as _e:
+            logger.debug(f"v28 闭市止损检查跳过: {_e}")
+        logger.info("🏁 闭市时段: 仅维持风控与 v28 止损，不开新仓")
 
     # ---- 7. 最终结算 ----
     _finalize_cycle(account, cycle, regime, current_vix, signals, top_picks,

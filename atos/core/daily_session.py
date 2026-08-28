@@ -5,12 +5,18 @@ ATOS Institutional v2 — Daily Session Timeline
 规格书时间线版: Layer 0 初始设置 → Layer 1 盘前 → Layer 2 盘中 → Layer 3 盘后
 
 调度不硬编码本地时间 — 由 UTC + 美股日历决定当前阶段。
-夏令时/冬令时自动处理 (UTC-4 / UTC-5)。
+夏令时/冬令时由 zoneinfo(America/New_York) 精确处理（复用 atos.core.market_clock，
+与 is_safe_to_trade / is_market_open 单一真源一致，不手算 DST 窗口）。
 
 Layer 0 (盘前90min): 系统自检 — 任一失败 → NO_TRADE
 Layer 1 (盘前): Go/No-Go 终审 — 默认 NO_TRADE, 需证据翻转
 Layer 2 (盘中): 30min 循环流水线 — 开盘30min禁新仓, 收盘30min只平仓
 Layer 3 (盘后): 对账 + 归因 + 研究队列
+
+⚠️ 接线现状：本模块为规格书 Layer 0-3 参考实现，当前未被任何主循环引用。
+实际交易循环由 shadow_trader.run_shadow_cycle 驱动（Layer 0/1 对应其盘前自检，
+Layer 2 对应 run_risk_phase 等）。如需接入本模块，属策略级决策，须用户拍板，
+不得擅自接线。
 """
 import os
 import json
@@ -56,29 +62,24 @@ def _drawdown_tier(dd: float):
 
 # ── 美股日历 (简化版 — 用 UTC 时间推算 session) ─────────────
 def us_market_phase(now_utc: datetime.datetime = None) -> str:
-    """返回当前美股阶段: PRE_MARKET / OPEN / CLOSING / POST_MARKET / CLOSED
+    """返回当前美股阶段: PRE_MARKET / OPENING_AUCTION / OPEN / CLOSING / POST_MARKET / CLOSED
 
     美股常规时段 09:30-16:00 ET。
-    夏令时 (3月第2周日-11月第1周日): ET = UTC-4
-    冬令时: ET = UTC-5
+    夏令时/冬令时由 zoneinfo(America/New_York) 精确处理（复用 atos.core.market_clock
+    单一真源，不再手算 DST 窗口；原近似规则在 3 月/11 月转换周会偏差 1 小时）。
     """
+    from zoneinfo import ZoneInfo
     if now_utc is None:
-        now_utc = datetime.datetime.utcnow()
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+    if now_utc.tzinfo is None:
+        now_utc = now_utc.replace(tzinfo=datetime.timezone.utc)
+    ny = now_utc.astimezone(ZoneInfo("America/New_York"))
 
-    # 夏令时判断 (简化: 3月15日-11月7日)
-    y = now_utc.year
-    dst_start = datetime.datetime(y, 3, 15) - datetime.timedelta(days=(datetime.datetime(y,3,15).weekday()+1) % 7 + 7)
-    dst_end = datetime.datetime(y, 11, 7) - datetime.timedelta(days=(datetime.datetime(y,11,7).weekday()+1) % 7)
-    is_dst = dst_start <= now_utc.replace(tzinfo=None) < dst_end
-    et_offset = -4 if is_dst else -5
-
-    et = now_utc + datetime.timedelta(hours=et_offset)
-
-    # 周末
-    if et.weekday() >= 5:
+    # 周末（美东时间）
+    if ny.weekday() >= 5:
         return "CLOSED"
 
-    hm = et.hour * 60 + et.minute
+    hm = ny.hour * 60 + ny.minute
     open_min, close_min = 9*60+30, 16*60
 
     if hm < open_min - 90:

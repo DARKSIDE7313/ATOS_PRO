@@ -16,6 +16,7 @@ import datetime
 
 from atos.core.logging import get_logger
 from atos.core.position_schema import get_qty
+from atos.config_shared import RISK as _RISK
 
 logger = get_logger("shadow_trader")
 
@@ -31,9 +32,9 @@ V28_CORE_SYMBOL = "QQQ"  # v28 核心 ETF 标的 (单一真源, risk_gate/risk_m
 V28_CORE_PCT = 0.60      # QQQ 核心仓位比例
 V28_ALPHA_COUNT = 7       # alpha 个股数量 (v29: 5→7)
 V28_REBALANCE_DAYS = 63   # 每季度再平衡
-V28_STOP_LOSS = 0.05      # 个股止损 5%
-V28_TRAILING_STOP = 0.08  # 移动止损 8%
-V28_QQQ_TRAILING = 0.12   # QQQ 移动止损 12%
+V28_STOP_LOSS = _RISK.get("stop_loss_pct", 0.05)  # 个股硬止损 — 真源 config_shared.RISK.stop_loss_pct
+V28_TRAILING_STOP = 0.08  # 个股移动止损 8% (策略参数, 用户拍板项)
+V28_QQQ_TRAILING = 0.12   # QQQ 移动止损 12% (策略参数, 用户拍板项)
 
 
 def is_v28_position(sym: str) -> bool:
@@ -45,23 +46,13 @@ def is_v28_position(sym: str) -> bool:
     return sym == V28_CORE_SYMBOL or sym in V28_ALPHA_UNIVERSE
 
 
-def _v28_qqq_core_alpha(account, signals, regime, spy_trend):
-    """v29 策略: QQQ 核心 + 动量个股 alpha (优化: 7只 + 动量权重0.6)
+def v28_check_exits(account, signals) -> None:
+    """v28 持仓止损/移动止损检查 — 与交易时段解耦 (审计 P2: 闭市无止损)。
 
-    规则:
-    1. 60% 资金买 QQQ（始终持有，不择时）
-    2. 40% 资金买 7 只最强动量股 (21日动量 + 距20日高点)
-    3. 每季度再平衡
-    4. 个股止损 5%, 移动止损 8%
-    5. QQQ 移动止损 12%
+    原卖出检查内嵌在 _v28_qqq_core_alpha 里, 而该函数仅在盘中 (is_market_hours)
+    被调用, 导致闭市时 v28 核心持仓 (QQQ+alpha, 占大部分资金) 无止损保护。
+    现提取为独立函数: 盘中由 _v28_qqq_core_alpha 调用, 闭市由主循环单独调用。
     """
-    # P0-3: 读取风险敞口缩放系数（安全层×宏观门控合并值），clamp 到 [0,1]
-    scale = max(0.0, min(1.0, getattr(account, '_risk_exposure_scale', 1.0)))
-
-    equity = account.total_equity
-    cash = account.cash
-
-    # ── 卖出检查 ──
     for sym in list(account.positions.keys()):
         pos = account.positions[sym]
         qty = get_qty(pos)
@@ -85,7 +76,7 @@ def _v28_qqq_core_alpha(account, signals, regime, spy_trend):
 
         sell_reason = None
 
-        if sym == "QQQ":
+        if sym == V28_CORE_SYMBOL:
             # QQQ: 移动止损 12%
             if peak > avg_price * 1.05:
                 ts_drop = (peak - price) / peak
@@ -104,6 +95,26 @@ def _v28_qqq_core_alpha(account, signals, regime, spy_trend):
         if sell_reason:
             account.execute(sym, "SELL", qty, price, reason=sell_reason)
             logger.info(f"🔴 v28卖出 {sym}: {sell_reason} PnL={pnl_pct:.1%}")
+
+
+def _v28_qqq_core_alpha(account, signals, regime, spy_trend):
+    """v29 策略: QQQ 核心 + 动量个股 alpha (优化: 7只 + 动量权重0.6)
+
+    规则:
+    1. 60% 资金买 QQQ（始终持有，不择时）
+    2. 40% 资金买 7 只最强动量股 (21日动量 + 距20日高点)
+    3. 每季度再平衡
+    4. 个股止损 5%, 移动止损 8%
+    5. QQQ 移动止损 12%
+    """
+    # P0-3: 读取风险敞口缩放系数（安全层×宏观门控合并值），clamp 到 [0,1]
+    scale = max(0.0, min(1.0, getattr(account, '_risk_exposure_scale', 1.0)))
+
+    equity = account.total_equity
+    cash = account.cash
+
+    # ── 卖出检查 (提取自 v28_check_exits, 盘中照常执行) ──
+    v28_check_exits(account, signals)
 
     # ── 再平衡检查 ──
     last_rebal = getattr(account, '_v28_last_rebalance', None)

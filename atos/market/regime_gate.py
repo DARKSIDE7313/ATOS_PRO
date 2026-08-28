@@ -168,7 +168,12 @@ def get_vxn_excess_rank() -> Optional[float]:
     当科技股（VXN）的波动率显著高于大盘（VIX）时，
     是科技危机的早期信号。
 
-    返回 0-1 百分位
+    ⚠️ 失效标注：^VXN（CBOE NASDAQ-100 波动率指数）已在
+    Yahoo Finance 退市（possibly delisted），本函数实际永远
+    返回 None，该过滤器处于失效状态。保留实现仅为兼容调用，
+    未接入替代数据源（VIXY/VXX 或 FRED VXNCLS）前不假装生效。
+
+    返回 0-1 百分位，或 None 数据不足
     """
     ve = _get_cached("vxn_vix_spread")
     if ve is None:
@@ -198,13 +203,17 @@ def get_vxn_excess_rank() -> Optional[float]:
 
 
 # ============================================================
-# 过滤器 3: 2s10s 收益率曲线斜率
+# 过滤器 3: 收益率曲线斜率（实际为 5s10s，见下方注释）
 # ============================================================
 def get_curve_slope_rank() -> Optional[float]:
-    """计算 2s10s 收益率曲线斜率的252日百分位排名。
+    """计算收益率曲线斜率的252日百分位排名。
 
     当曲线倒挂或接近倒挂时（斜率在底部百分位），
     是衰退预警信号。
+
+    注：实现用 ^FVX(5年) - ^TNX(10年)，即 5s10s 期限利差，
+    并非函数名/早期注释所写的 2s10s。数据源依赖 yfinance 的
+    国债代理，精度有限，属于近似指标。
 
     返回 0-1 百分位（低值=倒挂/衰退风险）
     """
@@ -242,8 +251,12 @@ def get_curve_slope_rank() -> Optional[float]:
 # ============================================================
 # 主门控函数
 # ============================================================
-def evaluate_regime_gate() -> dict:
+def evaluate_regime_gate(vix_level: Optional[float] = None) -> dict:
     """评估三个宏观门控，返回综合状态和暴露系数。
+
+    Args:
+        vix_level: 当前 VIX 真实值（供市场上下文降级判断），
+                   取不到时传 None，绝不使用假值兜底。
 
     Returns:
         {
@@ -259,11 +272,13 @@ def evaluate_regime_gate() -> dict:
     """
     filters = {}
     triggered_count = 0
+    available_count = 0   # 成功取得数据的过滤器数量（用于数据全挂判定）
 
     # 过滤器 1: SPY IV 百分位
     try:
         iv_rank = get_spy_iv_rank()
         if iv_rank is not None:
+            available_count += 1
             iv_triggered = iv_rank > IV_THR
             if iv_triggered:
                 triggered_count += 1
@@ -280,6 +295,7 @@ def evaluate_regime_gate() -> dict:
     try:
         vxn_excess = get_vxn_excess_rank()
         if vxn_excess is not None:
+            available_count += 1
             vxn_triggered = vxn_excess > VXN_THR
             if vxn_triggered:
                 triggered_count += 1
@@ -296,6 +312,7 @@ def evaluate_regime_gate() -> dict:
     try:
         curve_slope = get_curve_slope_rank()
         if curve_slope is not None:
+            available_count += 1
             curve_triggered = curve_slope < SLOPE_THR
             if curve_triggered:
                 triggered_count += 1
@@ -307,6 +324,22 @@ def evaluate_regime_gate() -> dict:
             }
     except Exception as e:
         logger.warning(f"收益率曲线获取失败: {e}")
+
+    # 数据全挂（三个过滤器均无法取得数据）→ fail-closed
+    # 原逻辑：available_count==0 时 triggered_count==0 → GATE_NORMAL → exposure=1.0
+    # 对风控门来说这是反的——测不到恐慌时应更保守而非更激进。
+    if available_count == 0:
+        logger.warning("宏观门控: 三个过滤器均无数据（数据源故障），"
+                       "fail-closed 暴露降至 0.5")
+        return {
+            "gate_level": GATE_CAUTION,
+            "exposure": 0.5,
+            "filters": filters,
+            "triggered_count": 0,
+            "data_outage": True,
+            "description": "🔴 数据缺失（fail-closed）",
+            "timestamp": datetime.datetime.now().isoformat(),
+        }
 
     # 综合门控等级
     gate_level = GATE_NORMAL
@@ -336,10 +369,13 @@ def evaluate_regime_gate() -> dict:
                 spy_info = {"current": spy_current_val, "ma200": spy_ma200_val}
                 _set_cache("spy_context", spy_info)
         if spy_info and spy_info.get("ma200") is not None:
-            # 用 VIX 近似（20日 SPY 波动率作为替代，或从缓存取）
-            vix_data = _get_cached("vix_level") or 19.0  # 默认安全值
+            # VIX 使用调用方传入的真实值；取不到时不假值兜底（原 19.0 缓存 key
+            # 从未被写入，导致降级判断长期失效）。None 时 _market_context_downgrade
+            # 保持原门控等级（不放松），并记 WARNING。
+            if vix_level is None:
+                logger.warning("宏观门控: VIX 真实值缺失，跳过市场上下文降级（保持严格）")
             gate_level = _market_context_downgrade(
-                gate_level, spy_info["current"], spy_info["ma200"], vix_data
+                gate_level, spy_info["current"], spy_info["ma200"], vix_level
             )
     except Exception as e:
         logger.debug(f"市场上下文修正跳过: {e}")
