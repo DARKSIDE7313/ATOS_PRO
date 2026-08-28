@@ -91,6 +91,53 @@ class PerformanceTracker:
         if date:
             self.trade_dates.append(date)
 
+    def sync_trades(self, trade_history) -> int:
+        """从真实交易历史同步已平仓盈亏 (修复 total_trades/win_rate/profit_factor 恒为 0)。
+
+        trade_history 为 account.trade_history (list[dict])，每笔含 action/pnl 字段。
+        仅统计已平仓 (action == 'SELL') 且 pnl 为数值的笔数，用真实盈亏覆盖内部 trades。
+        返回同步笔数；无有效数据时返回 0 且不改动。
+        """
+        if not trade_history:
+            return 0
+        pnls = []
+        for t in trade_history:
+            if not isinstance(t, dict):
+                continue
+            if t.get("action") != "SELL":
+                continue
+            pnl = t.get("pnl")
+            if isinstance(pnl, bool):
+                continue
+            if isinstance(pnl, (int, float)):
+                if isinstance(pnl, float) and (math.isnan(pnl) or math.isinf(pnl)):
+                    continue
+                pnls.append(float(pnl))
+        if pnls:
+            self.trades = pnls
+        return len(pnls)
+
+    def sync_peak(self, peak: float) -> None:
+        """用账户真实历史峰值修正内部峰值，并据此重算历史最大回撤。
+
+        get_tracker() 恢复时 peak_equity 只从最近 500 个 equity 点推断，会丢失更早峰值，
+        导致 max_drawdown 被低估 (如真实 ~10% 被算成 1.22%)。账户侧 account.peak_equity
+        才是全期峰值，此处用它覆盖，并重算 max_dd 补偿窗口截断。
+        """
+        if not peak or peak <= 0:
+            return
+        if peak > self.peak_equity:
+            self.peak_equity = peak
+        # 用真实峰值重算历史最大回撤
+        dd = 0.0
+        for eq in self.equity:
+            if isinstance(eq, (int, float)) and self.peak_equity > 0:
+                d = (self.peak_equity - eq) / self.peak_equity
+                if d > dd:
+                    dd = d
+        if dd > self.max_dd:
+            self.max_dd = dd
+
     def get_metrics(self) -> dict:
         """计算所有绩效指标"""
         m = {"cycles": self.cycles, "peak_equity": round(self.peak_equity, 2),
@@ -159,11 +206,15 @@ class PerformanceTracker:
         return m
 
     def save(self):
-        """持久化到文件"""
+        """持久化到文件 (含跨重启恢复所需的峰值/回撤/周期数)"""
         if PERF_FILE:
             try:
                 data = {"metrics": self.get_metrics(), "equity": self.equity[-500:],
-                        "returns": self.returns[-500:], "trades": self.trades[-100:]}
+                        "returns": self.returns[-500:], "trades": self.trades[-100:],
+                        "peak_equity": self.peak_equity,
+                        "max_dd": self.max_dd,
+                        "max_dd_duration": self.max_dd_duration,
+                        "cycles": self.cycles}
                 with open(PERF_FILE, 'w') as f:
                     json.dump(data, f)
             except Exception as e:
@@ -186,7 +237,12 @@ def get_tracker() -> PerformanceTracker:
                 _perf_tracker.equity = data.get("equity", [])
                 _perf_tracker.returns = data.get("returns", [])
                 _perf_tracker.trades = data.get("trades", [])
-                if _perf_tracker.equity:
+                # 跨重启恢复峰值/回撤/周期 (旧文件无这些字段时回退默认值, 向后兼容)
+                _perf_tracker.cycles = data.get("cycles", (data.get("metrics") or {}).get("cycles", 0))
+                _perf_tracker.max_dd = data.get("max_dd", 0.0)
+                _perf_tracker.max_dd_duration = data.get("max_dd_duration", 0)
+                _perf_tracker.peak_equity = data.get("peak_equity", 0.0)
+                if not _perf_tracker.peak_equity and _perf_tracker.equity:
                     _perf_tracker.peak_equity = max(_perf_tracker.equity)
                 logger.info(f"绩效追踪恢复: {_perf_tracker.cycles}周期")
             except Exception:

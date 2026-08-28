@@ -55,6 +55,9 @@ def _v28_qqq_core_alpha(account, signals, regime, spy_trend):
     4. 个股止损 5%, 移动止损 8%
     5. QQQ 移动止损 12%
     """
+    # P0-3: 读取风险敞口缩放系数（安全层×宏观门控合并值），clamp 到 [0,1]
+    scale = max(0.0, min(1.0, getattr(account, '_risk_exposure_scale', 1.0)))
+
     equity = account.total_equity
     cash = account.cash
 
@@ -127,7 +130,7 @@ def _v28_qqq_core_alpha(account, signals, regime, spy_trend):
     logger.info(f"📊 v28 季度再平衡 | Equity=${equity:,.0f}")
 
     # ── 核心仓: QQQ ──
-    target_qqq_value = equity * V28_CORE_PCT
+    target_qqq_value = equity * V28_CORE_PCT * scale
     qqq_price = signals.get("QQQ", {}).get("price", 0)
 
     if qqq_price > 0:
@@ -163,7 +166,7 @@ def _v28_qqq_core_alpha(account, signals, regime, spy_trend):
                     logger.warning(f"⚠️ v28 QQQ减持被拒绝: {sell_qty}股 @${qqq_price:.2f}")
 
     # ── Alpha 仓: 动量股 ──
-    target_alpha_value = equity * (1 - V28_CORE_PCT)
+    target_alpha_value = equity * (1 - V28_CORE_PCT) * scale
     per_stock_value = target_alpha_value / V28_ALPHA_COUNT
 
     # 计算动量分 (v28i: 行业动量 — 1日变动 + 距20日高点距离)

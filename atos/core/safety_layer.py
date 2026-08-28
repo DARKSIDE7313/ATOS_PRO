@@ -49,6 +49,15 @@ logger = _std_logging.getLogger(__name__)
 BASE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SAFETY_STATE_FILE = os.path.join(BASE, "data", "safety_state.json")
 
+# P1-6: 回撤阈值单一真源 (config_shared.RISK)，带缺省兜底防止配置缺失时崩溃
+try:
+    from atos.config_shared import RISK as _RISK
+except Exception:
+    _RISK = {}
+_DRAWDOWN_LIQUIDATE = _RISK.get("drawdown_liquidate_pct", 0.15)     # 回撤>15% 清仓
+_DRAWDOWN_REDUCE = _RISK.get("max_drawdown_pct", 0.12)              # 回撤>12% 减仓50%
+_DRAWDOWN_LIGHT = _RISK.get("drawdown_reduce_light_pct", 0.07)      # 回撤>7% 减仓30%
+
 
 def _load_safety_state():
     """加载风控状态"""
@@ -90,23 +99,23 @@ def check_portfolio_risk(equity, peak_equity, positions, cash):
     state = _load_safety_state()
 
     # 熔断器: 回撤 > 15%
-    if drawdown > 0.15:
+    if drawdown > _DRAWDOWN_LIQUIDATE:
         if not state.get('circuit_breaker_triggered'):
             state['circuit_breaker_triggered'] = True
             state['circuit_breaker_date'] = datetime.datetime.now().isoformat()
             _save_safety_state(state)
-            logger.critical(f"🚨 熔断器触发! 回撤={drawdown:.1%} > 15%")
-        return 'LIQUIDATE', f'回撤{drawdown:.1%}>15% 清仓', 0.0
+            logger.critical(f"🚨 熔断器触发! 回撤={drawdown:.1%} > {_DRAWDOWN_LIQUIDATE:.0%}")
+        return 'LIQUIDATE', f'回撤{drawdown:.1%}>{_DRAWDOWN_LIQUIDATE:.0%} 清仓', 0.0
 
     # 减仓: 回撤 > 12%
-    if drawdown > 0.12:
-        logger.warning(f"⚠️ 回撤={drawdown:.1%} > 12% → 减仓50%")
-        return 'REDUCE', f'回撤{drawdown:.1%}>12% 减仓', 0.5
+    if drawdown > _DRAWDOWN_REDUCE:
+        logger.warning(f"⚠️ 回撤={drawdown:.1%} > {_DRAWDOWN_REDUCE:.0%} → 减仓50%")
+        return 'REDUCE', f'回撤{drawdown:.1%}>{_DRAWDOWN_REDUCE:.0%} 减仓', 0.5
 
     # 减仓: 回撤 > 7%
-    if drawdown > 0.07:
-        logger.warning(f"⚠️ 回撤={drawdown:.1%} > 7% → 减仓30%")
-        return 'REDUCE', f'回撤{drawdown:.1%}>7% 减仓', 0.7
+    if drawdown > _DRAWDOWN_LIGHT:
+        logger.warning(f"⚠️ 回撤={drawdown:.1%} > {_DRAWDOWN_LIGHT:.0%} → 减仓30%")
+        return 'REDUCE', f'回撤{drawdown:.1%}>{_DRAWDOWN_LIGHT:.0%} 减仓', 0.7
 
     return 'NORMAL', '', 1.0
 

@@ -197,6 +197,7 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
     is_market_hours = market_ok  # 仅在交易时段开新仓
 
     # ---- v28: 多层安全检查 ----
+    safety_exposure = 1.0  # P0-3: 安全层减仓系数默认值（异常/未触发减仓时为 1.0）
     try:
         from atos.core.safety_layer import full_safety_check
         _vix = None
@@ -229,6 +230,7 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
             logger.warning(f"🛑 安全层暂停: {_safety['reasons']}")
             is_market_hours = False  # 禁止开新仓
         elif _safety['exposure'] < 1.0:
+            safety_exposure = _safety['exposure']  # P0-3: 记录减仓系数，供下方合并
             logger.warning(f"⚠️ 安全层减仓: {_safety['reasons']} exposure={_safety['exposure']:.0%}")
     except Exception as e:
         logger.debug(f"安全层检查跳过: {e}")
@@ -277,6 +279,9 @@ def run_shadow_cycle(account: ShadowAccount, cycle: int = 0):
     except Exception as e:
         logger.warning(f"宏观门控失败: {e}")
         gate_exposure = 1.0
+
+    # P0-3: 合并安全层与宏观门控敞口系数（取 min），存入 account 供 v28 策略读取
+    account._risk_exposure_scale = min(safety_exposure, gate_exposure)
 
     # ---- 2. 信号 ----
     use_realtime = getattr(account, '_use_realtime', True)
@@ -426,7 +431,7 @@ def _finalize_cycle(account, cycle, regime, current_vix, signals, top_picks,
                 f"DD={current_dd:.2%} | Peak=${account.peak_equity:,.0f}")
 
     # ── v17: 统一绩效追踪 — 每20周期汇报 ──
-    update_perf_tracker(current_eq, cycle_ret, cycle)
+    update_perf_tracker(current_eq, cycle_ret, cycle, account)
 
     # 记录每日收益
     record_daily_returns(current_eq, account)

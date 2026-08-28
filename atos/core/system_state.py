@@ -165,6 +165,16 @@ class SystemStateMachine:
                 self._reason = d.get('reason', 'restored')
             except Exception:
                 self._state = SystemState.PAPER
+        # P1-5: 一致性校验 — 状态非 KILL_SWITCH 但 reason 残留 kill 标记、
+        # 且 KILL_SWITCH 文件已不存在时，清理误导性 reason。
+        if self._state != SystemState.KILL_SWITCH and \
+           ("KILL_SWITCH" in (self._reason or "").upper() or "kill" in (self._reason or "").lower()):
+            try:
+                from atos.core.kill_switch import KILL_FILE
+                if not os.path.exists(KILL_FILE):
+                    self._reason = "manual reset (stale kill reason cleared on load)"
+            except Exception:
+                pass
 
     def _log_event(self, severity: str, code: str, message: str,
                    before: SystemState, after: SystemState):

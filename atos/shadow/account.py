@@ -383,10 +383,10 @@ class ShadowAccount:
             # 记录风控
             record_fill(pnl, self.total_equity)
 
-            # 保存到 trade_stats 供 Kelly 学习
+            # 保存到 trade_stats 供 Kelly 学习 (P1-1: 同时传美元 PnL，修复百分比口径失真)
             try:
                 from atos.live.kelly import save_trade
-                result = save_trade(pnl_pct)
+                result = save_trade(pnl_pct, pnl_usd=pnl, weight=shares * fill / self.total_equity if self.total_equity > 0 else None)
                 logger.info(f"[Kelly] 交易记录: {symbol} PnL={pnl_pct:.2%} total_trades={result.get('total_trades',0)} WR={result.get('win_rate',0):.1%}")
             except Exception as e:
                 logger.warning(f"[Kelly] save_trade failed: {e}")

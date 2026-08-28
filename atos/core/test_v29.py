@@ -9,8 +9,23 @@ ATOS Institutional v2 — Integration Test Matrix
 import os
 import sys
 import json
+import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+# ── P1-4: 单测环境隔离 ──
+# 重定向所有风控状态文件到临时目录，杜绝测试污染生产 data/ 下的
+# system_state.json / risk_events.jsonl / KILL_SWITCH / risk_decisions.jsonl。
+import atos.core.system_state as _ss
+import atos.core.kill_switch as _ks
+import atos.core.risk_gate as _rg
+
+_TEST_TMP = tempfile.mkdtemp(prefix="atos_test_v29_")
+_ss.STATE_FILE = os.path.join(_TEST_TMP, "system_state.json")
+_ss.EVENTS_FILE = os.path.join(_TEST_TMP, "risk_events.jsonl")
+_ks.KILL_FILE = os.path.join(_TEST_TMP, "KILL_SWITCH")
+if hasattr(_rg, "DECISIONS_FILE"):
+    _rg.DECISIONS_FILE = os.path.join(_TEST_TMP, "risk_decisions.jsonl")
 
 from atos.core.system_state import SystemStateMachine, SystemState
 from atos.core.risk_gate import get_gate, OrderIntent, PreTradeRiskGate

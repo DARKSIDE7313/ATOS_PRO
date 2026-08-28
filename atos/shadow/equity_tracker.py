@@ -63,8 +63,13 @@ def record_cycle_equity(account, current_eq: float, cycle_ret: float) -> None:
     account.peak_equity = max(account.peak_equity, current_eq)
 
 
-def update_perf_tracker(current_eq: float, cycle_ret: float, cycle: int) -> None:
-    """v17: 统一绩效追踪 — 每20周期汇报"""
+def update_perf_tracker(current_eq: float, cycle_ret: float, cycle: int, account=None) -> None:
+    """v17: 统一绩效追踪 — 每20周期汇报
+
+    account 用于把真实交易统计注入绩效追踪器: 否则 total_trades/win_rate/profit_factor
+    恒为 0 (add_trade 从未被调用), 且内部 peak_equity 因 500 点窗口截断丢失早期峰值
+    导致 max_drawdown 被低估。account 为 None 时退化为纯权益追踪 (向后兼容)。
+    """
     state = CycleState.get()
     try:
         from atos.core.performance import get_tracker, init_tracker
@@ -74,6 +79,9 @@ def update_perf_tracker(current_eq: float, cycle_ret: float, cycle: int) -> None
             state.perf_inited = True
         perf = get_tracker()
         perf.update(current_eq, cycle_ret)
+        if account is not None:
+            perf.sync_trades(getattr(account, "trade_history", None))
+            perf.sync_peak(getattr(account, "peak_equity", 0.0))
         if cycle % 20 == 0:
             m = perf.get_metrics()
             logger.info(f"📊 绩效#{cycle}: Sharpe={m.get('sharpe',0):.2f} Sortino={m.get('sortino',0):.2f} "
