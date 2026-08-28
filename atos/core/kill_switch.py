@@ -6,7 +6,7 @@ ATOS Institutional v2 — Kill Switch
 
 自动触发条件:
 - 日内亏损 > 阈值 (默认 -2.5%, 真源 config_shared.RISK)
-- 回撤 > 12% (真源 config_shared.RISK)
+- 回撤 > 15% (真源 config_shared.RISK.drawdown_liquidate_pct, 与 safety_layer 清仓线对齐)
 - 重复订单异常
 - 对账失败
 
@@ -29,7 +29,7 @@ KILL_FILE = os.path.join(BASE, 'data', 'KILL_SWITCH')
 
 # 自动触发阈值 — C1: 统一从 config_shared.RISK 真源读取 (消除 kill_switch 硬编码双账本)
 DAILY_LOSS_LIMIT = -RISK["max_daily_loss_pct"]   # 日内亏损 -2.5% → kill (真源: config_shared)
-DRAWDOWN_LIMIT = RISK["max_drawdown_pct"]        # 回撤 > 10% → kill (真源: config_shared)
+DRAWDOWN_LIMIT = RISK["drawdown_liquidate_pct"]  # 回撤 > 15% → kill (真源: config_shared, 与 safety_layer 清仓线对齐)
 
 
 class KillSwitch:

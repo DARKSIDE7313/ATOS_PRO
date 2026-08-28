@@ -5,6 +5,8 @@ Dashboard 可读取 data/daily_returns/ 获取历史收益曲线。
 """
 import os, json, datetime
 
+from atos.core.market_clock import get_market_date
+
 BASE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DAILY_DIR = os.path.join(BASE, "data", "daily_returns")
 os.makedirs(DAILY_DIR, exist_ok=True)
@@ -14,7 +16,7 @@ _last_equity = None
 def record_daily(equity: float, trades_today: int = 0, positions: int = 0):
     """每次周期结束时调用，自动记录当天收益"""
     global _last_equity
-    today = datetime.date.today().isoformat()
+    today = get_market_date().isoformat()
     filepath = os.path.join(DAILY_DIR, f"{today}.json")
 
     # 加载今天的记录

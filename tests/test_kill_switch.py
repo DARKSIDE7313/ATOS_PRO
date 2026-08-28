@@ -2,7 +2,7 @@
 
 覆盖:
   - check(): 日亏触发（阈值从 config_shared.RISK 读取，-2.5%）
-  - 回撤触发（10%）
+  - 回撤触发（15%）
   - 人工文件触发（data/KILL_SWITCH）
   - 日界翻转后基准权益复位
   - 日中断重启后首周期不误清当日累计
@@ -85,8 +85,8 @@ class TestKillSwitchCheck(KillSwitchBase):
     def test_drawdown_triggers(self, mock_exists, mock_date):
         self.ks.check(self._acct(300000, 300000))  # 基准 300000
         self.ks.check(self._acct(350000, 350000))  # 新高，不触发
-        # dd = (350000-310000)/350000 = 11.4% >= 10%，日亏 +3.3% 不触发日亏分支
-        self.assertTrue(self.ks.check(self._acct(310000, 350000)))
+        # dd = (350000-295000)/350000 = 15.71% >= 15%，日亏 -1.67% 不触发日亏分支
+        self.assertTrue(self.ks.check(self._acct(295000, 350000)))
         self.assertEqual(self.ks.sm.state, SystemState.KILL_SWITCH)
 
     @patch("atos.core.kill_switch.get_market_date", return_value=datetime.date(2026, 8, 25))
@@ -124,7 +124,7 @@ class TestKillSwitchDayReset(KillSwitchBase):
         with patch("atos.core.kill_switch.os.path.exists", return_value=False), \
              patch("atos.core.kill_switch.get_market_date",
                    return_value=datetime.date(2026, 8, 25)):
-            acct = self._acct(292000, 300000)  # dd 2.67% < 10%
+            acct = self._acct(292000, 300000)  # dd 2.67% < 15%
             self.assertFalse(self.ks.check(acct))
             self.assertEqual(self.ks.get_day_start_equity(), 292000)
 
