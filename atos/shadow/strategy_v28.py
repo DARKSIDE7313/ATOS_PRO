@@ -35,6 +35,7 @@ V28_REBALANCE_DAYS = 63   # 每季度再平衡
 V28_STOP_LOSS = _RISK.get("stop_loss_pct", 0.05)  # 个股硬止损 — 真源 config_shared.RISK.stop_loss_pct
 V28_TRAILING_STOP = 0.08  # 个股移动止损 8% (策略参数, 用户拍板项)
 V28_QQQ_TRAILING = 0.12   # QQQ 移动止损 12% (策略参数, 用户拍板项)
+V28_QQQ_HARD_STOP = 0.10  # QQQ 硬止损 10% 兜底 (策略参数, 用户拍板项) — 封死未武装期无限扛跌
 
 
 def is_v28_position(sym: str) -> bool:
@@ -77,8 +78,10 @@ def v28_check_exits(account, signals) -> None:
         sell_reason = None
 
         if sym == V28_CORE_SYMBOL:
-            # QQQ: 移动止损 12%
-            if peak > avg_price * 1.05:
+            # QQQ: 硬止损 10% 兜底 + 移动止损 12%
+            if pnl_pct <= -V28_QQQ_HARD_STOP:
+                sell_reason = f"QQQ硬止损{pnl_pct:.1%}"
+            elif peak > avg_price * 1.05:
                 ts_drop = (peak - price) / peak
                 if ts_drop >= V28_QQQ_TRAILING:
                     sell_reason = f"QQQ移动止损{ts_drop:.1%}"
@@ -86,11 +89,14 @@ def v28_check_exits(account, signals) -> None:
             # 个股: 止损 5%
             if pnl_pct <= -V28_STOP_LOSS:
                 sell_reason = f"止损{pnl_pct:.1%}"
-            # 移动止损 8%
-            elif peak > avg_price * 1.03:
+            # 移动止损 8% (arming 阈值提至 +5%)
+            elif peak > avg_price * 1.05:
                 ts_drop = (peak - price) / peak
                 if ts_drop >= V28_TRAILING_STOP:
                     sell_reason = f"移动止损{ts_drop:.1%}"
+            # 保本止损: 曾到 +3% 后回落到成本附近, 小赢不转亏
+            elif peak > avg_price * 1.03 and pnl_pct <= 0.001:
+                sell_reason = f"保本止损{pnl_pct:.1%}"
 
         if sell_reason:
             account.execute(sym, "SELL", qty, price, reason=sell_reason)

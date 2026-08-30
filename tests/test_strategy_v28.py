@@ -15,6 +15,7 @@ from atos.shadow.strategy_v28 import (
     V28_ALPHA_UNIVERSE,
     V28_CORE_PCT,
     V28_CORE_SYMBOL,
+    V28_QQQ_HARD_STOP,
     V28_QQQ_TRAILING,
     V28_REBALANCE_DAYS,
     V28_STOP_LOSS,
@@ -89,6 +90,47 @@ class TestV28CheckExits(unittest.TestCase):
         self.assertEqual(len(acct.executed), 1)
         self.assertIn("移动止损", acct.executed[0]["reason"])
 
+    def test_qqq_hard_stop_triggers(self):
+        # QQQ 未武装 (峰值未超 +5%) 且亏损 -11% <= -10% → 硬止损兜底卖出
+        acct = _FakeAccount(self._qqq_pos(avg=100.0, last=89.0, peak=100.0))
+        v28_check_exits(acct, {"QQQ": {"price": 89.0}})
+        self.assertEqual(len(acct.executed), 1)
+        self.assertEqual(acct.executed[0]["sym"], "QQQ")
+        self.assertIn("硬止损", acct.executed[0]["reason"])
+
+    def test_qqq_hard_stop_below_threshold_no_trigger(self):
+        # QQQ 未武装且亏损 -8% (未达 -10%) → 无任何卖出
+        acct = _FakeAccount(self._qqq_pos(avg=100.0, last=92.0, peak=100.0))
+        v28_check_exits(acct, {"QQQ": {"price": 92.0}})
+        self.assertEqual(len(acct.executed), 0)
+
+    def test_individual_breakeven_stop_triggers(self):
+        # 个股曾到 +4% (峰值104>103) 回落到成本 → 保本止损卖出 (小赢不转亏)
+        positions = {"NVDA": {"qty": 5, "avg_price": 100.0, "last_price": 100.0,
+                              "peak_price": 104.0}}
+        acct = _FakeAccount(positions)
+        v28_check_exits(acct, {"NVDA": {"price": 100.0}})
+        self.assertEqual(len(acct.executed), 1)
+        self.assertIn("保本止损", acct.executed[0]["reason"])
+
+    def test_individual_breakeven_stop_not_triggered_in_profit(self):
+        # 个股仍浮盈 +0.5% (未回落至成本) → 保本止损不触发
+        positions = {"NVDA": {"qty": 5, "avg_price": 100.0, "last_price": 100.5,
+                              "peak_price": 104.0}}
+        acct = _FakeAccount(positions)
+        v28_check_exits(acct, {"NVDA": {"price": 100.5}})
+        self.assertEqual(len(acct.executed), 0)
+
+    def test_individual_arming_threshold_raised(self):
+        # 峰值 +4% (原阈值1.03 已够, 新阈值1.05 不够) → 移动止损不触发
+        positions = {"NVDA": {"qty": 5, "avg_price": 100.0, "last_price": 96.0,
+                              "peak_price": 104.0}}
+        acct = _FakeAccount(positions)
+        v28_check_exits(acct, {"NVDA": {"price": 96.0}})
+        # 移动止损不触发 (peak<105)；保本止损会触发 (peak>103 且 pnl<=0.1%)
+        self.assertEqual(len(acct.executed), 1)
+        self.assertIn("保本止损", acct.executed[0]["reason"])
+
     def test_no_signals_no_action(self):
         # 价格不可得 (signals 缺价且持仓无 last) → 跳过
         positions = {"NVDA": {"qty": 5, "avg_price": 100.0}}
@@ -140,6 +182,10 @@ class TestV28StopParams(unittest.TestCase):
     def test_qqq_trailing_stop_param(self):
         self.assertEqual(V28_QQQ_TRAILING, 0.12)     # QQQ 移动止损 12%
         self.assertGreater(V28_QQQ_TRAILING, V28_TRAILING_STOP)
+
+    def test_qqq_hard_stop_param(self):
+        self.assertEqual(V28_QQQ_HARD_STOP, 0.10)    # QQQ 硬止损 10% 兜底
+        self.assertGreater(V28_QQQ_HARD_STOP, V28_STOP_LOSS)
 
     def test_core_allocation_params(self):
         self.assertEqual(V28_CORE_SYMBOL, "QQQ")
