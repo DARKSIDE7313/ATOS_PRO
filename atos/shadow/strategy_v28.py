@@ -32,12 +32,12 @@ V28_ALPHA_UNIVERSE = [
 V28_CORE_SYMBOL = "QQQ"  # v28 核心 ETF 标的 (单一真源, risk_gate/risk_manager 引用)
 V28_CORE_PCT = 0.60      # QQQ 核心仓位比例
 V28_ALPHA_COUNT = 7       # alpha 个股数量 (v29: 5→7)
-V28_REBALANCE_DAYS = 63   # 每季度再平衡
-V28_STOP_LOSS = 0.08  # 个股硬止损 8% (hermes 网格寻优1152组合 top1, 5%→8% 放宽让赢家奔跑; 原真源 config_shared.RISK.stop_loss_pct=0.05 仅v28覆盖)
-V28_TRAILING_STOP = 0.08  # 个股移动止损 8% (策略参数, hermes 寻优确认保持)
-V28_QQQ_TRAILING = 0.10   # QQQ 移动止损 10% (hermes 寻优: 12%→10% 收紧锁定收益)
-V28_QQQ_HARD_STOP = 0.12  # QQQ 硬止损 12% 兜底 (hermes 寻优: 10%→12% 与移动止损对齐, 封死未武装期无限扛跌)
-V28_ARM = 0.03            # 移动止损 arming 阈值 +3% (hermes 寻优: 5%→3% 更早武装锁定)
+V28_REBALANCE_DAYS = 63   # 再平衡周期: 63 交易日 (F2: 原63日历日≈44交易日, 改为交易日口径, 见 _trading_days_since)
+V28_STOP_LOSS = 0.10  # 个股硬止损 10% (F2: hermes 系统级寻优 — 8%和10%相当,10%少whipsaw, 移除移动止损后硬止损兜底)
+V28_TRAILING_STOP = 0.08  # 个股移动止损 (F2: 已停用 — 高波动动量股纯whipsaw, -6pp/年, 见 SYSTEM_OPT_REPORT 结论3)
+V28_QQQ_TRAILING = 0.10   # QQQ 移动止损 (F2: 已停用 — 指数回调必反弹, 移动止损只锁损)
+V28_QQQ_HARD_STOP = 0.25  # QQQ 硬止损 25% 兜底 (F2: 从12%放宽 — 指数级-25%才触发, 仅防极端黑天鹅, 12%日常回调会误杀)
+V28_ARM = 0.03            # 移动止损 arming 阈值 (F2: 已停用, 保留常量防引用断裂)
 
 
 def is_v28_position(sym: str) -> bool:
@@ -80,37 +80,53 @@ def v28_check_exits(account, signals) -> None:
         sell_reason = None
 
         if sym == V28_CORE_SYMBOL:
-            # QQQ: 硬止损 12% 兜底 + 移动止损 10% (armed +3%)
+            # QQQ: 硬止损 25% 兜底 (F2: 移除移动止损/12%硬止损 — 指数回调必反弹, 25%仅防极端黑天鹅)
             if pnl_pct <= -V28_QQQ_HARD_STOP:
                 sell_reason = f"QQQ硬止损{pnl_pct:.1%}"
-            elif peak > avg_price * (1 + V28_ARM):
-                ts_drop = (peak - price) / peak
-                if ts_drop >= V28_QQQ_TRAILING:
-                    sell_reason = f"QQQ移动止损{ts_drop:.1%}"
         else:
-            # 个股: 硬止损 8%
+            # 个股: 硬止损 10% (F2: 移除移动止损 whipsaw — 高波动动量股涨3%武装→回调8%卖→反弹, 纯损耗)
             if pnl_pct <= -V28_STOP_LOSS:
                 sell_reason = f"止损{pnl_pct:.1%}"
-            # 移动止损 8% (arming 阈值 +3%, hermes 寻优: 关保本止损, 让赢家奔跑)
-            elif peak > avg_price * (1 + V28_ARM):
-                ts_drop = (peak - price) / peak
-                if ts_drop >= V28_TRAILING_STOP:
-                    sell_reason = f"移动止损{ts_drop:.1%}"
 
         if sell_reason:
             account.execute(sym, "SELL", qty, price, reason=sell_reason)
             logger.info(f"🔴 v28卖出 {sym}: {sell_reason} PnL={pnl_pct:.1%}")
 
 
-def _v28_qqq_core_alpha(account, signals, regime, spy_trend):
-    """v29 策略: QQQ 核心 + 动量个股 alpha (优化: 7只 + 动量权重0.6)
+def _trading_days_since(last_rebal):
+    """计算自上次再平衡以来经历的美股交易日数（剔除周末与 2026 假日）。
 
-    规则:
-    1. 60% 资金买 QQQ（始终持有，不择时）
+    F2 (SYSTEM_OPT_REPORT 改动4/P4): 再平衡 63 日历日 → 63 交易日。
+    63 日历日≈44 交易日，等价于把再平衡从最优 63d 偷偷提到 42d 档，
+    少赚约 1.7pp/年。此函数用 market_clock 的交易日口径重算。
+    """
+    if last_rebal is None:
+        return 999
+    try:
+        from atos.core import market_clock
+    except Exception:
+        return (datetime.datetime.now() - last_rebal).days
+    now = datetime.datetime.now()
+    trading_days = 0
+    d = last_rebal.date()
+    while d < now.date():
+        d += datetime.timedelta(days=1)
+        if d.weekday() >= 5:
+            continue
+        if d in market_clock.US_HOLIDAYS_2026:
+            continue
+        trading_days += 1
+    return trading_days
+
+
+def _v28_qqq_core_alpha(account, signals, regime, spy_trend):
+    """v29 策略: QQQ 核心 + 动量个股 alpha (F2 优化: 7只 + 动量权重0.6)
+
+    F2 规则 (hermes 系统级寻优, SYSTEM_OPT_REPORT):
+    1. 60% 资金买 QQQ（始终持有，不择时）— 无 QQQ 硬止损(25% 极端兜底)/移动止损
     2. 40% 资金买 7 只最强动量股 (21日动量 + 距20日高点)
-    3. 每季度再平衡
-    4. 个股止损 5%, 移动止损 8%
-    5. QQQ 移动止损 12%
+    3. 63 交易日再平衡 (原63日历日≈44交易日, 改交易日口径 +1.7pp)
+    4. 个股硬止损 10% (原8%), 移动止损已移除 (whipsaw -6pp)
     """
     # P0-3: 读取风险敞口缩放系数（安全层×宏观门控合并值），clamp 到 [0,1]
     scale = max(0.0, min(1.0, getattr(account, '_risk_exposure_scale', 1.0)))
@@ -121,10 +137,10 @@ def _v28_qqq_core_alpha(account, signals, regime, spy_trend):
     # ── 卖出检查 (提取自 v28_check_exits, 盘中照常执行) ──
     v28_check_exits(account, signals)
 
-    # ── 再平衡检查 ──
+    # ── 再平衡检查 (F2: 63 日历日 → 63 交易日) ──
     last_rebal = getattr(account, '_v28_last_rebalance', None)
     now = datetime.datetime.now()
-    days_since = (now - last_rebal).days if last_rebal else 999
+    days_since = _trading_days_since(last_rebal)
 
     # v28c: 如果 QQQ 配比远低于目标，每天都再平衡直到到位
     qqq_pos = account.positions.get("QQQ", {})

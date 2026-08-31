@@ -35,9 +35,9 @@ MAX_POSITIONS = {
 # === 风控全局阈值 ===
 RISK = {
     "max_daily_loss_pct":   0.025,  # 日亏损2.5%熔断
-    "max_drawdown_pct":     0.12,   # 最大回撤12% (恢复旧行为, 用户拍板 2026-08-25 Phase7 C2)
-    "drawdown_liquidate_pct": 0.15, # 回撤15%熔断清仓 (safety_layer 从配置读取)
-    "drawdown_reduce_light_pct": 0.07, # 回撤7%轻减仓档 (safety_layer 从配置读取)
+    "max_drawdown_pct":     0.20,   # F2: 0.12→0.20 — 关闭12%减仓档, 保留深危停开仓保护 (SYSTEM_OPT_REPORT 改动1)
+    "drawdown_liquidate_pct": 0.25, # F2: 0.15→0.25 — 深危才清仓兜底 (原15%日常深度回调会误杀 QQQ 级组合)
+    "drawdown_reduce_light_pct": 0.25, # F2: 0.07→0.25 — 等同关闭7%轻减仓档 (回撤减仓是-24pp/年元凶)
     "max_consecutive_losses": 3,    # 连续3次亏损降频
     "stop_loss_pct":        0.05,   # 硬止损5% (v16: 从6%收紧)
     "take_profit_pct":      0.18,   # 止盈18% (让赢家奔跑)
@@ -47,9 +47,10 @@ RISK = {
 # P2: 回撤风险阶梯 (单源化) — daily_session Layer1 从这里读取, 消除 0.03/0.06/0.09/0.12 硬编码。
 # 每档: dd < threshold 命中该档风险乘数; 最后一档 threshold 绑定 max_drawdown_pct,
 # dd >= max_drawdown_pct 时判定 kill (乘数 0, 触发 sm.kill) —— 保留旧行为。
+# F2: 前两档 multiplier 提为 1.00 (0.03/0.06 档不再减仓), 只保留深危 0.20 档兜底。
 RISK["drawdown_tiers"] = [
     {"threshold": 0.03,                     "tier": "normal",    "multiplier": 1.00},
-    {"threshold": 0.06,                     "tier": "caution",   "multiplier": 0.70},
+    {"threshold": 0.06,                     "tier": "caution",   "multiplier": 1.00},
     {"threshold": 0.09,                     "tier": "defensive", "multiplier": 0.40},
     {"threshold": RISK["max_drawdown_pct"], "tier": "critical",  "multiplier": 0.15},
 ]

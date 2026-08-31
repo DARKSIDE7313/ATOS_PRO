@@ -54,9 +54,10 @@ try:
     from atos.config_shared import RISK as _RISK
 except Exception:
     _RISK = {}
-_DRAWDOWN_LIQUIDATE = _RISK.get("drawdown_liquidate_pct", 0.15)     # 回撤>15% 清仓
-_DRAWDOWN_REDUCE = _RISK.get("max_drawdown_pct", 0.12)              # 回撤>12% 减仓50%
-_DRAWDOWN_LIGHT = _RISK.get("drawdown_reduce_light_pct", 0.07)      # 回撤>7% 减仓30%
+# F2: 阈值从 15/12/7 → 25% 单一深危档 (移除 7%/12% 减仓, 见 check_portfolio_risk docstring)
+_DRAWDOWN_LIQUIDATE = _RISK.get("drawdown_liquidate_pct", 0.25)     # 回撤>25% 深危清仓兜底
+_DRAWDOWN_REDUCE = _RISK.get("max_drawdown_pct", 0.12)              # (F2 停用 12% 减仓档)
+_DRAWDOWN_LIGHT = _RISK.get("drawdown_reduce_light_pct", 0.07)      # (F2 停用 7% 减仓档)
 
 
 def _load_safety_state():
@@ -91,6 +92,13 @@ def check_portfolio_risk(equity, peak_equity, positions, cash):
     Returns: (action, reason, position_scale)
       action: 'NORMAL' | 'REDUCE' | 'HALT' | 'LIQUIDATE'
       position_scale: 0.0-1.0 仓位缩放系数
+
+    F2 (hermes 系统级寻优, SYSTEM_OPT_REPORT 结论1/2):
+      - 移除 7%/12% 两档回撤减仓 (回撤减仓是 -24pp/年元凶: peak_equity 高水位
+        永不重置, COVID-2020 触发清仓后永久躺现金, 卖在最低点+永不抄底)
+      - 仅保留 25% 深危清仓兜底 (极端黑天鹅)
+      - 修复"永久清仓"bug: 清仓后若 equity 重新 > peak*0.85, 重置 peak_equity,
+        打破"回撤冻结→永不恢复"的死锁 (现金不涨, peak 冻结, 回撤恒>阈值)
     """
     if peak_equity <= 0:
         return 'NORMAL', '', 1.0
@@ -98,7 +106,7 @@ def check_portfolio_risk(equity, peak_equity, positions, cash):
     drawdown = (peak_equity - equity) / peak_equity
     state = _load_safety_state()
 
-    # 熔断器: 回撤 > 15%
+    # 熔断器: 回撤 > 25% (F2: 从15%放宽 — 15%日常深度回调会误杀 QQQ 级组合)
     if drawdown > _DRAWDOWN_LIQUIDATE:
         if not state.get('circuit_breaker_triggered'):
             state['circuit_breaker_triggered'] = True
@@ -107,15 +115,12 @@ def check_portfolio_risk(equity, peak_equity, positions, cash):
             logger.critical(f"🚨 熔断器触发! 回撤={drawdown:.1%} > {_DRAWDOWN_LIQUIDATE:.0%}")
         return 'LIQUIDATE', f'回撤{drawdown:.1%}>{_DRAWDOWN_LIQUIDATE:.0%} 清仓', 0.0
 
-    # 减仓: 回撤 > 12%
-    if drawdown > _DRAWDOWN_REDUCE:
-        logger.warning(f"⚠️ 回撤={drawdown:.1%} > {_DRAWDOWN_REDUCE:.0%} → 减仓50%")
-        return 'REDUCE', f'回撤{drawdown:.1%}>{_DRAWDOWN_REDUCE:.0%} 减仓', 0.5
-
-    # 减仓: 回撤 > 7%
-    if drawdown > _DRAWDOWN_LIGHT:
-        logger.warning(f"⚠️ 回撤={drawdown:.1%} > {_DRAWDOWN_LIGHT:.0%} → 减仓30%")
-        return 'REDUCE', f'回撤{drawdown:.1%}>{_DRAWDOWN_LIGHT:.0%} 减仓', 0.7
+    # F2: 永久清仓死锁修复 — 曾触发熔断但权益已恢复 → 重置高水位, 允许重新入场
+    if state.get('circuit_breaker_triggered') and equity > peak_equity * 0.85:
+        state['circuit_breaker_triggered'] = False
+        state['circuit_breaker_date'] = None
+        _save_safety_state(state)
+        logger.info(f"🔄 熔断恢复: equity=${equity:,.0f} 重新回到 peak*0.85 以上, 重置高水位")
 
     return 'NORMAL', '', 1.0
 
@@ -157,10 +162,9 @@ def check_market_risk(vix_level=None, spy_above_ma50=True, news_panic_count=0):
             exposure = 0.7
             logger.warning(f"⚠️ VIX={vix_level:.0f} > 25 → 减仓30%")
 
-    # SPY 趋势
-    if not spy_above_ma50:
-        exposure = min(exposure, 0.5)
-        logger.warning(f"⚠️ SPY < MA50 → 减仓至50%")
+    # F2 (改动5): SPY<MA50 减仓已移除 — SPY<MA50 是常态回调, 同属 P2 价格类减仓,
+    # 会砍掉买入持策略收益 (SYSTEM_OPT_REPORT 结论2: 价格类减仓是结构错配)。
+    # 仅保留 VIX>35 深危清仓兜底。
 
     # 新闻恐慌
     if news_panic_count >= 3:
