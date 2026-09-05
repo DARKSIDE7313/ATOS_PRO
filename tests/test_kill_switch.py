@@ -1,8 +1,8 @@
 """KillSwitch 单元测试 — atos/core/kill_switch.py
 
 覆盖:
-  - check(): 日亏触发（阈值从 config_shared.RISK 读取，-2.5%）
-  - 回撤触发（15%）
+  - check(): 日亏触发（阈值从 config_shared.RISK 读取，-2.5%→F3-2 为 -3%）
+  - 回撤触发（F2 起 drawdown_liquidate_pct=25%）
   - 人工文件触发（data/KILL_SWITCH）
   - 日界翻转后基准权益复位
   - 日中断重启后首周期不误清当日累计
@@ -65,12 +65,12 @@ class TestKillSwitchCheck(KillSwitchBase):
     @patch("atos.core.kill_switch.get_market_date", return_value=datetime.date(2026, 8, 25))
     @patch("atos.core.kill_switch.os.path.exists", return_value=False)
     def test_daily_loss_triggers_at_threshold(self, mock_exists, mock_date):
-        # 阈值来自 config_shared.RISK 真源
+        # 阈值来自 config_shared.RISK 真源 (F3-2: -2.5% → -3%)
         expected_limit = -RISK["max_daily_loss_pct"]
-        self.assertAlmostEqual(expected_limit, -0.025, places=6)
+        self.assertAlmostEqual(expected_limit, -0.03, places=6)
         self.ks.check(self._acct(300000, 300000))  # 首周期锁定基准 300000
-        # 恰好 -2.5% → 触发
-        self.assertTrue(self.ks.check(self._acct(292500, 300000)))
+        # 恰好 -3% → 触发
+        self.assertTrue(self.ks.check(self._acct(291000, 300000)))
         self.assertEqual(self.ks.sm.state, SystemState.KILL_SWITCH)
         self.assertIn("daily loss", self.ks.sm._reason)
 
@@ -84,9 +84,9 @@ class TestKillSwitchCheck(KillSwitchBase):
     @patch("atos.core.kill_switch.os.path.exists", return_value=False)
     def test_drawdown_triggers(self, mock_exists, mock_date):
         self.ks.check(self._acct(300000, 300000))  # 基准 300000
-        self.ks.check(self._acct(350000, 350000))  # 新高，不触发
-        # dd = (350000-295000)/350000 = 15.71% >= 15%，日亏 -1.67% 不触发日亏分支
-        self.assertTrue(self.ks.check(self._acct(295000, 350000)))
+        self.ks.check(self._acct(400000, 400000))  # 新高，不触发
+        # dd = (400000-299000)/400000 = 25.25% >= 25% (F2 drawdown_liquidate_pct)，日亏 -0.33% 不触发日亏分支
+        self.assertTrue(self.ks.check(self._acct(299000, 400000)))
         self.assertEqual(self.ks.sm.state, SystemState.KILL_SWITCH)
 
     @patch("atos.core.kill_switch.get_market_date", return_value=datetime.date(2026, 8, 25))

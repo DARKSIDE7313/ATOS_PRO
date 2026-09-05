@@ -34,7 +34,7 @@ MAX_POSITIONS = {
 
 # === 风控全局阈值 ===
 RISK = {
-    "max_daily_loss_pct":   0.025,  # 日亏损2.5%熔断
+    "max_daily_loss_pct":   0.03,   # F3-2: 日亏损2.5%→3.0%熔断 (对齐 kill_switch 单源; -2.5% 易误触发躺现金, 见 SYSTEM_OPT_REPORT_F3 4.5)
     "max_drawdown_pct":     0.20,   # F2: 0.12→0.20 — 关闭12%减仓档, 保留深危停开仓保护 (SYSTEM_OPT_REPORT 改动1)
     "drawdown_liquidate_pct": 0.25, # F2: 0.15→0.25 — 深危才清仓兜底 (原15%日常深度回调会误杀 QQQ 级组合)
     "drawdown_reduce_light_pct": 0.25, # F2: 0.07→0.25 — 等同关闭7%轻减仓档 (回撤减仓是-24pp/年元凶)
@@ -43,6 +43,10 @@ RISK = {
     "take_profit_pct":      0.18,   # 止盈18% (让赢家奔跑)
     "cooldown_cycles":      24,     # 冷却周期 (v9: 从48→24)
 }
+
+# F2/F3 注释: stop_loss_pct/take_profit_pct 为 phoenix 旧策略残留字段,
+# v30 已统一 v28 单一策略, 实盘止损由 strategy_v28.V28_STOP_LOSS(10%) 决定。
+# drawdown_liquidate_pct/drawdown_reduce_light_pct 已按 F2 放至 0.25 等同停用。
 
 # P2: 回撤风险阶梯 (单源化) — daily_session Layer1 从这里读取, 消除 0.03/0.06/0.09/0.12 硬编码。
 # 每档: dd < threshold 命中该档风险乘数; 最后一档 threshold 绑定 max_drawdown_pct,

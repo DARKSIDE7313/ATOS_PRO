@@ -5,8 +5,8 @@ ATOS Institutional v2 — Kill Switch
 规格书 §3/§10.3: 自动与人工 kill switch，独立于策略逻辑。
 
 自动触发条件:
-- 日内亏损 > 阈值 (默认 -2.5%, 真源 config_shared.RISK)
-- 回撤 > 15% (真源 config_shared.RISK.drawdown_liquidate_pct, 与 safety_layer 清仓线对齐)
+- 日内亏损 > 阈值 (默认 -3%, 真源 config_shared.RISK)  # F3-2: 2.5%→3%
+- 回撤 > 25% (真源 config_shared.RISK.drawdown_liquidate_pct, F2 已放宽; 与 safety_layer 清仓线对齐)
 - 重复订单异常
 - 对账失败
 

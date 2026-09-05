@@ -18,7 +18,7 @@ from atos.core.fee_model import futu_buy_fee, futu_sell_fee
 
 POOL = ['NVDA','AAPL','MSFT','GOOGL','META','AMZN','AVGO','AMD','CRM','NFLX','PLTR','MU','TSLA']
 ALL = ['QQQ','SPY'] + POOL
-INITIAL = 300000.0
+INITIAL = 1000000.0  # F3-1: $300K → $1M, 对齐实盘初始资金 (config_shared TOTAL_CAPITAL)
 
 # Phase 5: import 不再触发回测 — 数据准备/网格搜索收进函数, 仅 __main__ 执行
 data = {}
@@ -64,6 +64,27 @@ def run(core_pct, alpha_pct, cash_pct, n_stocks, rebalance, mom_lb, w_mom):
                         for s, (q, _) in positions.items()
                         if s in data and date in data[s].index)
         curve.append(pv)
+
+        # F3-1: 每日硬止损检查 (对齐 F2 生产 V28_STOP_LOSS=0.10 / V28_QQQ_HARD_STOP=0.25)
+        # 信号: 当日收盘 pnl <= -limit → 次日开盘卖出 (T+1, 无未来函数)
+        for sym in list(positions.keys()):
+            if sym not in data or date not in data[sym].index:
+                continue
+            qty, avg = positions[sym]
+            if avg <= 0:
+                continue
+            close_px = float(data[sym].loc[date, 'Close'])
+            pnl_pct = (close_px - avg) / avg
+            limit = 0.25 if sym == 'QQQ' else 0.10
+            if pnl_pct <= -limit:
+                p = _next_open(data[sym], dates, i)
+                if p is None:
+                    continue
+                fee = futu_sell_fee(qty, p)
+                cash += qty * p - fee
+                total_fees += fee; trades += 1
+                del positions[sym]
+
         if i % rebalance != 0:
             continue
 
@@ -206,9 +227,14 @@ def main():
 
     out = {'timestamp': str(pd.Timestamp.now()), 'spy_annual': round(spy_ann, 2),
            'results': results, 'n_configs': len(configs)}
-    with open(os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'backtest_v7_result.json'), 'w') as f:
+    base_path = os.path.join(os.path.dirname(__file__), '..', '..', 'data')
+    with open(os.path.join(base_path, 'backtest_v7_result.json'), 'w') as f:
         json.dump(out, f, indent=2, default=str)
-    print(f"\nSaved data/backtest_v7_result.json ({len(configs)} configs, {time.time()-t0:.0f}s total)")
+    # F3-1: 真实化后的新基准文件 ($1M + 每日硬止损, 非裸网格)
+    with open(os.path.join(base_path, 'backtest_v7_result_f3.json'), 'w') as f:
+        json.dump(out, f, indent=2, default=str)
+    print(f"\nSaved data/backtest_v7_result.json + backtest_v7_result_f3.json "
+          f"({len(configs)} configs, {time.time()-t0:.0f}s total)")
 
 
 if __name__ == '__main__':
