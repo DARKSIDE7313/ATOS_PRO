@@ -20,7 +20,7 @@ UNIVERSE_FULL: dict[str, list[str]] = {
     # 工业/能源
     "industrial":  ["CAT", "BA", "GE", "HON", "UPS", "XOM", "CVX"],
     # 防御/ETF
-    "defensive":   ["SPY", "QQQ", "IWM", "TLT", "GLD", "SLV", "USO"],
+    "defensive":   ["SPY", "QQQ", "IWM", "TLT", "GLD", "SLV", "USO", "XLP", "XLV", "XLF"],
     # 高波动/AI题材（进攻型新增）— NVDA 已存在于 tech_mega，此组不再重复
     "high_beta":   ["MARA", "PLTR", "SOFI", "RKLB", "ASTS", "TSLL", "IONQ", "SMCI"],
     # 扩展

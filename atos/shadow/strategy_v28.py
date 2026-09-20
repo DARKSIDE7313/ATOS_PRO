@@ -7,6 +7,15 @@ ATOS PRO — v29 QQQ Core + Alpha 策略模块 (Phase 5 框架重塑)
   参数经 hermes 网格寻优(1152组合) top1: 年化20.93% vs 默认14.8%, PF 2.91。
   回测v7: 年化30.7% vs SPY 15.2%。
 
+F4 算法优化 (2026-09, backtest_v31 三轮网格验证, 见 data/backtest_v31{,b,c}_result.json):
+  ① alpha 宇宙 13→20: 加入 7 只低相关防御性标的 (XLP/XLV/XLF/COST/JNJ/WMT/UNH)。
+     分散化动量 (Moskowitz/AQR) — 胜率 54.9%→62.1% (+7.2pp), PF 2.93→3.38,
+     年化代价 ~3.8pp (仍 24.5% >> SPY 15%)。
+  ② QQQ 趋势去险叠加: QQQ 跌破 MA200 时整体敞口 ×0.80 (留 20% 现金),
+     回撤 -31.6%→-27.5%, 年化代价 ~1.2pp。仅去险不加杠杆, 不择时抄底。
+  最终回测: 年化 23.3%, 回撤 -27.5%, 胜率 62.1%, PF 3.38, Sharpe 1.12。
+
+
 架构修复 (报告 §7.3.1): "策略隔离" 原本靠散落 6+ 处循环的
 ``if sym in ("QQQ",) or sym in V28_ALPHA_UNIVERSE: continue`` if-flag
 (Pattern 87/90/96/97 反复证明"漏一个循环就杀持仓")。
@@ -26,18 +35,27 @@ logger = get_logger("shadow_trader")
 # 回测v7: 60% QQQ + 40% 动量股(7只), 年化30.7%, 跑赢SPY 15.6%
 # ============================================================
 V28_ALPHA_UNIVERSE = [
+    # 科技/成长动量核心 (v28 原始 13 只)
     "NVDA", "AAPL", "MSFT", "GOOGL", "META", "AMZN", "AVGO", "AMD",
     "CRM", "NFLX", "PLTR", "MU", "TSLA",
+    # F4 分散化: 7 只低相关防御性标的 (必需/公用/金融) —
+    # 动量选股从单一科技扩展为全市场动量, 降低组合相关性。
+    # 回测: 胜率 54.9%→62.1%, PF 2.93→3.38, 回撤 -36.1%→-31.6%。
+    "XLP", "XLV", "XLF", "COST", "JNJ", "WMT", "UNH",
 ]
 V28_CORE_SYMBOL = "QQQ"  # v28 核心 ETF 标的 (单一真源, risk_gate/risk_manager 引用)
 V28_CORE_PCT = 0.60      # QQQ 核心仓位比例
 V28_ALPHA_COUNT = 7       # alpha 个股数量 (v29: 5→7)
 V28_REBALANCE_DAYS = 63   # 再平衡周期: 63 交易日 (F2: 原63日历日≈44交易日, 改为交易日口径, 见 _trading_days_since)
-V28_STOP_LOSS = 0.10  # 个股硬止损 10% (F2: hermes 系统级寻优 — 8%和10%相当,10%少whipsaw, 移除移动止损后硬止损兜底)
+V28_STOP_LOSS = 0.12  # 个股硬止损 12% (F3: 网格回测 10%→12% 年化+0.58pp, maxDD+1.5pp, 用户确认切换)
 V28_TRAILING_STOP = 0.08  # 个股移动止损 (F2: 已停用 — 高波动动量股纯whipsaw, -6pp/年, 见 SYSTEM_OPT_REPORT 结论3)
 V28_QQQ_TRAILING = 0.10   # QQQ 移动止损 (F2: 已停用 — 指数回调必反弹, 移动止损只锁损)
 V28_QQQ_HARD_STOP = 0.25  # QQQ 硬止损 25% 兜底 (F2: 从12%放宽 — 指数级-25%才触发, 仅防极端黑天鹅, 12%日常回调会误杀)
 V28_ARM = 0.03            # 移动止损 arming 阈值 (F2: 已停用, 保留常量防引用断裂)
+# F4 趋势去险: QQQ 跌破 MA200 时整体敞口缩放 (仅降险, 不择时抄底)。
+# 回测: 回撤 -31.6%→-27.5%, 年化代价 ~1.2pp。1.0 = 关闭去险。
+V28_TREND_DERISK_SCALE = 0.80
+V28_TREND_MA = 200        # 趋势判定均线周期 (需 signals[QQQ]["ma200"])
 
 
 def is_v28_position(sym: str) -> bool:
@@ -119,6 +137,19 @@ def _trading_days_since(last_rebal):
     return trading_days
 
 
+def _trend_derisk_scale(signals) -> float:
+    """F4: QQQ 趋势去险系数 — QQQ 跌破 MA200 返回 V28_TREND_DERISK_SCALE, 否则 1.0。
+
+    仅降险 (减少部署/增加现金), 不做抄底或加杠杆。signals 缺价/缺 MA 时安全返回 1.0。
+    """
+    q = signals.get(V28_CORE_SYMBOL, {}) or {}
+    price = q.get("price", 0) or 0
+    ma = q.get("ma200", 0) or 0
+    if price > 0 and ma > 0 and price < ma:
+        return V28_TREND_DERISK_SCALE
+    return 1.0
+
+
 def _v28_qqq_core_alpha(account, signals, regime, spy_trend):
     """v29 策略: QQQ 核心 + 动量个股 alpha (F2 优化: 7只 + 动量权重0.6)
 
@@ -130,6 +161,12 @@ def _v28_qqq_core_alpha(account, signals, regime, spy_trend):
     """
     # P0-3: 读取风险敞口缩放系数（安全层×宏观门控合并值），clamp 到 [0,1]
     scale = max(0.0, min(1.0, getattr(account, '_risk_exposure_scale', 1.0)))
+
+    # F4: QQQ 趋势去险叠加 — QQQ 跌破 MA200 时整体敞口 ×0.80 (降险/增现金)
+    _tds = _trend_derisk_scale(signals)
+    if _tds < 1.0:
+        scale *= _tds
+        logger.info(f"🛡️ v28趋势去险: QQQ 跌破 MA{V28_TREND_MA} → 敞口×{_tds:.2f}")
 
     equity = account.total_equity
     cash = account.cash

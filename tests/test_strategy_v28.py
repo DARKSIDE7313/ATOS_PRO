@@ -20,6 +20,9 @@ from atos.shadow.strategy_v28 import (
     V28_REBALANCE_DAYS,
     V28_STOP_LOSS,
     V28_TRAILING_STOP,
+    V28_TREND_DERISK_SCALE,
+    _trend_derisk_scale,
+    _v28_qqq_core_alpha,
     is_v28_position,
     v28_check_exits,
 )
@@ -72,7 +75,7 @@ class TestV28CheckExits(unittest.TestCase):
         self.assertEqual(len(acct.executed), 0)
 
     def test_individual_stop_loss_triggers(self):
-        # alpha 个股: 亏损 -12% <= -10% (F2 V28_STOP_LOSS) → 卖出
+        # alpha 个股: 亏损 -12% <= -12% (F3 V28_STOP_LOSS) → 卖出
         positions = {"NVDA": {"qty": 5, "avg_price": 100.0, "last_price": 88.0}}
         acct = _FakeAccount(positions)
         v28_check_exits(acct, {"NVDA": {"price": 88.0}})
@@ -170,7 +173,7 @@ class TestV28StopParams(unittest.TestCase):
     """止损参数存在性 — 主循环依赖这些常量 (F2: 移动/保本止损已移除)"""
 
     def test_individual_stop_loss_params(self):
-        self.assertEqual(V28_STOP_LOSS, 0.10)        # F2: 个股硬止损 10%
+        self.assertEqual(V28_STOP_LOSS, 0.12)        # F3: 个股硬止损 12% (网格寻优落地)
         self.assertEqual(V28_TRAILING_STOP, 0.08)    # F2: 已停用 (保留常量防引用断裂)
 
     def test_qqq_trailing_stop_param(self):
@@ -190,6 +193,110 @@ class TestV28StopParams(unittest.TestCase):
 
     def test_alpha_universe_has_enough_candidates(self):
         self.assertGreaterEqual(len(V28_ALPHA_UNIVERSE), V28_ALPHA_COUNT)
+
+    def test_alpha_universe_no_duplicates(self):
+        self.assertEqual(len(V28_ALPHA_UNIVERSE), len(set(V28_ALPHA_UNIVERSE)))
+
+    def test_alpha_universe_includes_defensives(self):
+        # F4: 分散化宇宙 — 必需/医药/金融 等低相关防御标的必须入池
+        for sym in ("XLP", "XLV", "XLF", "COST", "JNJ", "WMT", "UNH"):
+            self.assertIn(sym, V28_ALPHA_UNIVERSE)
+
+
+class TestTrendDeriskScale(unittest.TestCase):
+    """F4: QQQ 趋势去险系数 — QQQ < MA200 时降险, 否则满仓。"""
+
+    def test_below_ma200_derisks(self):
+        sig = {"QQQ": {"price": 400.0, "ma200": 450.0}}
+        self.assertEqual(_trend_derisk_scale(sig), V28_TREND_DERISK_SCALE)
+        self.assertLess(V28_TREND_DERISK_SCALE, 1.0)
+
+    def test_above_ma200_full_exposure(self):
+        sig = {"QQQ": {"price": 460.0, "ma200": 450.0}}
+        self.assertEqual(_trend_derisk_scale(sig), 1.0)
+
+    def test_equal_to_ma200_full_exposure(self):
+        sig = {"QQQ": {"price": 450.0, "ma200": 450.0}}
+        self.assertEqual(_trend_derisk_scale(sig), 1.0)
+
+    def test_missing_data_full_exposure(self):
+        self.assertEqual(_trend_derisk_scale({}), 1.0)
+        self.assertEqual(_trend_derisk_scale({"QQQ": {}}), 1.0)
+        self.assertEqual(_trend_derisk_scale({"QQQ": {"price": 0, "ma200": 450.0}}), 1.0)
+        self.assertEqual(_trend_derisk_scale({"QQQ": {"price": 400.0, "ma200": 0}}), 1.0)
+
+    def test_defensive_symbols_are_v28_isolated(self):
+        # 新增防御标的也须被 is_v28_position 判定为 v28 (旧卖出规则隔离)
+        for sym in ("XLP", "XLV", "XLF", "COST", "JNJ", "WMT", "UNH"):
+            self.assertTrue(is_v28_position(sym))
+
+
+class _StubAccount:
+    """集成替身 — 供 _v28_qqq_core_alpha 端到端运行。"""
+
+    def __init__(self, equity=1_000_000.0):
+        self.total_equity = equity
+        self.cash = equity
+        self.positions = {}
+        self.executed = []
+        self._risk_exposure_scale = 1.0
+        self._v28_last_rebalance = None
+
+    def execute(self, sym, side, qty, price, reason):
+        self.executed.append({"sym": sym, "side": side, "qty": qty,
+                              "price": price, "reason": reason})
+        if side == "BUY":
+            p = self.positions.setdefault(sym, {"qty": 0, "avg_price": price,
+                                                "last_price": price})
+            p["qty"] += qty
+            self.cash -= qty * price
+        return True
+
+
+class TestCoreAlphaTrendDeriskIntegration(unittest.TestCase):
+    """F4: 趋势去险必须真实作用到 QQQ 下单量 (敞口×0.8)。"""
+
+    @staticmethod
+    def _signals(qqq_price, qqq_ma200):
+        sig = {"QQQ": {"price": qqq_price, "ma200": qqq_ma200, "ma50": qqq_price * 0.9,
+                       "rsi": 55, "mom_21": 3.0, "dist_20d_high": -1.0}}
+        for s in V28_ALPHA_UNIVERSE:
+            sig[s] = {"price": 100.0, "ma50": 90.0, "rsi": 55,
+                      "mom_21": 10.0, "dist_20d_high": -0.5}
+        return sig
+
+    def test_below_ma200_reduces_qqq_order(self):
+        acct = _StubAccount()
+        # QQQ 380 < MA200 400 → 去险 0.8 → 目标 = 1e6*0.60*0.8 = 480k / 380
+        _v28_qqq_core_alpha(acct, self._signals(380.0, 400.0), "BULL", "BULL")
+        qqq_buy = [e for e in acct.executed if e["sym"] == "QQQ" and e["side"] == "BUY"]
+        self.assertEqual(len(qqq_buy), 1)
+        expected = int(1_000_000 * 0.60 * 0.80 / 380.0)
+        self.assertEqual(qqq_buy[0]["qty"], expected)
+        self.assertLess(expected, int(1_000_000 * 0.60 / 380.0))
+
+    def test_above_ma200_full_exposure(self):
+        acct = _StubAccount()
+        _v28_qqq_core_alpha(acct, self._signals(420.0, 400.0), "BULL", "BULL")
+        qqq_buy = [e for e in acct.executed if e["sym"] == "QQQ" and e["side"] == "BUY"]
+        self.assertEqual(len(qqq_buy), 1)
+        expected = int(1_000_000 * 0.60 / 420.0)
+        self.assertEqual(qqq_buy[0]["qty"], expected)
+
+    def test_new_defensive_universe_is_tradeable(self):
+        # 防御标的动量更高时应进入 top7 并被买入 (证明宇宙扩展真实生效)
+        defensive = {"XLP", "XLV", "XLF", "COST", "JNJ", "WMT", "UNH"}
+        acct = _StubAccount()
+        sig = {"QQQ": {"price": 420.0, "ma200": 400.0, "ma50": 400.0, "rsi": 55,
+                       "mom_21": 1.0, "dist_20d_high": -2.0}}
+        for s in V28_ALPHA_UNIVERSE:
+            sig[s] = {"price": 100.0, "ma50": 90.0, "rsi": 55,
+                      "mom_21": (30.0 if s in defensive else 1.0),
+                      "dist_20d_high": -1.0}
+        _v28_qqq_core_alpha(acct, sig, "BULL", "BULL")
+        bought = {e["sym"] for e in acct.executed if e["side"] == "BUY"}
+        self.assertTrue(bought & defensive,
+                        f"防御标的应可被买入, 实际买入: {bought}")
 
 
 if __name__ == "__main__":
